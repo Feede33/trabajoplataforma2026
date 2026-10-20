@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   User,
@@ -10,23 +10,36 @@ import {
   FileText,
   Upload,
   CheckCircle2,
-  AlertCircle,
   ArrowLeft,
-  Download
+  Download,
+  Lock,
+  ArrowRight
 } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
 
 export default function CandidatoPerfilPage() {
-  const { profile, updateProfile } = useAuth()
+  const { profile, updateProfile, isLoading } = useAuth()
 
-  const [nombre, setNombre] = useState(profile?.nombre || '')
-  const [email, setEmail] = useState(profile?.email || '')
-  const [bio, setBio] = useState(profile?.bio || '')
-  const [ubicacion, setUbicacion] = useState(profile?.ubicacion || '')
-  const [website, setWebsite] = useState(profile?.website || '')
-  const [cvName, setCvName] = useState(profile?.cv_url ? 'CV_Actual.pdf' : '')
+  const [nombre, setNombre] = useState('')
+  const [email, setEmail] = useState('')
+  const [bio, setBio] = useState('')
+  const [ubicacion, setUbicacion] = useState('')
+  const [website, setWebsite] = useState('')
+  const [cvName, setCvName] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+
+  // Sync state as soon as profile is loaded
+  useEffect(() => {
+    if (profile) {
+      setNombre(profile.nombre || '')
+      setEmail(profile.email || '')
+      setBio(profile.bio || '')
+      setUbicacion(profile.ubicacion || '')
+      setWebsite(profile.website || '')
+      setCvName(profile.cv_url ? 'CV_Actual.pdf' : '')
+    }
+  }, [profile])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -55,6 +68,46 @@ export default function CandidatoPerfilPage() {
     setSaving(false)
   }
 
+  if (isLoading) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16 space-y-4">
+        <div className="h-6 w-36 bg-slate-200 rounded animate-pulse" />
+        <div className="h-80 bg-slate-200 rounded-3xl animate-pulse" />
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Iniciá sesión para ver tu perfil</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Necesitás estar conectado para editar tus datos personales y administrar tu currículum.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/auth/login"
+            className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Iniciar Sesión</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/auth/registro?tipo=candidato"
+            className="w-full py-3 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors"
+          >
+            Crear Cuenta de Candidato
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
       <Link
@@ -66,22 +119,27 @@ export default function CandidatoPerfilPage() {
       </Link>
 
       <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
-            Tu Cuenta
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+              Perfil Conectado
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+              Mi Perfil y Currículum Vitae
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Conectado como <span className="font-semibold text-slate-800">{profile.email}</span>
+            </p>
+          </div>
+          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize">
+            {profile.role}
           </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
-            Mi Perfil y Currículum Vitae
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Mantené tus datos actualizados para que las empresas puedan contactarte rápidamente
-          </p>
         </div>
 
         {savedSuccess && (
           <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>¡Tu perfil y CV fueron actualizados correctamente!</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>¡Tu perfil y CV fueron actualizados correctamente en Supabase!</span>
           </div>
         )}
 

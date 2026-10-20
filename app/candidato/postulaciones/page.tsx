@@ -6,10 +6,10 @@ import {
   Briefcase,
   ExternalLink,
   Clock,
-  CheckCircle2,
-  AlertCircle,
   ArrowLeft,
-  Search
+  Search,
+  Lock,
+  ArrowRight
 } from 'lucide-react'
 import { fetchApplicationsForCandidate } from '@/lib/data'
 import { ApplicationWithDetails, ApplicationEstado } from '@/lib/supabase/database.types'
@@ -18,19 +18,27 @@ import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
 
 export default function CandidatoPostulacionesPage() {
-  const { profile } = useAuth()
+  const { profile, isLoading } = useAuth()
   const [applications, setApplications] = useState<ApplicationWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingApps, setLoadingApps] = useState(true)
   const [filter, setFilter] = useState<string>('todas')
 
   useEffect(() => {
     async function load() {
-      const data = await fetchApplicationsForCandidate(profile?.id || 'cand-1')
+      if (!profile) {
+        setLoadingApps(false)
+        return
+      }
+      setLoadingApps(true)
+      const data = await fetchApplicationsForCandidate(profile.id)
       setApplications(data)
-      setLoading(false)
+      setLoadingApps(false)
     }
-    load()
-  }, [profile?.id])
+
+    if (!isLoading) {
+      load()
+    }
+  }, [profile?.id, isLoading])
 
   const filtered = applications.filter((app) => {
     if (filter === 'todas') return true
@@ -43,7 +51,7 @@ export default function CandidatoPostulacionesPage() {
       visto: { variant: 'primary', label: 'CV Visto por la Empresa' },
       entrevista: { variant: 'success', label: 'Convocado a Entrevista' },
       rechazado: { variant: 'danger', label: 'Proceso Finalizado' },
-    }[estado] as { variant: any; label: string }
+    }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }
 
     return <Badge variant={map.variant} size="sm">{map.label}</Badge>
   }
@@ -51,16 +59,56 @@ export default function CandidatoPostulacionesPage() {
   const getStatusDescription = (estado: ApplicationEstado) => {
     switch (estado) {
       case 'pendiente':
-        return 'Tu CV fue entregado correctamente y está esperando ser abierto por los reclutadores.'
+        return 'Tu postulación fue enviada correctamente y está esperando ser revisada por el reclutador.'
       case 'visto':
         return 'La empresa ya abrió y revisó tu perfil y currículum vitae.'
       case 'entrevista':
-        return '¡Excelente noticia! La empresa seleccionó tu perfil para avanzar en la etapa de entrevistas. Te contactarán por email o teléfono.'
+        return '¡Excelente! La empresa seleccionó tu perfil para coordinar una entrevista.'
       case 'rechazado':
-        return 'La empresa optó por otros perfiles para esta posición específica en esta oportunidad.'
+        return 'La empresa optó por otros perfiles para esta vacante.'
       default:
         return ''
     }
+  }
+
+  if (isLoading || loadingApps) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-16 space-y-4">
+        <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
+        <div className="h-48 bg-slate-200 rounded-3xl animate-pulse" />
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Iniciá sesión para ver tus postulaciones</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Necesitás identificarte para consultar el estado de los empleos a los que te postulaste.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/auth/login"
+            className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Iniciar Sesión</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/auth/registro?tipo=candidato"
+            className="w-full py-3 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors"
+          >
+            Crear Cuenta de Candidato
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -76,13 +124,13 @@ export default function CandidatoPostulacionesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
-            Seguimiento
+            Seguimiento de Empleos
           </span>
           <h1 className="text-3xl font-extrabold text-slate-900 mt-1">
-            Mis Postulaciones Laborales
+            Mis Postulaciones
           </h1>
           <p className="text-sm text-slate-500">
-            Revisá el estado y avance de todas tus aplicaciones
+            Postulaciones registradas con tu cuenta <span className="font-semibold text-slate-700">{profile.email}</span>
           </p>
         </div>
 
@@ -104,15 +152,13 @@ export default function CandidatoPostulacionesPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="py-16 text-center text-slate-400">Cargando postulaciones...</div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4">
           <Briefcase className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="text-lg font-bold text-slate-800">No encontramos postulaciones</h3>
+          <h3 className="text-lg font-bold text-slate-800">No encontramos postulaciones activas</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {filter === 'todas'
-              ? 'Todavía no aplicaste a ninguna vacante. Explorá las oportunidades disponibles y postulate hoy.'
+              ? 'Todavía no aplicaste a ninguna vacante. Explorá los empleos abiertos y postulate con tu perfil.'
               : `No tenés postulaciones en estado "${filter}".`}
           </p>
           <Link
@@ -120,7 +166,7 @@ export default function CandidatoPostulacionesPage() {
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-200 transition-colors"
           >
             <Search className="w-3.5 h-3.5" />
-            <span>Explorar Empleos</span>
+            <span>Explorar Empleos Disponibles</span>
           </Link>
         </div>
       ) : (

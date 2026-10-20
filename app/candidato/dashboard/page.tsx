@@ -7,10 +7,9 @@ import {
   FileText,
   User,
   CheckCircle2,
-  Clock,
   ArrowRight,
-  Sparkles,
-  ExternalLink
+  ExternalLink,
+  Lock
 } from 'lucide-react'
 import { fetchApplicationsForCandidate, fetchJobs } from '@/lib/data'
 import { ApplicationWithDetails, JobWithEmpresa } from '@/lib/supabase/database.types'
@@ -20,25 +19,77 @@ import { formatRelativeTime } from '@/lib/utils'
 import { JobCard } from '@/components/jobs/JobCard'
 
 export default function CandidatoDashboard() {
-  const { profile } = useAuth()
+  const { profile, isLoading } = useAuth()
   const [applications, setApplications] = useState<ApplicationWithDetails[]>([])
   const [recommendedJobs, setRecommendedJobs] = useState<JobWithEmpresa[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
     async function load() {
+      if (!profile) {
+        setLoadingData(false)
+        return
+      }
+      setLoadingData(true)
       const [apps, jobs] = await Promise.all([
-        fetchApplicationsForCandidate(profile?.id || 'cand-1'),
+        fetchApplicationsForCandidate(profile.id),
         fetchJobs(),
       ])
       setApplications(apps)
       setRecommendedJobs(jobs.slice(0, 3))
-      setLoading(false)
+      setLoadingData(false)
     }
-    load()
-  }, [profile?.id])
+
+    if (!isLoading) {
+      load()
+    }
+  }, [profile?.id, isLoading])
 
   const entrevistas = applications.filter((a) => a.estado === 'entrevista').length
+
+  if (isLoading || loadingData) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
+          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
+          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Iniciá sesión para ver tu panel</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Identificate con tu cuenta de candidato para gestionar tus postulaciones y ver recomendaciones.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/auth/login"
+            className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Iniciar Sesión</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/auth/registro?tipo=candidato"
+            className="w-full py-3 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors"
+          >
+            Crear Cuenta de Candidato
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,7 +100,7 @@ export default function CandidatoDashboard() {
             Panel de Candidato
           </span>
           <h1 className="text-3xl font-extrabold text-slate-900 mt-1">
-            Hola, {profile?.nombre || 'Candidato'} 👋
+            Hola, {profile?.nombre || profile?.email?.split('@')[0]} 👋
           </h1>
           <p className="text-sm text-slate-500">
             Hacé seguimiento de tus postulaciones y descubrí nuevas vacantes
@@ -126,9 +177,7 @@ export default function CandidatoDashboard() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="py-8 text-center text-slate-400">Cargando postulaciones...</div>
-        ) : applications.length === 0 ? (
+        {applications.length === 0 ? (
           <div className="py-8 text-center space-y-3">
             <p className="text-sm text-slate-500">Todavía no te postulaste a ningún empleo.</p>
             <Link

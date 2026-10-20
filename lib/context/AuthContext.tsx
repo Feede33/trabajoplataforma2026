@@ -27,6 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isConfigured = isSupabaseConfigured()
 
   useEffect(() => {
+    let authListener: { unsubscribe: () => void } | null = null
+
     async function initAuth() {
       if (isConfigured) {
         try {
@@ -42,10 +44,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (userProfile) {
               setProfile(userProfile)
-              setIsLoading(false)
-              return
+            } else {
+              setProfile({
+                id: session.user.id,
+                role: (session.user.user_metadata?.role as UserRole) || 'candidato',
+                nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || '',
+                email: session.user.email || '',
+                avatar_url: null,
+                bio: null,
+                ubicacion: null,
+                cv_url: null,
+                website: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
             }
           }
+
+          // Listen to live auth changes (login, signup, logout)
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session?.user) {
+              const { data: userProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single()
+
+              if (userProfile) {
+                setProfile(userProfile)
+              } else {
+                setProfile({
+                  id: session.user.id,
+                  role: (session.user.user_metadata?.role as UserRole) || 'candidato',
+                  nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || '',
+                  email: session.user.email || '',
+                  avatar_url: null,
+                  bio: null,
+                  ubicacion: null,
+                  cv_url: null,
+                  website: null,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+              }
+            } else if (event === 'SIGNED_OUT') {
+              setProfile(null)
+            }
+          })
+          authListener = subscription
         } catch (e) {
           console.warn('Error reading Supabase session:', e)
         }
@@ -62,6 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     initAuth()
+
+    return () => {
+      authListener?.unsubscribe()
+    }
   }, [isConfigured])
 
   const loginDemo = (targetRole: UserRole) => {
@@ -82,8 +132,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
           if (p) {
             setProfile(p)
-            return { success: true }
+          } else {
+            setProfile({
+              id: data.user.id,
+              role: (data.user.user_metadata?.role as UserRole) || 'candidato',
+              nombre: data.user.user_metadata?.nombre || data.user.email?.split('@')[0] || '',
+              email: data.user.email || '',
+              avatar_url: null,
+              bio: null,
+              ubicacion: null,
+              cv_url: null,
+              website: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
           }
+          return { success: true }
         }
       } catch (err: any) {
         return { success: false, error: err.message || 'Error al iniciar sesión' }
