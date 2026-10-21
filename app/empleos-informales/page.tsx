@@ -370,57 +370,75 @@ export default function EmpleosInformalesPage() {
 
                     {/* Address if to show in person */}
                     {job.direccion && (
-                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 font-medium">
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 font-medium min-w-0">
                         <Navigation className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>Tratar personalmente en: <strong>{job.direccion}</strong></span>
+                        <span className="truncate">Tratar personalmente en: <strong>{job.direccion}</strong></span>
                       </div>
                     )}
 
                     {/* Indications if present */}
                     {job.contacto_indicaciones && !job.direccion && (
-                      <p className="text-[11px] text-slate-500 italic flex items-center gap-1">
-                        ℹ️ <span>{job.contacto_indicaciones}</span>
+                      <p className="text-[11px] text-slate-500 italic flex items-center gap-1 truncate">
+                        ℹ️ <span className="truncate">{job.contacto_indicaciones}</span>
                       </p>
                     )}
                   </div>
 
-                  {/* Adaptable Direct Contact Action Buttons */}
-                  <div className="pt-2 flex flex-col sm:flex-row flex-wrap gap-2">
-                    {/* Canal WhatsApp */}
-                    {waLink && waNumber && (
-                      <a
-                        href={waLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all text-center"
-                      >
-                        <MessageCircle className="w-4 h-4 fill-white" />
-                        <span>WhatsApp ({waNumber})</span>
-                      </a>
-                    )}
+                  {/* Adaptable Direct Contact Action Buttons with controlled width and truncation */}
+                  {(() => {
+                    const showWhatsApp = !!(waLink && waNumber)
+                    const showEmail = !!job.email
+                    const showPhone = !!(job.telefono && (!waNumber || job.telefono !== waNumber))
+                    const totalButtons = (showWhatsApp ? 1 : 0) + (showEmail ? 1 : 0) + (showPhone ? 1 : 0)
 
-                    {/* Canal Email */}
-                    {job.email && (
-                      <a
-                        href={`mailto:${job.email}?subject=Postulaci%C3%B3n%20para%20${encodeURIComponent(job.titulo)}`}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all text-center"
+                    return (
+                      <div
+                        className={`pt-2 grid gap-2 w-full ${
+                          totalButtons > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
+                        }`}
                       >
-                        <Mail className="w-4 h-4" />
-                        <span>Enviar CV ({job.email})</span>
-                      </a>
-                    )}
+                        {/* Canal WhatsApp */}
+                        {showWhatsApp && (
+                          <a
+                            href={waLink!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Contactar por WhatsApp a ${waNumber}`}
+                            className="w-full min-w-0 h-10 flex items-center justify-center gap-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all"
+                          >
+                            <MessageCircle className="w-4 h-4 fill-white shrink-0" />
+                            <span className="truncate">WhatsApp ({waNumber})</span>
+                          </a>
+                        )}
 
-                    {/* Canal Teléfono / Llamada (Si no hay WhatsApp o si es número adicional) */}
-                    {job.telefono && (!waNumber || job.telefono !== waNumber) && (
-                      <a
-                        href={`tel:${job.telefono}`}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors"
-                      >
-                        <Phone className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Llamar ({job.telefono})</span>
-                      </a>
-                    )}
-                  </div>
+                        {/* Canal Email */}
+                        {showEmail && (
+                          <a
+                            href={`mailto:${job.email}?subject=Postulaci%C3%B3n%20para%20${encodeURIComponent(job.titulo)}`}
+                            title={`Enviar CV a ${job.email}`}
+                            className="w-full min-w-0 h-10 flex items-center justify-center gap-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all"
+                          >
+                            <Mail className="w-4 h-4 shrink-0" />
+                            <span className="truncate">Enviar CV ({job.email})</span>
+                          </a>
+                        )}
+
+                        {/* Canal Teléfono */}
+                        {showPhone && (
+                          <a
+                            href={`tel:${job.telefono}`}
+                            title={`Llamar a ${job.telefono}`}
+                            className={`w-full min-w-0 h-10 flex items-center justify-center gap-1.5 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors ${
+                              totalButtons === 3 ? 'sm:col-span-2' : ''
+                            }`}
+                          >
+                            <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                            <span className="truncate">Llamar ({job.telefono})</span>
+                          </a>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )
             })}
