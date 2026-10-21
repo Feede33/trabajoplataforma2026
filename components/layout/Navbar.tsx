@@ -48,12 +48,14 @@ export function Navbar() {
               </div>
             </Link>
 
-            {/* Supabase status badge */}
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-slate-200 bg-slate-50 text-slate-600">
-              <span className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-              <Database className="w-3 h-3 text-slate-500" />
-              <span>{isConfigured ? 'Supabase Conectado' : 'Modo Demo / Local'}</span>
-            </div>
+            {/* Backend status badge */}
+            {isConfigured && (
+              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-emerald-200 bg-emerald-50 text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Database className="w-3 h-3 text-emerald-600" />
+                <span>Supabase Conectado</span>
+              </div>
+            )}
           </div>
 
           {/* Desktop Navigation */}
@@ -268,12 +270,14 @@ export function Navbar() {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-5 pt-3 pb-6 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-slate-200 bg-slate-50 text-slate-600">
-              <span className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              <span>{isConfigured ? 'Supabase Activo' : 'Modo Demo'}</span>
+          {isConfigured && (
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-emerald-200 bg-emerald-50 text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>Backend Conectado</span>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-1">
             <Link

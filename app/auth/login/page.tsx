@@ -3,14 +3,14 @@
 import React, { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Briefcase, Building2, User, Lock, Mail, ArrowRight, AlertCircle, Sparkles } from 'lucide-react'
+import { Briefcase, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
 
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect')
-  const { login, loginDemo } = useAuth()
+  const { login } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,17 +38,6 @@ function LoginContent() {
     }
   }
 
-  const handleDemo = (role: 'empresa' | 'candidato') => {
-    loginDemo(role)
-    if (redirect) {
-      router.push(redirect)
-    } else if (role === 'empresa') {
-      router.push('/empresa/dashboard')
-    } else {
-      router.push('/candidato/dashboard')
-    }
-  }
-
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-8 shadow-xl space-y-6">
@@ -59,38 +48,12 @@ function LoginContent() {
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900">Iniciar Sesión</h1>
           <p className="text-xs text-slate-500">
-            Ingresá a tu cuenta para gestionar vacantes o ver tus postulaciones
+            Ingresá las credenciales de tu cuenta registrada en EmpleosYa
           </p>
-        </div>
-
-        {/* Demo Fast Login Pills */}
-        <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-            Acceso Rápido de Prueba (Demo)
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleDemo('empresa')}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 hover:text-indigo-600 font-semibold text-xs shadow-sm transition-all"
-            >
-              <Building2 className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Soy Empresa</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDemo('candidato')}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 hover:text-indigo-600 font-semibold text-xs shadow-sm transition-all"
-            >
-              <User className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Soy Candidato</span>
-            </button>
-          </div>
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+          <div className="flex items-center gap-2 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -137,7 +100,7 @@ function LoginContent() {
             disabled={isLoading}
             className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {isLoading ? <span>Iniciando...</span> : <span>Ingresar</span>}
+            {isLoading ? <span>Iniciando sesión...</span> : <span>Ingresar</span>}
           </button>
         </form>
 

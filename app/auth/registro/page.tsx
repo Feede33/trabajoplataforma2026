@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Briefcase, Building2, User, Lock, Mail, MapPin, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Briefcase, Building2, User, Lock, Mail, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
 import { UserRole } from '@/lib/supabase/database.types'
 
@@ -18,9 +18,9 @@ function RegistroContent() {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [ubicacion, setUbicacion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,7 +31,11 @@ function RegistroContent() {
     setIsLoading(false)
 
     if (res.success) {
-      if (redirect) {
+      if (res.requiresEmailConfirmation) {
+        setSuccessMessage(
+          res.message || '¡Cuenta registrada con éxito! Te enviamos un enlace de confirmación a tu correo electrónico para que actives tu cuenta antes de iniciar sesión.'
+        )
+      } else if (redirect) {
         router.push(redirect)
       } else if (role === 'empresa') {
         router.push('/empresa/dashboard')
@@ -39,8 +43,32 @@ function RegistroContent() {
         router.push('/candidato/dashboard')
       }
     } else {
-      setError(res.error || 'Ocurrió un error al crear la cuenta.')
+      setError(res.error || 'Ocurrió un error al crear la cuenta en el backend.')
     }
+  }
+
+  if (successMessage) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-8 shadow-xl text-center space-y-5">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-9 h-9" />
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-900">¡Cuenta Creada!</h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            {successMessage}
+          </p>
+          <div className="pt-2">
+            <Link
+              href={redirect ? `/auth/login?redirect=${encodeURIComponent(redirect)}` : '/auth/login'}
+              className="inline-block w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-colors"
+            >
+              Ir a Iniciar Sesión
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -87,7 +115,7 @@ function RegistroContent() {
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+          <div className="flex items-center gap-2 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -148,7 +176,7 @@ function RegistroContent() {
             disabled={isLoading}
             className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {isLoading ? <span>Registrando...</span> : <span>Crear mi Cuenta</span>}
+            {isLoading ? <span>Registrando en el sistema...</span> : <span>Crear mi Cuenta</span>}
           </button>
         </form>
 

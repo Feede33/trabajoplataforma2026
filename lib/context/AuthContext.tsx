@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { Profile, UserRole } from '../supabase/database.types'
 import { isSupabaseConfigured, createClient } from '../supabase/client'
-import { MOCK_CANDIDATO, MOCK_EMPRESAS } from '../mock-data'
 
 interface AuthContextType {
   profile: Profile | null
@@ -11,15 +10,17 @@ interface AuthContextType {
   isLoading: boolean
   isConfigured: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>
-  loginDemo: (targetRole: UserRole) => void
-  signup: (email: string, password: string, targetRole: UserRole, nombre: string) => Promise<{ success: boolean; error?: string }>
+  signup: (
+    email: string,
+    password: string,
+    targetRole: UserRole,
+    nombre: string
+  ) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean; message?: string }>
   logout: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-const LOCAL_STORAGE_USER_KEY = 'empleos_current_user'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -27,14 +28,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isConfigured = isSupabaseConfigured()
 
   useEffect(() => {
+    // Limpiar cualquier residuo de sesiones mock almacenadas previamente en el navegador
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('empleos_current_user')
+      } catch {}
+    }
+
     let authListener: { unsubscribe: () => void } | null = null
 
     async function initAuth() {
-      if (isConfigured) {
-        try {
-          const supabase = createClient()
-          const { data: { session } } = await supabase.auth.getSession()
+      if (!isConfigured) {
+        setProfile(null)
+        setIsLoading(false)
+        return
+      }
 
+      try {
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+
+          if (userProfile) {
+            setProfile(userProfile)
+          } else {
+            // El usuario existe en auth.users pero el trigger aún no completó la fila en profiles
+            setProfile({
+              id: session.user.id,
+              role: (session.user.user_metadata?.role as UserRole) || 'candidato',
+              nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || '',
+              email: session.user.email || '',
+              avatar_url: null,
+              bio: null,
+              ubicacion: null,
+              cv_url: null,
+              website: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+          }
+        } else {
+          setProfile(null)
+        }
+
+        // Escuchar eventos en vivo de autenticación (LOGIN, LOGOUT, TOKEN REFRESH)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (session?.user) {
             const { data: userProfile } = await supabase
               .from('profiles')
@@ -59,52 +103,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 updated_at: new Date().toISOString(),
               })
             }
+          } else {
+            setProfile(null)
           }
-
-          // Listen to live auth changes (login, signup, logout)
-          const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (session?.user) {
-              const { data: userProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single()
-
-              if (userProfile) {
-                setProfile(userProfile)
-              } else {
-                setProfile({
-                  id: session.user.id,
-                  role: (session.user.user_metadata?.role as UserRole) || 'candidato',
-                  nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || '',
-                  email: session.user.email || '',
-                  avatar_url: null,
-                  bio: null,
-                  ubicacion: null,
-                  cv_url: null,
-                  website: null,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                })
-              }
-            } else if (event === 'SIGNED_OUT') {
-              setProfile(null)
-            }
-          })
-          authListener = subscription
-        } catch (e) {
-          console.warn('Error reading Supabase session:', e)
-        }
+        })
+        authListener = subscription
+      } catch (e) {
+        console.error('Error al inicializar sesión con Supabase:', e)
+        setProfile(null)
+      } finally {
+        setIsLoading(false)
       }
-
-      // Fallback: check localStorage for saved demo session
-      try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_USER_KEY)
-        if (saved) {
-          setProfile(JSON.parse(saved))
-        }
-      } catch {}
-      setIsLoading(false)
     }
 
     initAuth()
@@ -114,129 +123,122 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isConfigured])
 
-  const loginDemo = (targetRole: UserRole) => {
-    const demoUser = targetRole === 'empresa' ? MOCK_EMPRESAS[0] : MOCK_CANDIDATO
-    setProfile(demoUser)
-    try {
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(demoUser))
-    } catch {}
-  }
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
+    if (!isConfigured) {
+      return { success: false, error: 'Supabase no está configurado en el archivo .env' }
+    }
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
-    if (isConfigured) {
-      try {
-        const supabase = createClient()
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) return { success: false, error: error.message }
-        if (data.user) {
-          const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-          let userRole: UserRole = 'candidato'
-          if (p) {
-            setProfile(p)
-            userRole = p.role
-          } else {
-            userRole = (data.user.user_metadata?.role as UserRole) || 'candidato'
-            setProfile({
-              id: data.user.id,
-              role: userRole,
-              nombre: data.user.user_metadata?.nombre || data.user.email?.split('@')[0] || '',
-              email: data.user.email || '',
-              avatar_url: null,
-              bio: null,
-              ubicacion: null,
-              cv_url: null,
-              website: null,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-          }
-          return { success: true, role: userRole }
-        }
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Error al iniciar sesión' }
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (error) {
+        return { success: false, error: error.message || 'Credenciales inválidas' }
       }
-    }
 
-    // Demo fallback: simulate login based on email
-    const isCompany = email.toLowerCase().includes('empresa') || email.toLowerCase().includes('rrhh')
-    const role: UserRole = isCompany ? 'empresa' : 'candidato'
-    const user: Profile = {
-      id: 'user-' + Date.now(),
-      role,
-      nombre: email.split('@')[0],
-      email,
-      avatar_url: isCompany ? MOCK_EMPRESAS[0].avatar_url : MOCK_CANDIDATO.avatar_url,
-      bio: isCompany ? 'Empresa registrada' : 'Candidato en búsqueda de nuevas oportunidades',
-      ubicacion: 'Argentina',
-      cv_url: isCompany ? null : MOCK_CANDIDATO.cv_url,
-      website: isCompany ? 'https://empresa.com' : null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
+      if (!data.user) {
+        return { success: false, error: 'No se encontró el usuario en el backend' }
+      }
 
-    setProfile(user)
-    try {
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(user))
-    } catch {}
-    return { success: true, role }
+      // Buscar perfil real en la tabla profiles
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single()
+
+      let userRole: UserRole = 'candidato'
+
+      if (p) {
+        setProfile(p)
+        userRole = p.role
+      } else {
+        userRole = (data.user.user_metadata?.role as UserRole) || 'candidato'
+        const tempProfile: Profile = {
+          id: data.user.id,
+          role: userRole,
+          nombre: data.user.user_metadata?.nombre || data.user.email?.split('@')[0] || '',
+          email: data.user.email || '',
+          avatar_url: null,
+          bio: null,
+          ubicacion: null,
+          cv_url: null,
+          website: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        setProfile(tempProfile)
+      }
+
+      return { success: true, role: userRole }
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error al iniciar sesión' }
+    }
   }
 
-  const signup = async (email: string, password: string, targetRole: UserRole, nombre: string): Promise<{ success: boolean; error?: string }> => {
-    if (isConfigured) {
-      try {
-        const supabase = createClient()
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              role: targetRole,
-              nombre,
-            }
-          }
-        })
-        if (error) return { success: false, error: error.message }
-        if (data.user) {
-          const newProfile: Profile = {
-            id: data.user.id,
+  const signup = async (
+    email: string,
+    password: string,
+    targetRole: UserRole,
+    nombre: string
+  ): Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean; message?: string }> => {
+    if (!isConfigured) {
+      return { success: false, error: 'Supabase no está configurado en el archivo .env' }
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
             role: targetRole,
             nombre,
-            email,
-            avatar_url: null,
-            bio: null,
-            ubicacion: null,
-            cv_url: null,
-            website: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }
-          setProfile(newProfile)
-          return { success: true }
-        }
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Error al registrar usuario' }
-      }
-    }
+          },
+        },
+      })
 
-    // Demo fallback
-    const newProfile: Profile = {
-      id: 'user-' + Date.now(),
-      role: targetRole,
-      nombre,
-      email,
-      avatar_url: null,
-      bio: null,
-      ubicacion: 'Argentina',
-      cv_url: null,
-      website: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      if (!data.user) {
+        return { success: false, error: 'Error al registrar el usuario en el backend' }
+      }
+
+      // Si Supabase requiere confirmación de email (data.session es null)
+      if (!data.session) {
+        return {
+          success: true,
+          requiresEmailConfirmation: true,
+          message: '¡Cuenta creada! Por favor revisá tu casilla de correo electrónico para confirmar tu cuenta antes de iniciar sesión.',
+        }
+      }
+
+      // Si la sesión se creó inmediatamente (confirmación de email desactivada)
+      const newProfile: Profile = {
+        id: data.user.id,
+        role: targetRole,
+        nombre,
+        email,
+        avatar_url: null,
+        bio: null,
+        ubicacion: null,
+        cv_url: null,
+        website: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      setProfile(newProfile)
+
+      return { success: true, requiresEmailConfirmation: false }
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error al registrar la cuenta' }
     }
-    setProfile(newProfile)
-    try {
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(newProfile))
-    } catch {}
-    return { success: true }
   }
 
   const logout = async () => {
@@ -244,12 +246,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const supabase = createClient()
         await supabase.auth.signOut()
-      } catch {}
+      } catch (err) {
+        console.warn('Error durante el cierre de sesión en Supabase:', err)
+      }
     }
     setProfile(null)
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_USER_KEY)
-    } catch {}
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('empleos_current_user')
+      } catch {}
+    }
   }
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -257,16 +263,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const updated = { ...profile, ...updates, updated_at: new Date().toISOString() }
 
     if (isConfigured) {
-      try {
-        const supabase = createClient()
-        await supabase.from('profiles').update(updates).eq('id', profile.id)
-      } catch {}
+      const supabase = createClient()
+      const { error } = await supabase.from('profiles').update(updates).eq('id', profile.id)
+      if (error) {
+        throw new Error(error.message || 'Error al actualizar el perfil en la base de datos')
+      }
     }
 
     setProfile(updated)
-    try {
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(updated))
-    } catch {}
   }
 
   return (
@@ -277,7 +281,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isConfigured,
         login,
-        loginDemo,
         signup,
         logout,
         updateProfile,
