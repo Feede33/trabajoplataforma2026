@@ -8,25 +8,28 @@ export async function POST(request: Request) {
 
     let jobData: any = {}
 
-    // Si le envían texto libre crudo (como el texto copiado de WhatsApp o Facebook)
+    // Si le envían texto libre crudo (como el texto copiado de clasificados o WhatsApp)
     if (body.text && typeof body.text === 'string') {
       const parsed = parseInformalJobWithAI(body.text)
       jobData = {
         ...parsed,
-        salario: body.salario || 'A convenir',
         activo: true,
       }
-    } else if (body.cargo && body.zona && body.contacto_whatsapp) {
+    } else if (body.cargo) {
       // Si el agente de IA ya envía los datos estructurados
       jobData = {
-        titulo: body.titulo || `${body.cargo} en ${body.zona}`,
+        titulo: body.titulo || (body.zona ? `${body.cargo} (${body.zona})` : body.cargo),
         cargo: body.cargo,
         rubro: body.rubro || 'General',
-        zona: body.zona,
-        horario: body.horario || 'A convenir',
-        descripcion: body.descripcion || body.text || `${body.cargo} en ${body.zona}`,
-        contacto_whatsapp: body.contacto_whatsapp,
-        contacto_indicaciones: body.contacto_indicaciones || 'Contactar por WhatsApp',
+        zona: body.zona || null,
+        horario: body.horario || null,
+        descripcion: body.descripcion || body.text || body.cargo,
+        whatsapp: body.whatsapp || body.contacto_whatsapp || null,
+        telefono: body.telefono || null,
+        email: body.email || null,
+        direccion: body.direccion || null,
+        contacto_whatsapp: body.whatsapp || body.contacto_whatsapp || null,
+        contacto_indicaciones: body.contacto_indicaciones || null,
         salario: body.salario || null,
         raw_text: body.raw_text || body.text || null,
         activo: true,
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            'Debes enviar un campo "text" con el aviso para que la IA lo interprete, o los campos estructurados (cargo, zona, contacto_whatsapp).',
+            'Debes enviar un campo "text" con el aviso para que la IA lo interprete, o los campos estructurados.',
         },
         { status: 400 }
       )
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: 'Aviso de empleo informal publicado exitosamente',
+        message: 'Aviso de empleo publicado exitosamente',
         job: data,
       })
     }
@@ -70,7 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       simulated: true,
-      message: 'Aviso interpretado con éxito (Supabase no configurado en entorno)',
+      message: 'Aviso interpretado con éxito',
       job: {
         id: 'inf-' + Date.now(),
         ...jobData,
@@ -90,7 +93,7 @@ export async function GET() {
     status: 'online',
     description: 'Endpoint de ingesta de avisos informales para IA',
     examplePayload: {
-      text: 'Estamos buscando personal para local de comidas, ubicado en la zona del Paso Molino, para el turno vespertino 17 a 01am.\nPara el cargo : CAJERA\nNuestro contacto para enviar cv es:\nWhatsApp ( no llamar porfavor)\n* 092327302 •.',
+      text: 'CHOFERES para taxi diurno nocturno o trabajar solo, radio taxi 141 con o sin experiencia; enviar foto de libreta al WhatsApp cel 093609479 - 094920807 Cod.Web.298982761',
     },
   })
 }

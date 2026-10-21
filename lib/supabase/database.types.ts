@@ -53,10 +53,14 @@ export interface InformalJob {
   titulo: string
   cargo: string
   rubro: string
-  zona: string
+  zona: string | null
   horario: string | null
   descripcion: string
-  contacto_whatsapp: string
+  whatsapp: string | null
+  telefono: string | null
+  email: string | null
+  direccion: string | null
+  contacto_whatsapp?: string | null
   contacto_indicaciones: string | null
   salario: string | null
   raw_text: string | null
