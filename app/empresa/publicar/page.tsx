@@ -1,16 +1,14 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Briefcase,
-  Building2,
-  MapPin,
-  Sparkles,
   ArrowLeft,
-  CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  Building2,
+  ArrowRight
 } from 'lucide-react'
 import { RUBROS, MODALIDADES, TIPOS_CONTRATO, slugify } from '@/lib/utils'
 import { createJob } from '@/lib/data'
@@ -19,22 +17,35 @@ import { JobModalidad, JobTipoContrato } from '@/lib/supabase/database.types'
 
 export default function PublicarEmpleoPage() {
   const router = useRouter()
-  const { profile } = useAuth()
+  const { profile, isLoading } = useAuth()
 
   const [titulo, setTitulo] = useState('')
   const [rubro, setRubro] = useState(RUBROS[0])
   const [modalidad, setModalidad] = useState<JobModalidad>('remoto')
   const [tipoContrato, setTipoContrato] = useState<JobTipoContrato>('full-time')
-  const [zona, setZona] = useState('Buenos Aires, Argentina')
+  const [zona, setZona] = useState('')
   const [salario, setSalario] = useState('')
   const [tagsInput, setTagsInput] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    if (profile?.ubicacion) {
+      setZona(profile.ubicacion)
+    } else {
+      setZona('Buenos Aires, Argentina')
+    }
+  }, [profile])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    if (!profile) {
+      setError('Tenés que iniciar sesión como empresa para publicar.')
+      return
+    }
 
     if (!titulo.trim() || !descripcion.trim()) {
       setError('Por favor completá el título y la descripción del puesto.')
@@ -53,11 +64,11 @@ export default function PublicarEmpleoPage() {
 
       await createJob(
         {
-          empresa_id: profile?.id || 'emp-demo',
+          empresa_id: profile.id,
           titulo,
           descripcion,
           rubro,
-          zona,
+          zona: zona || 'Argentina',
           modalidad,
           tipo_contrato: tipoContrato,
           salario_rango: salario || null,
@@ -65,7 +76,7 @@ export default function PublicarEmpleoPage() {
           slug,
           tags,
         },
-        profile?.nombre || 'Mi Empresa'
+        profile.nombre || 'Mi Empresa'
       )
 
       router.push('/empresa/dashboard')
@@ -73,6 +84,46 @@ export default function PublicarEmpleoPage() {
       setError(err.message || 'Error al publicar la vacante.')
       setIsSubmitting(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded animate-pulse" />
+        <div className="h-96 bg-slate-200 rounded-3xl animate-pulse" />
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+          <Building2 className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Iniciá sesión para publicar</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Para publicar una oferta laboral, tenés que identificarte con tu cuenta de Empresa.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/auth/login"
+            className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Iniciar Sesión</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/auth/registro?tipo=empresa"
+            className="w-full py-3 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors"
+          >
+            Crear Cuenta de Empresa
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -88,13 +139,13 @@ export default function PublicarEmpleoPage() {
       <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-8">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
-            Nueva Búsqueda
+            Nueva Búsqueda Laboral
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             Publicar un Nuevo Empleo
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Completá los detalles de la posición para comenzar a recibir candidatos calificados
+            Publicando en nombre de <span className="font-semibold text-slate-800">{profile.nombre || profile.email}</span>
           </p>
         </div>
 

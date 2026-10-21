@@ -13,9 +13,11 @@ import {
   ArrowLeft,
   Download,
   Lock,
-  ArrowRight
+  ArrowRight,
+  AlertCircle
 } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
+import { uploadCV } from '@/lib/data'
 
 export default function CandidatoPerfilPage() {
   const { profile, updateProfile, isLoading } = useAuth()
@@ -26,8 +28,10 @@ export default function CandidatoPerfilPage() {
   const [ubicacion, setUbicacion] = useState('')
   const [website, setWebsite] = useState('')
   const [cvName, setCvName] = useState('')
+  const [cvFile, setCvFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   // Sync state as soon as profile is loaded
   useEffect(() => {
@@ -37,35 +41,48 @@ export default function CandidatoPerfilPage() {
       setBio(profile.bio || '')
       setUbicacion(profile.ubicacion || '')
       setWebsite(profile.website || '')
-      setCvName(profile.cv_url ? 'CV_Actual.pdf' : '')
+      setCvName(profile.cv_url ? 'CV adjunto en tu perfil' : '')
     }
   }, [profile])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
+      setCvFile(file)
       setCvName(file.name)
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!profile) return
+
     setSaving(true)
     setSavedSuccess(false)
+    setErrorMessage('')
 
     try {
+      let finalCvUrl = profile.cv_url || null
+
+      if (cvFile) {
+        finalCvUrl = await uploadCV(cvFile, profile.id)
+      }
+
       await updateProfile({
         nombre,
         email,
         bio,
         ubicacion,
         website,
-        cv_url: profile?.cv_url || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+        cv_url: finalCvUrl,
       })
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 3000)
-    } catch {}
-    setSaving(false)
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error al actualizar el perfil.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (isLoading) {
@@ -139,7 +156,14 @@ export default function CandidatoPerfilPage() {
         {savedSuccess && (
           <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800 animate-in fade-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>¡Tu perfil y CV fueron actualizados correctamente en Supabase!</span>
+            <span>¡Tu perfil y CV fueron actualizados correctamente!</span>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
           </div>
         )}
 

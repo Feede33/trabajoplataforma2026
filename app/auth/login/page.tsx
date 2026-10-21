@@ -1,14 +1,16 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Briefcase, Building2, User, Lock, Mail, ArrowRight, AlertCircle, Sparkles } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
-  const { login, loginDemo, profile } = useAuth()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect')
+  const { login, loginDemo } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,7 +26,13 @@ export default function LoginPage() {
     setIsLoading(false)
 
     if (res.success) {
-      router.push('/empleos')
+      if (redirect) {
+        router.push(redirect)
+      } else if (res.role === 'empresa') {
+        router.push('/empresa/dashboard')
+      } else {
+        router.push('/candidato/dashboard')
+      }
     } else {
       setError(res.error || 'Credenciales inválidas')
     }
@@ -32,7 +40,9 @@ export default function LoginPage() {
 
   const handleDemo = (role: 'empresa' | 'candidato') => {
     loginDemo(role)
-    if (role === 'empresa') {
+    if (redirect) {
+      router.push(redirect)
+    } else if (role === 'empresa') {
       router.push('/empresa/dashboard')
     } else {
       router.push('/candidato/dashboard')
@@ -134,11 +144,22 @@ export default function LoginPage() {
         {/* Register link */}
         <div className="pt-2 text-center text-xs text-slate-500">
           ¿No tenés una cuenta todavía?{' '}
-          <Link href="/auth/registro" className="font-semibold text-indigo-600 hover:underline">
+          <Link
+            href={redirect ? `/auth/registro?redirect=${encodeURIComponent(redirect)}` : '/auth/registro'}
+            className="font-semibold text-indigo-600 hover:underline"
+          >
             Registrate acá
           </Link>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="max-w-md mx-auto py-20 text-center text-slate-400">Cargando...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

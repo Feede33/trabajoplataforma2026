@@ -1,5 +1,5 @@
 import { isSupabaseConfigured, createClient } from './supabase/client'
-import { MOCK_JOBS, MOCK_APPLICATIONS, MOCK_EMPRESAS } from './mock-data'
+import { MOCK_JOBS, MOCK_APPLICATIONS } from './mock-data'
 import { JobWithEmpresa, ApplicationWithDetails, Job, JobEstado, ApplicationEstado } from './supabase/database.types'
 
 const LOCAL_STORAGE_JOBS_KEY = 'empleos_custom_jobs'
@@ -47,7 +47,7 @@ export async function fetchJobs(): Promise<JobWithEmpresa[]> {
         .from('jobs')
         .select(`
           *,
-          empresa:profiles!jobs_empresa_id_fkey(nombre, avatar_url, website, ubicacion)
+          empresa:profiles(nombre, avatar_url, website, ubicacion)
         `)
         .eq('estado', 'activo')
         .order('created_at', { ascending: false })
@@ -65,6 +65,33 @@ export async function fetchJobs(): Promise<JobWithEmpresa[]> {
   return [...custom, ...MOCK_JOBS]
 }
 
+export async function fetchJobsByEmpresa(empresaId: string): Promise<JobWithEmpresa[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          empresa:profiles(nombre, avatar_url, website, ubicacion)
+        `)
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        return data as unknown as JobWithEmpresa[]
+      }
+    } catch (err) {
+      console.warn('Supabase fetch company jobs failed', err)
+    }
+  }
+
+  const custom = getStoredJobs()
+  const companyCustom = custom.filter((j) => j.empresa_id === empresaId)
+  if (companyCustom.length > 0) return companyCustom
+  return MOCK_JOBS
+}
+
 export async function fetchJobBySlug(slug: string): Promise<JobWithEmpresa | null> {
   if (isSupabaseConfigured()) {
     try {
@@ -73,7 +100,7 @@ export async function fetchJobBySlug(slug: string): Promise<JobWithEmpresa | nul
         .from('jobs')
         .select(`
           *,
-          empresa:profiles!jobs_empresa_id_fkey(nombre, avatar_url, website, ubicacion)
+          empresa:profiles(nombre, avatar_url, website, ubicacion)
         `)
         .eq('slug', slug)
         .single()
@@ -149,7 +176,7 @@ export async function fetchApplicationsForEmpresa(empresaId?: string): Promise<A
         .select(`
           *,
           job:jobs(titulo, slug),
-          candidato:profiles!applications_candidato_id_fkey(nombre, email, cv_url, bio, ubicacion)
+          candidato:profiles(nombre, email, cv_url, bio, ubicacion)
         `)
         .order('created_at', { ascending: false })
 
@@ -174,7 +201,7 @@ export async function fetchApplicationsForCandidate(candidatoId: string): Promis
         .select(`
           *,
           job:jobs(titulo, slug),
-          candidato:profiles!applications_candidato_id_fkey(nombre, email, cv_url, bio, ubicacion)
+          candidato:profiles(nombre, email, cv_url, bio, ubicacion)
         `)
         .eq('candidato_id', candidatoId)
         .order('created_at', { ascending: false })
@@ -187,6 +214,34 @@ export async function fetchApplicationsForCandidate(candidatoId: string): Promis
 
   const custom = getStoredApplications()
   return [...custom, ...MOCK_APPLICATIONS]
+}
+
+export async function uploadCV(file: File, userId: string): Promise<string> {
+  if (isSupabaseConfigured()) {
+    const supabase = createClient()
+    const fileExt = file.name.split('.').pop() || 'pdf'
+    const fileName = `${userId}/${Date.now()}.${fileExt}`
+
+    const { data, error } = await supabase.storage
+      .from('cvs')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: true,
+      })
+
+    if (error) {
+      console.error('Error subiendo CV a Supabase Storage:', error)
+      throw new Error(`Error al subir el CV: ${error.message}`)
+    }
+
+    const { data: publicData } = supabase.storage
+      .from('cvs')
+      .getPublicUrl(data.path)
+
+    return publicData.publicUrl
+  }
+
+  return URL.createObjectURL(file)
 }
 
 export async function submitApplication(data: {
@@ -213,33 +268,39 @@ export async function submitApplication(data: {
     candidato: {
       nombre: data.candidato_nombre,
       email: data.candidato_email,
-      cv_url: data.cv_url || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      cv_url: data.cv_url || null,
       bio: '',
       ubicacion: 'Argentina',
     }
   }
 
   if (isSupabaseConfigured()) {
-    try {
-      const supabase = createClient()
-      const { data: inserted, error } = await supabase
-        .from('applications')
-        .insert([{
-          job_id: data.job_id,
-          candidato_id: data.candidato_id,
-          mensaje: data.mensaje,
-        }])
-        .select()
-        .single()
+    const supabase = createClient()
+    const { data: inserted, error } = await supabase
+      .from('applications')
+      .insert([{
+        job_id: data.job_id,
+        candidato_id: data.candidato_id,
+        mensaje: data.mensaje,
+      }])
+      .select()
+      .single()
 
-      if (!error && inserted) {
-        return {
-          ...inserted,
-          job: newApp.job,
-          candidato: newApp.candidato,
-        } as unknown as ApplicationWithDetails
+    if (error) {
+      console.error('Error insertando postulación en Supabase:', error)
+      if (error.code === '23505' || error.message?.includes('unique_job_candidato')) {
+        throw new Error('Ya te has postulado a este empleo anteriormente.')
       }
-    } catch (err) {}
+      throw new Error(error.message || 'No se pudo registrar la postulación.')
+    }
+
+    if (inserted) {
+      return {
+        ...inserted,
+        job: newApp.job,
+        candidato: newApp.candidato,
+      } as unknown as ApplicationWithDetails
+    }
   }
 
   const existing = getStoredApplications()

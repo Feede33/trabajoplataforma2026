@@ -11,6 +11,7 @@ function RegistroContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialRole: UserRole = searchParams.get('tipo') === 'empresa' ? 'empresa' : 'candidato'
+  const redirect = searchParams.get('redirect')
 
   const { signup } = useAuth()
   const [role, setRole] = useState<UserRole>(initialRole)
@@ -30,7 +31,9 @@ function RegistroContent() {
     setIsLoading(false)
 
     if (res.success) {
-      if (role === 'empresa') {
+      if (redirect) {
+        router.push(redirect)
+      } else if (role === 'empresa') {
         router.push('/empresa/dashboard')
       } else {
         router.push('/candidato/dashboard')
@@ -151,7 +154,10 @@ function RegistroContent() {
 
         <div className="pt-2 text-center text-xs text-slate-500">
           ¿Ya tenés una cuenta?{' '}
-          <Link href="/auth/login" className="font-semibold text-indigo-600 hover:underline">
+          <Link
+            href={redirect ? `/auth/login?redirect=${encodeURIComponent(redirect)}` : '/auth/login'}
+            className="font-semibold text-indigo-600 hover:underline"
+          >
             Iniciá sesión acá
           </Link>
         </div>

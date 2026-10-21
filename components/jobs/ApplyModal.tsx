@@ -1,10 +1,22 @@
 'use client'
 
-import React, { useState } from 'react'
-import { X, CheckCircle2, Upload, FileText, Send, AlertCircle } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
+import {
+  X,
+  CheckCircle2,
+  Upload,
+  FileText,
+  Send,
+  AlertCircle,
+  Lock,
+  ArrowRight,
+  Building2,
+  Check
+} from 'lucide-react'
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
-import { submitApplication } from '@/lib/data'
+import { submitApplication, uploadCV } from '@/lib/data'
 
 interface ApplyModalProps {
   job: JobWithEmpresa
@@ -13,20 +25,33 @@ interface ApplyModalProps {
 }
 
 export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
-  const { profile } = useAuth()
+  const { profile, updateProfile } = useAuth()
   const [nombre, setNombre] = useState(profile?.nombre || '')
   const [email, setEmail] = useState(profile?.email || '')
   const [mensaje, setMensaje] = useState('')
-  const [cvFileName, setCvFileName] = useState(profile?.cv_url ? 'CV_Actual.pdf' : '')
+  const [cvFile, setCvFile] = useState<File | null>(null)
+  const [cvFileName, setCvFileName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    if (profile) {
+      setNombre(profile.nombre || '')
+      setEmail(profile.email || '')
+      if (profile.cv_url) {
+        setCvFileName('CV guardado en tu perfil')
+      }
+    }
+  }, [profile])
 
   if (!isOpen) return null
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setCvFileName(e.target.files[0].name)
+      const file = e.target.files[0]
+      setCvFile(file)
+      setCvFileName(file.name)
     }
   }
 
@@ -34,23 +59,51 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
     e.preventDefault()
     setErrorMessage('')
 
+    if (!profile) {
+      setErrorMessage('Tenés que iniciar sesión con una cuenta de candidato para postularte.')
+      return
+    }
+
+    if (profile.role === 'empresa') {
+      setErrorMessage('Tu cuenta actual es de tipo Empresa. Necesitás una cuenta de Candidato para postularte.')
+      return
+    }
+
     if (!nombre.trim() || !email.trim()) {
       setErrorMessage('Por favor completá tu nombre y correo electrónico.')
+      return
+    }
+
+    if (!cvFile && !profile.cv_url) {
+      setErrorMessage('Por favor adjuntá tu currículum vitae en formato PDF o Word.')
       return
     }
 
     setIsSubmitting(true)
 
     try {
+      let currentCvUrl = profile.cv_url || ''
+
+      // Si subió un nuevo archivo de CV, lo subimos a Supabase Storage
+      if (cvFile) {
+        currentCvUrl = await uploadCV(cvFile, profile.id)
+        // Guardamos también en su perfil para futuras postulaciones
+        try {
+          await updateProfile({ cv_url: currentCvUrl })
+        } catch {
+          console.warn('No se pudo actualizar el cv_url en el perfil')
+        }
+      }
+
       await submitApplication({
         job_id: job.id,
         job_titulo: job.titulo,
         job_slug: job.slug,
-        candidato_id: profile?.id || 'guest-' + Date.now(),
+        candidato_id: profile.id,
         candidato_nombre: nombre,
         candidato_email: email,
         mensaje,
-        cv_url: profile?.cv_url || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+        cv_url: currentCvUrl,
       })
 
       setIsSuccess(true)
@@ -67,7 +120,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          className="absolute right-4 top-4 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors z-10"
           aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
@@ -81,9 +134,69 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
             <h3 className="text-2xl font-bold text-slate-900">¡Postulación Enviada con Éxito!</h3>
             <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto">
               Tu postulación para <span className="font-semibold text-slate-800">{job.titulo}</span> en{' '}
-              <span className="font-semibold text-slate-800">{job.empresa.nombre}</span> fue recibida. Te contactarán por email ante cualquier novedad.
+              <span className="font-semibold text-slate-800">{job.empresa.nombre}</span> fue registrada correctamente.
             </p>
-            <div className="pt-4">
+            <div className="pt-4 flex flex-col gap-2">
+              <Link
+                href="/candidato/postulaciones"
+                className="w-full py-3 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors text-center shadow-md shadow-indigo-100"
+              >
+                Ver Mis Postulaciones
+              </Link>
+              <button
+                onClick={onClose}
+                className="w-full py-2.5 px-6 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        ) : !profile ? (
+          /* Usuario NO autenticado -> Forzar inicio de sesión */
+          <div className="p-8 text-center space-y-6">
+            <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+              <Lock className="w-8 h-8" />
+            </div>
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+                Identificación Requerida
+              </span>
+              <h3 className="text-2xl font-extrabold text-slate-900 mt-1">Iniciá sesión para postularte</h3>
+              <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto mt-2">
+                Para postularte a <span className="font-semibold text-slate-800">{job.titulo}</span> en{' '}
+                <span className="font-semibold text-slate-800">{job.empresa.nombre}</span>, necesitás ingresar con tu cuenta de candidato.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-2">
+              <Link
+                href={`/auth/login?redirect=/empleos/${job.slug}`}
+                className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>Iniciar Sesión</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href={`/auth/registro?tipo=candidato&redirect=/empleos/${job.slug}`}
+                className="w-full py-3 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors text-center"
+              >
+                Crear Cuenta de Candidato
+              </Link>
+            </div>
+          </div>
+        ) : profile.role === 'empresa' ? (
+          /* Cuenta Empresa -> Advertir que debe ser candidato */
+          <div className="p-8 text-center space-y-6">
+            <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
+              <Building2 className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">Cuenta de Empresa detectada</h3>
+              <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto mt-2">
+                Actualmente estás identificado como <span className="font-semibold text-slate-800">{profile.nombre || profile.email}</span> (Rol Empresa). Las postulaciones a empleos sólo están disponibles para cuentas con perfil Candidato.
+              </p>
+            </div>
+            <div className="pt-2">
               <button
                 onClick={onClose}
                 className="w-full py-3 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition-colors"
@@ -93,6 +206,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
             </div>
           </div>
         ) : (
+          /* Formulario de Postulación de Candidato */
           <form onSubmit={handleSubmit} className="p-7 space-y-5">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
@@ -141,7 +255,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
               {/* Upload CV */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Currículum Vitae (PDF o Word)
+                  Currículum Vitae (PDF o Word) *
                 </label>
                 <label className="flex items-center justify-between p-3 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50 hover:bg-indigo-50/30 cursor-pointer transition-colors group">
                   <div className="flex items-center gap-2.5 text-xs text-slate-600">
@@ -152,7 +266,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
                   </div>
                   <span className="text-xs font-semibold text-indigo-600 group-hover:underline flex items-center gap-1">
                     <Upload className="w-3.5 h-3.5" />
-                    Examinar
+                    {profile.cv_url && !cvFile ? 'Reemplazar' : 'Examinar'}
                   </span>
                   <input
                     type="file"
@@ -161,6 +275,11 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
                     className="hidden"
                   />
                 </label>
+                {profile.cv_url && !cvFile && (
+                  <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-medium">
+                    <Check className="w-3 h-3" /> Se utilizará el CV adjunto en tu perfil. Podés hacer clic arriba para cambiarlo.
+                  </p>
+                )}
               </div>
 
               {/* Mensaje */}
@@ -192,7 +311,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
                 className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-md shadow-indigo-200 hover:shadow-lg transition-all"
               >
                 {isSubmitting ? (
-                  <span>Enviando...</span>
+                  <span>Subiendo y postulando...</span>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />

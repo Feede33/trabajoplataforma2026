@@ -10,7 +10,7 @@ interface AuthContextType {
   role: UserRole | null
   isLoading: boolean
   isConfigured: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>
   loginDemo: (targetRole: UserRole) => void
   signup: (email: string, password: string, targetRole: UserRole, nombre: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
     if (isConfigured) {
       try {
         const supabase = createClient()
@@ -130,12 +130,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) return { success: false, error: error.message }
         if (data.user) {
           const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
+          let userRole: UserRole = 'candidato'
           if (p) {
             setProfile(p)
+            userRole = p.role
           } else {
+            userRole = (data.user.user_metadata?.role as UserRole) || 'candidato'
             setProfile({
               id: data.user.id,
-              role: (data.user.user_metadata?.role as UserRole) || 'candidato',
+              role: userRole,
               nombre: data.user.user_metadata?.nombre || data.user.email?.split('@')[0] || '',
               email: data.user.email || '',
               avatar_url: null,
@@ -147,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               updated_at: new Date().toISOString(),
             })
           }
-          return { success: true }
+          return { success: true, role: userRole }
         }
       } catch (err: any) {
         return { success: false, error: err.message || 'Error al iniciar sesión' }
@@ -175,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(user))
     } catch {}
-    return { success: true }
+    return { success: true, role }
   }
 
   const signup = async (email: string, password: string, targetRole: UserRole, nombre: string): Promise<{ success: boolean; error?: string }> => {

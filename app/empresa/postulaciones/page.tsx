@@ -4,36 +4,42 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Users,
-  Briefcase,
   FileText,
   Mail,
-  MapPin,
-  Clock,
-  CheckCircle2,
-  XCircle,
   ExternalLink,
   Download,
-  Filter
+  Lock,
+  Building2,
+  ArrowRight
 } from 'lucide-react'
 import { fetchApplicationsForEmpresa, updateApplicationStatus } from '@/lib/data'
 import { ApplicationWithDetails, ApplicationEstado } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
+import { useAuth } from '@/lib/context/AuthContext'
 
 export default function EmpresaPostulacionesPage() {
+  const { profile, isLoading } = useAuth()
   const [applications, setApplications] = useState<ApplicationWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingData, setLoadingData] = useState(true)
   const [filterStatus, setFilterStatus] = useState<string>('todos')
-  const [selectedApp, setSelectedApp] = useState<ApplicationWithDetails | null>(null)
 
   useEffect(() => {
     async function load() {
-      const data = await fetchApplicationsForEmpresa()
+      if (!profile) {
+        setLoadingData(false)
+        return
+      }
+      setLoadingData(true)
+      const data = await fetchApplicationsForEmpresa(profile.id)
       setApplications(data)
-      setLoading(false)
+      setLoadingData(false)
     }
-    load()
-  }, [])
+
+    if (!isLoading) {
+      load()
+    }
+  }, [profile?.id, isLoading])
 
   const handleStatusChange = async (appId: string, newStatus: ApplicationEstado) => {
     await updateApplicationStatus(appId, newStatus)
@@ -53,9 +59,53 @@ export default function EmpresaPostulacionesPage() {
       visto: { variant: 'primary', label: 'Visto' },
       entrevista: { variant: 'success', label: 'En Entrevista' },
       rechazado: { variant: 'danger', label: 'Rechazado' },
-    }[estado] as { variant: any; label: string }
+    }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }
 
     return <Badge variant={map.variant} size="sm">{map.label}</Badge>
+  }
+
+  if (isLoading || loadingData) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 space-y-4">
+        <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="h-64 bg-slate-200 rounded-3xl animate-pulse" />
+          <div className="h-64 bg-slate-200 rounded-3xl animate-pulse" />
+          <div className="h-64 bg-slate-200 rounded-3xl animate-pulse" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+          <Building2 className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Iniciá sesión como Empresa</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Identificate con tu cuenta de empresa para revisar los candidatos que se postularon a tus ofertas.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/auth/login"
+            className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Iniciar Sesión</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/auth/registro?tipo=empresa"
+            className="w-full py-3 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors"
+          >
+            Crear Cuenta de Empresa
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -70,7 +120,7 @@ export default function EmpresaPostulacionesPage() {
             Postulaciones Recibidas
           </h1>
           <p className="text-sm text-slate-500">
-            Revisá los perfiles y currículums de los candidatos que aplicaron a tus ofertas
+            Candidatos que aplicaron a las búsquedas de <span className="font-semibold text-slate-700">{profile.nombre || profile.email}</span>
           </p>
         </div>
 
@@ -92,9 +142,7 @@ export default function EmpresaPostulacionesPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="p-16 text-center text-slate-400">Cargando postulaciones...</div>
-      ) : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-3">
           <Users className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="text-lg font-bold text-slate-800">No hay postulaciones para mostrar</h3>

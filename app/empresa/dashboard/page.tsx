@@ -5,38 +5,45 @@ import Link from 'next/link'
 import {
   Briefcase,
   Users,
-  Eye,
   PlusCircle,
   Clock,
-  CheckCircle,
-  XCircle,
   ExternalLink,
-  ArrowRight
+  ArrowRight,
+  Lock,
+  Building2
 } from 'lucide-react'
-import { fetchJobs, fetchApplicationsForEmpresa, toggleJobState } from '@/lib/data'
+import { fetchJobsByEmpresa, fetchApplicationsForEmpresa, toggleJobState } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails, JobEstado } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
 
 export default function EmpresaDashboard() {
-  const { profile } = useAuth()
+  const { profile, isLoading } = useAuth()
   const [jobs, setJobs] = useState<JobWithEmpresa[]>([])
   const [applications, setApplications] = useState<ApplicationWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
     async function loadData() {
+      if (!profile) {
+        setLoadingData(false)
+        return
+      }
+      setLoadingData(true)
       const [jobsData, appsData] = await Promise.all([
-        fetchJobs(),
-        fetchApplicationsForEmpresa(profile?.id)
+        fetchJobsByEmpresa(profile.id),
+        fetchApplicationsForEmpresa(profile.id)
       ])
       setJobs(jobsData)
       setApplications(appsData)
-      setLoading(false)
+      setLoadingData(false)
     }
-    loadData()
-  }, [profile?.id])
+
+    if (!isLoading) {
+      loadData()
+    }
+  }, [profile?.id, isLoading])
 
   const handleToggleStatus = async (jobId: string, currentStatus: JobEstado) => {
     const nextStatus: JobEstado = currentStatus === 'activo' ? 'cerrado' : 'activo'
@@ -47,6 +54,50 @@ export default function EmpresaDashboard() {
   }
 
   const activeJobs = jobs.filter((j) => j.estado === 'activo')
+
+  if (isLoading || loadingData) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 space-y-6">
+        <div className="h-8 w-48 bg-slate-200 rounded animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
+          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
+          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-slate-900">Iniciá sesión como Empresa</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Accedé a tu panel para publicar nuevas vacantes, gestionar búsquedas y revisar currículums.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/auth/login"
+            className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Iniciar Sesión</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/auth/registro?tipo=empresa"
+            className="w-full py-3 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm transition-colors"
+          >
+            Crear Cuenta de Empresa
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -60,7 +111,7 @@ export default function EmpresaDashboard() {
             Gestión de Empleos y Candidatos
           </h1>
           <p className="text-sm text-slate-600">
-            Bienvenido, <span className="font-semibold text-slate-800">{profile?.nombre || 'Empresa'}</span>
+            Conectado como <span className="font-semibold text-slate-800">{profile.nombre || profile.email}</span>
           </p>
         </div>
 
@@ -80,7 +131,7 @@ export default function EmpresaDashboard() {
             <Briefcase className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Empleos Activos</p>
+            <p className="text-xs text-slate-500 font-medium">Tus Empleos Activos</p>
             <p className="text-2xl font-extrabold text-slate-900 mt-0.5">{activeJobs.length}</p>
           </div>
         </div>
@@ -100,7 +151,7 @@ export default function EmpresaDashboard() {
             <Clock className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">En Revisión / Entrevista</p>
+            <p className="text-xs text-slate-500 font-medium">En Entrevista / Revisión</p>
             <p className="text-2xl font-extrabold text-slate-900 mt-0.5">
               {applications.filter((a) => a.estado === 'entrevista' || a.estado === 'pendiente').length}
             </p>
@@ -124,16 +175,19 @@ export default function EmpresaDashboard() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="p-12 text-center text-slate-400">Cargando publicaciones...</div>
-        ) : jobs.length === 0 ? (
+        {jobs.length === 0 ? (
           <div className="p-12 text-center space-y-3">
-            <p className="text-slate-500 text-sm">No tenés búsquedas publicadas todavía.</p>
+            <Building2 className="w-12 h-12 text-slate-300 mx-auto" />
+            <p className="text-slate-700 font-bold text-base">No tenés búsquedas publicadas todavía</p>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Comenzá a recibir candidatos publicando tu primera oferta de empleo.
+            </p>
             <Link
               href="/empresa/publicar"
-              className="inline-block px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold text-xs"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold text-xs shadow-md shadow-indigo-200"
             >
-              Publicar mi primer empleo
+              <PlusCircle className="w-4 h-4" />
+              <span>Publicar mi primer empleo</span>
             </Link>
           </div>
         ) : (
