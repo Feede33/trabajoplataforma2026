@@ -48,6 +48,23 @@ export type JobWithEmpresa = Job & {
   empresa: Pick<Profile, 'nombre' | 'avatar_url' | 'website' | 'ubicacion'>
 }
 
+export interface InformalJob {
+  id: string
+  titulo: string
+  cargo: string
+  rubro: string
+  zona: string
+  horario: string | null
+  descripcion: string
+  contacto_whatsapp: string
+  contacto_indicaciones: string | null
+  salario: string | null
+  raw_text: string | null
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type ApplicationWithDetails = Application & {
   job: Pick<Job, 'titulo' | 'slug'>
   candidato: Pick<Profile, 'nombre' | 'email' | 'cv_url' | 'bio' | 'ubicacion'>
@@ -77,6 +94,15 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Omit<Application, 'id'>>
+      }
+      informal_jobs: {
+        Row: InformalJob
+        Insert: Omit<InformalJob, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Omit<InformalJob, 'id'>>
       }
     }
   }

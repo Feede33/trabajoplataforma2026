@@ -16,7 +16,8 @@ import {
   Users,
   Search,
   Sparkles,
-  Database
+  Database,
+  Zap
 } from 'lucide-react'
 
 export function Navbar() {
@@ -69,6 +70,21 @@ export function Navbar() {
               }`}
             >
               Explorar Empleos
+            </Link>
+
+            <Link
+              href="/empleos-informales"
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                pathname === '/empleos-informales'
+                  ? 'text-amber-800 bg-amber-50 font-semibold border border-amber-200'
+                  : 'text-slate-600 hover:text-amber-800 hover:bg-amber-50/50'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>Empleos Informales</span>
+              <span className="px-1.5 py-0.2 text-[10px] bg-amber-100 text-amber-800 rounded-full font-bold">
+                WhatsApp
+              </span>
             </Link>
 
             {isEmpresa && (
@@ -287,6 +303,20 @@ export function Navbar() {
             >
               <Search className="w-4 h-4 text-indigo-600" />
               Explorar Empleos
+            </Link>
+
+            <Link
+              href="/empleos-informales"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100/70"
+            >
+              <div className="flex items-center gap-3">
+                <Zap className="w-4 h-4 text-amber-600 fill-amber-500" />
+                <span>Empleos Informales</span>
+              </div>
+              <span className="px-2 py-0.5 text-[10px] bg-amber-200 text-amber-900 rounded-full font-bold">
+                WhatsApp
+              </span>
             </Link>
 
             {isEmpresa && (

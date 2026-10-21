@@ -1,4 +1,4 @@
-import { JobWithEmpresa, Profile, ApplicationWithDetails } from './supabase/database.types'
+import { JobWithEmpresa, Profile, ApplicationWithDetails, InformalJob } from './supabase/database.types'
 
 export const MOCK_EMPRESAS: Profile[] = [
   {
@@ -334,5 +334,72 @@ export const MOCK_APPLICATIONS: ApplicationWithDetails[] = [
       bio: 'Desarrollador frontend con 3 años de experiencia en React y Next.js.',
       ubicacion: 'Buenos Aires, Argentina',
     }
+  }
+]
+
+export const MOCK_INFORMAL_JOBS: InformalJob[] = [
+  {
+    id: 'inf-1',
+    titulo: 'Cajera para Local de Comidas',
+    cargo: 'Cajera',
+    rubro: 'Gastronomía',
+    zona: 'Paso Molino, Montevideo',
+    horario: 'Turno vespertino 17:00 a 01:00 am',
+    descripcion: 'Estamos buscando personal para local de comidas, ubicado en la zona del Paso Molino, para el turno vespertino 17 a 01am. Para el cargo: CAJERA. Nuestro contacto para enviar CV es por WhatsApp (no llamar por favor).',
+    contacto_whatsapp: '092327302',
+    contacto_indicaciones: 'WhatsApp (no llamar por favor)',
+    salario: 'A convenir',
+    raw_text: 'Estamos buscando personal para local de comidas, ubicado en la zona del Paso Molino, para el turno vespertino 17 a 01am.\nPara el cargo : CAJERA\nNuestro contacto para enviar cv es:\nWhatsApp ( no llamar porfavor)\n* 092327302 •.',
+    activo: true,
+    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: 'inf-2',
+    titulo: 'Ayudante de Cocina y Minutero',
+    cargo: 'Ayudante de Cocina',
+    rubro: 'Gastronomía',
+    zona: 'Pocitos, Montevideo',
+    horario: 'Lunes a Viernes 11:00 a 16:30 hs',
+    descripcion: 'Se necesita ayudante de cocina para rotisería / local gastronómico en Pocitos. Tareas: preparación de minutas, elaboración y limpieza de estación.',
+    contacto_whatsapp: '099123456',
+    contacto_indicaciones: 'Solo mensajes de WhatsApp con experiencia previa',
+    salario: '$ 28.000 aprox.',
+    raw_text: 'Buscamos ayudante de cocina con ganas de trabajar para Pocitos, de 11 a 16:30 hs. WhatsApp 099123456.',
+    activo: true,
+    created_at: new Date(Date.now() - 10 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 10 * 3600000).toISOString(),
+  },
+  {
+    id: 'inf-3',
+    titulo: 'Cadete con Moto Propia para Delivery',
+    cargo: 'Repartidor / Cadete',
+    rubro: 'Logística y Envíos',
+    zona: 'Centro y Cordón, Montevideo',
+    horario: 'Jueves a Domingo 19:30 a 00:30 hs',
+    descripcion: 'Pizzería céntrica busca cadete con moto propia y libreta al día para turnos nocturnos de fin de semana. Pago por hora + propinas + porcentaje por viaje.',
+    contacto_whatsapp: '098765432',
+    contacto_indicaciones: 'Enviar modelo de moto y disponibilidad por WhatsApp',
+    salario: '$ 1.200 por turno + propinas',
+    raw_text: 'Cadete con moto para pizzería Centro Cordón. Turno noche jueves a domingo. 098765432 WhatsApp.',
+    activo: true,
+    created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+  },
+  {
+    id: 'inf-4',
+    titulo: 'Atención al Cliente y Repositor',
+    cargo: 'Atención al Público',
+    rubro: 'Comercio',
+    zona: 'La Unión, Montevideo',
+    horario: 'Lunes a Sábado 09:00 a 17:00 hs',
+    descripcion: 'Minimercado barrial busca persona responsable para atención de caja, reposición de góndolas y cobro con POS. Buena presencia y trato cordial.',
+    contacto_whatsapp: '091888999',
+    contacto_indicaciones: 'Enviar datos personales y barrio donde vivís por WhatsApp',
+    salario: '$ 26.500',
+    raw_text: 'Se precisa persona para atención en minimarket en La Unión. 091888999 WhatsApp.',
+    activo: true,
+    created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 48 * 3600000).toISOString(),
   }
 ]

@@ -1,9 +1,10 @@
 import { isSupabaseConfigured, createClient } from './supabase/client'
-import { MOCK_JOBS, MOCK_APPLICATIONS } from './mock-data'
-import { JobWithEmpresa, ApplicationWithDetails, Job, JobEstado, ApplicationEstado } from './supabase/database.types'
+import { MOCK_JOBS, MOCK_APPLICATIONS, MOCK_INFORMAL_JOBS } from './mock-data'
+import { JobWithEmpresa, ApplicationWithDetails, Job, JobEstado, ApplicationEstado, InformalJob } from './supabase/database.types'
 
 const LOCAL_STORAGE_JOBS_KEY = 'empleos_custom_jobs'
 const LOCAL_STORAGE_APPS_KEY = 'empleos_custom_apps'
+const LOCAL_STORAGE_INFORMAL_KEY = 'empleos_custom_informal_jobs'
 
 function getStoredJobs(): JobWithEmpresa[] {
   if (typeof window === 'undefined') return []
@@ -36,6 +37,23 @@ function saveStoredApplications(apps: ApplicationWithDetails[]) {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(LOCAL_STORAGE_APPS_KEY, JSON.stringify(apps))
+  } catch {}
+}
+
+function getStoredInformalJobs(): InformalJob[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_INFORMAL_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveStoredInformalJobs(jobs: InformalJob[]) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(LOCAL_STORAGE_INFORMAL_KEY, JSON.stringify(jobs))
   } catch {}
 }
 
@@ -321,4 +339,171 @@ export async function updateApplicationStatus(appId: string, nuevoEstado: Applic
   const updated = existing.map((a) => (a.id === appId ? { ...a, estado: nuevoEstado } : a))
   saveStoredApplications(updated)
   return true
+}
+
+export async function fetchInformalJobs(): Promise<InformalJob[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('informal_jobs')
+        .select('*')
+        .eq('activo', true)
+        .order('created_at', { ascending: false })
+
+      if (!error && data && data.length > 0) {
+        return data as InformalJob[]
+      }
+    } catch (err) {
+      console.warn('Error al consultar informal_jobs en Supabase, usando respaldo local:', err)
+    }
+  }
+
+  const custom = getStoredInformalJobs()
+  return [...custom, ...MOCK_INFORMAL_JOBS]
+}
+
+export async function createInformalJob(
+  jobData: Omit<InformalJob, 'id' | 'created_at' | 'updated_at'>
+): Promise<InformalJob> {
+  const newJob: InformalJob = {
+    ...jobData,
+    id: 'inf-' + Date.now(),
+    activo: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('informal_jobs')
+        .insert([jobData])
+        .select()
+        .single()
+
+      if (!error && data) {
+        return data as InformalJob
+      } else if (error) {
+        console.warn('Error insertando informal_job en Supabase, guardando en local:', error)
+      }
+    } catch (err) {
+      console.warn('Fallo de red con Supabase al crear empleo informal:', err)
+    }
+  }
+
+  const existing = getStoredInformalJobs()
+  saveStoredInformalJobs([newJob, ...existing])
+  return newJob
+}
+
+export function parseInformalJobWithAI(text: string): {
+  titulo: string
+  cargo: string
+  rubro: string
+  zona: string
+  horario: string
+  contacto_whatsapp: string
+  contacto_indicaciones: string
+  descripcion: string
+  raw_text: string
+} {
+  const clean = text.trim()
+
+  // 1. Cargo
+  let cargo = ''
+  const cargoMatch = clean.match(/(?:cargo|puesto|vacante|buscamos|precisamos|necesitamos)\s*(?:a|para|de)?\s*[:]?\s*([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{3,35})/i)
+  if (cargoMatch) {
+    cargo = cargoMatch[1].trim()
+  } else if (/cajera|cajero/i.test(clean)) cargo = 'Cajera'
+  else if (/cocinero|cocinera|ayudante de cocina/i.test(clean)) cargo = 'Ayudante de Cocina'
+  else if (/mozo|moza|camarero/i.test(clean)) cargo = 'Mozo / Camarero'
+  else if (/cadete|delivery|repartidor/i.test(clean)) cargo = 'Cadete / Delivery'
+  else if (/limpieza/i.test(clean)) cargo = 'Personal de Limpieza'
+  else if (/atenci[oó]n/i.test(clean)) cargo = 'Atención al Cliente'
+  else cargo = 'Personal General'
+
+  cargo = cargo.charAt(0).toUpperCase() + cargo.slice(1).toLowerCase()
+
+  // 2. Zona / Barrio
+  let zona = ''
+  const zonaMatch = clean.match(/(?:zona\s*(?:del?|en)?|ubicad[oa]\s*en|barrio)\s*[:]?\s*([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{3,35})/i)
+  if (zonaMatch) {
+    zona = zonaMatch[1].replace(/para|turno|con|de|el|la|los/gi, '').trim()
+  }
+  if (!zona) {
+    if (/paso molino/i.test(clean)) zona = 'Paso Molino'
+    else if (/pocitos/i.test(clean)) zona = 'Pocitos'
+    else if (/centro/i.test(clean)) zona = 'Centro'
+    else if (/cord[oó]n/i.test(clean)) zona = 'Cordón'
+    else if (/uni[oó]n/i.test(clean)) zona = 'La Unión'
+    else if (/malv[ií]n/i.test(clean)) zona = 'Malvín'
+    else if (/carrasco/i.test(clean)) zona = 'Carrasco'
+    else zona = 'Montevideo'
+  }
+
+  // 3. Horario / Turno
+  let horario = ''
+  const horarioMatch = clean.match(/(?:turno|horario)\s*[:]?\s*([^\n\.,;]{4,50})/i)
+  if (horarioMatch) {
+    horario = horarioMatch[1].trim()
+  } else {
+    const timeMatch = clean.match(/\d{1,2}(?::\d{2})?\s*(?:a|hasta)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm|hs)?/i)
+    if (timeMatch) horario = timeMatch[0].trim()
+  }
+
+  // 4. Contacto WhatsApp
+  let contacto_whatsapp = ''
+  const phoneMatch = clean.match(/(?:(?:09|\+?598\s*9)\d[\s.-]?\d{3}[\s.-]?\d{3}|\d{8,9})/)
+  if (phoneMatch) {
+    contacto_whatsapp = phoneMatch[0].replace(/[\s.-]/g, '')
+  }
+
+  // 5. Indicaciones
+  let contacto_indicaciones = 'Contactar directamente por WhatsApp'
+  if (/no llamar/i.test(clean)) {
+    contacto_indicaciones = 'WhatsApp únicamente (no llamar por favor)'
+  }
+
+  // 6. Rubro
+  let rubro = 'Comercio y Gastronomía'
+  if (/comida|restaurante|bar|pizzer[ií]a|rotiser[ií]a|cocina|cafeter[ií]a|local de comidas/i.test(clean)) {
+    rubro = 'Gastronomía'
+  } else if (/cadete|moto|delivery|reparto|env[ií]os/i.test(clean)) {
+    rubro = 'Logística y Envíos'
+  } else if (/tienda|minimarket|supermercado|almac[eé]n|kiosco|local/i.test(clean)) {
+    rubro = 'Comercio'
+  } else if (/limpieza|dom[eé]stico/i.test(clean)) {
+    rubro = 'Servicios y Limpieza'
+  }
+
+  // 7. Título atractivo
+  let titulo = `${cargo} para ${rubro.toLowerCase()}`
+  if (zona) {
+    titulo = `${cargo} en ${zona}`
+  }
+
+  return {
+    titulo,
+    cargo,
+    rubro,
+    zona,
+    horario: horario || 'A convenir con el empleador',
+    contacto_whatsapp,
+    contacto_indicaciones,
+    descripcion: clean,
+    raw_text: clean,
+  }
+}
+
+export function formatWhatsAppUrl(phone: string, jobTitle: string): string {
+  let cleaned = phone.replace(/\D/g, '')
+  if (cleaned.startsWith('09') && cleaned.length === 9) {
+    cleaned = '598' + cleaned.substring(1)
+  } else if (cleaned.startsWith('9') && cleaned.length === 8) {
+    cleaned = '598' + cleaned
+  }
+  const msg = encodeURIComponent(`¡Hola! Vi el aviso de "${jobTitle}" en EmpleosYa y me gustaría postularme.`)
+  return `https://wa.me/${cleaned}?text=${msg}`
 }
