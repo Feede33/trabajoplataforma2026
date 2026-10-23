@@ -20,7 +20,7 @@ import { useAuth } from '@/lib/context/AuthContext'
 import { uploadCV } from '@/lib/data'
 
 export default function CandidatoPerfilPage() {
-  const { profile, updateProfile, isLoading } = useAuth()
+  const { profile, updateProfile, isLoading, isAdmin } = useAuth()
 
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
@@ -149,7 +149,7 @@ export default function CandidatoPerfilPage() {
             </p>
           </div>
           <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize">
-            {profile.role}
+            {isAdmin ? 'Administrador' : profile.role === 'admin' ? 'Usuario' : profile.role}
           </span>
         </div>
 
