@@ -30,6 +30,10 @@ import {
   FileText,
   Layers,
   ChevronRight,
+  ChevronDown,
+  Calendar,
+  Check,
+  RotateCcw,
   Trash2,
   Plus,
   RefreshCw,
@@ -98,6 +102,8 @@ export default function EmpleosInformalesPage() {
   const [search, setSearch] = useState('')
   const [selectedFecha, setSelectedFecha] = useState('todas')
   const [selectedUbicacion, setSelectedUbicacion] = useState('Todos')
+  const [openDropdown, setOpenDropdown] = useState<'fecha' | 'ubicacion' | null>(null)
+  const filterDropdownRef = useRef<HTMLDivElement>(null)
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
   const [showAdminNotice, setShowAdminNotice] = useState(false)
   const [credits, setCredits] = useState<number | null>(null)
@@ -135,6 +141,16 @@ export default function EmpleosInformalesPage() {
   useEffect(() => {
     imageQueueRef.current = imageQueue
   }, [imageQueue])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleConfirmDelete = async () => {
     if (!jobToDelete) return
@@ -767,62 +783,225 @@ export default function EmpleosInformalesPage() {
             </div>
           </div>
 
-          {/* Search bar & 2 Filtros Simplificados: Fecha y Ubicación */}
-          <div className="mt-8 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <div className="relative">
-              <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por cargo, oficio o zona (ej: Chofer, Mecánico, Manicura, Paso Molino)..."
-                className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-50 focus:bg-white border border-slate-200 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-sm text-slate-800 placeholder-slate-400"
-              />
-            </div>
+          {/* Barra de Búsqueda y Filtros Modernos: Fecha y Ubicación */}
+          {(() => {
+            const fechaOptions = [
+              { value: 'todas', label: 'Todas las fechas' },
+              { value: 'hoy', label: 'Hoy' },
+              { value: '1_semana', label: 'Esta semana' },
+              { value: '2_semanas', label: 'Últimas dos semanas' },
+              { value: '3_semanas', label: 'Últimas tres semanas' },
+              { value: 'este_mes', label: 'Este mes' },
+            ]
+            const currentFechaLabel =
+              fechaOptions.find((o) => o.value === selectedFecha)?.label || 'Todas las fechas'
+            const isFechaActive = selectedFecha !== 'todas'
+            const isUbicacionActive = selectedUbicacion !== 'Todos'
+            const hasAnyFilter = search.trim() !== '' || isFechaActive || isUbicacionActive
 
-            {/* Filtros Simplificados: Fecha y Ubicación */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* Categoría 1: Fecha */}
-              <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/70 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80">
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
-                  <Clock className="w-4 h-4 text-amber-500" />
-                  Fecha:
-                </span>
-                <select
-                  value={selectedFecha}
-                  onChange={(e) => setSelectedFecha(e.target.value)}
-                  className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="todas">Todas las fechas</option>
-                  <option value="hoy">Hoy</option>
-                  <option value="1_semana">Esta semana</option>
-                  <option value="2_semanas">Últimas dos semanas</option>
-                  <option value="3_semanas">Últimas tres semanas</option>
-                  <option value="este_mes">Este mes</option>
-                </select>
-              </div>
+            return (
+              <div
+                ref={filterDropdownRef}
+                className="mt-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl p-2.5 sm:p-3 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-lg shadow-slate-900/5"
+              >
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+                  {/* Buscador Principal */}
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Buscar por cargo, oficio o barrio (ej: Chofer, Limpieza, Pocitos)..."
+                      className="w-full h-11 pl-11 pr-9 rounded-xl bg-slate-50 dark:bg-slate-800/70 focus:bg-white dark:focus:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 transition-all"
+                    />
+                    {search && (
+                      <button
+                        type="button"
+                        onClick={() => setSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded-md"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
 
-              {/* Categoría 2: Ubicación */}
-              <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/70 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80">
-                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
-                  <MapPin className="w-4 h-4 text-amber-500" />
-                  Ubicación:
-                </span>
-                <select
-                  value={selectedUbicacion}
-                  onChange={(e) => setSelectedUbicacion(e.target.value)}
-                  className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="Todos">Todos los departamentos</option>
-                  {departamentosList.map((dep) => (
-                    <option key={dep} value={dep}>
-                      {dep}
-                    </option>
-                  ))}
-                </select>
+                  {/* Contenedor de los 2 Dropdowns Modernos */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-2.5 shrink-0">
+                    {/* Dropdown 1: Fecha */}
+                    <div className="relative lg:w-60">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenDropdown((prev) => (prev === 'fecha' ? null : 'fecha'))
+                        }
+                        className={`w-full h-11 px-3.5 rounded-xl border text-left flex items-center justify-between gap-2.5 transition-all ${
+                          openDropdown === 'fecha'
+                            ? 'bg-amber-50/70 dark:bg-slate-800 border-amber-500 ring-2 ring-amber-500/20'
+                            : isFechaActive
+                              ? 'bg-amber-50/50 dark:bg-amber-500/10 border-amber-400/80 dark:border-amber-500/40'
+                              : 'bg-slate-50 dark:bg-slate-800/70 hover:bg-slate-100/80 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-700/80'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                              isFechaActive || openDropdown === 'fecha'
+                                ? 'bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/30'
+                                : 'bg-slate-200/70 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0 leading-tight">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                              Fecha
+                            </span>
+                            <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">
+                              {currentFechaLabel}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                            openDropdown === 'fecha' ? 'rotate-180 text-amber-500' : ''
+                          }`}
+                        />
+                      </button>
+
+                      {/* Menú Flotante Fecha */}
+                      {openDropdown === 'fecha' && (
+                        <div className="absolute left-0 right-0 sm:w-64 mt-2 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/90 shadow-2xl shadow-black/25 z-40 animate-in fade-in zoom-in-95 duration-150">
+                          <div className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 mb-1">
+                            Filtrar por antigüedad
+                          </div>
+                          <div className="space-y-0.5">
+                            {fechaOptions.map((opt) => {
+                              const active = selectedFecha === opt.value
+                              return (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedFecha(opt.value)
+                                    setOpenDropdown(null)
+                                  }}
+                                  className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all ${
+                                    active
+                                      ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
+                                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                  }`}
+                                >
+                                  <span>{opt.label}</span>
+                                  {active && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Dropdown 2: Ubicación */}
+                    <div className="relative lg:w-64">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenDropdown((prev) => (prev === 'ubicacion' ? null : 'ubicacion'))
+                        }
+                        className={`w-full h-11 px-3.5 rounded-xl border text-left flex items-center justify-between gap-2.5 transition-all ${
+                          openDropdown === 'ubicacion'
+                            ? 'bg-amber-50/70 dark:bg-slate-800 border-amber-500 ring-2 ring-amber-500/20'
+                            : isUbicacionActive
+                              ? 'bg-amber-50/50 dark:bg-amber-500/10 border-amber-400/80 dark:border-amber-500/40'
+                              : 'bg-slate-50 dark:bg-slate-800/70 hover:bg-slate-100/80 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-700/80'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                              isUbicacionActive || openDropdown === 'ubicacion'
+                                ? 'bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/30'
+                                : 'bg-slate-200/70 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0 leading-tight">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
+                              Ubicación
+                            </span>
+                            <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">
+                              {selectedUbicacion === 'Todos'
+                                ? 'Todos los departamentos'
+                                : selectedUbicacion}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                            openDropdown === 'ubicacion' ? 'rotate-180 text-amber-500' : ''
+                          }`}
+                        />
+                      </button>
+
+                      {/* Menú Flotante Ubicación */}
+                      {openDropdown === 'ubicacion' && (
+                        <div className="absolute right-0 left-0 sm:left-auto sm:w-64 mt-2 p-1.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/90 shadow-2xl shadow-black/25 z-40 animate-in fade-in zoom-in-95 duration-150">
+                          <div className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 mb-1">
+                            Departamento (Uruguay)
+                          </div>
+                          <div className="max-h-64 overflow-y-auto pr-1 space-y-0.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+                            {['Todos', ...departamentosList].map((dep) => {
+                              const active = selectedUbicacion === dep
+                              const label =
+                                dep === 'Todos' ? 'Todos los departamentos' : dep
+                              return (
+                                <button
+                                  key={dep}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedUbicacion(dep)
+                                    setOpenDropdown(null)
+                                  }}
+                                  className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all ${
+                                    active
+                                      ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm'
+                                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                  }`}
+                                >
+                                  <span>{label}</span>
+                                  {active && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Botón rápido de limpiar cuando hay filtros activos */}
+                    {hasAnyFilter && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearch('')
+                          setSelectedFecha('todas')
+                          setSelectedUbicacion('Todos')
+                          setOpenDropdown(null)
+                        }}
+                        title="Restablecer filtros"
+                        className="h-11 px-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shrink-0"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span className="lg:hidden xl:inline">Limpiar</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            )
+          })()}
         </div>
       </section>
 
