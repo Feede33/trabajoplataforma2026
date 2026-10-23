@@ -160,7 +160,21 @@ export async function createJob(jobData: Omit<Job, 'id' | 'created_at' | 'update
           empresa: newJob.empresa,
         } as unknown as JobWithEmpresa
       }
-    } catch (err) {
+
+      // Límites del plan: la base de datos rechaza la publicación y no debe guardarse localmente
+      const message = error?.message || ''
+      if (message.includes('QUOTA_EXCEEDED')) {
+        const quotaError = new Error('Alcanzaste el límite de avisos de tu plan este mes.')
+        ;(quotaError as any).code = 'QUOTA_EXCEEDED'
+        throw quotaError
+      }
+      if (message.includes('ROLE_NOT_ALLOWED')) {
+        const roleError = new Error('Solo las cuentas de Empresa pueden publicar empleos.')
+        ;(roleError as any).code = 'ROLE_NOT_ALLOWED'
+        throw roleError
+      }
+    } catch (err: any) {
+      if (err?.code === 'QUOTA_EXCEEDED' || err?.code === 'ROLE_NOT_ALLOWED') throw err
       console.warn('Supabase insert failed, saving locally', err)
     }
   }

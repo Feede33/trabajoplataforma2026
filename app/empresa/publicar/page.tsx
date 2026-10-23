@@ -14,10 +14,11 @@ import { RUBROS, MODALIDADES, TIPOS_CONTRATO, slugify } from '@/lib/utils'
 import { createJob } from '@/lib/data'
 import { useAuth } from '@/lib/context/AuthContext'
 import { JobModalidad, JobTipoContrato } from '@/lib/supabase/database.types'
+import { BillingStatus, fetchBillingStatus } from '@/lib/billing-client'
 
 export default function PublicarEmpleoPage() {
   const router = useRouter()
-  const { profile, isLoading } = useAuth()
+  const { profile, isLoading, isAdmin } = useAuth()
 
   const [titulo, setTitulo] = useState('')
   const [rubro, setRubro] = useState(RUBROS[0])
@@ -29,6 +30,8 @@ export default function PublicarEmpleoPage() {
   const [descripcion, setDescripcion] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [quotaExceeded, setQuotaExceeded] = useState(false)
+  const [billing, setBilling] = useState<BillingStatus | null>(null)
 
   useEffect(() => {
     if (profile?.ubicacion) {
@@ -37,6 +40,11 @@ export default function PublicarEmpleoPage() {
       setZona('Montevideo, Uruguay')
     }
   }, [profile])
+
+  useEffect(() => {
+    if (!profile || isAdmin) return
+    fetchBillingStatus(profile.id).then(setBilling).catch(() => setBilling(null))
+  }, [profile, isAdmin])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,6 +89,7 @@ export default function PublicarEmpleoPage() {
 
       router.push('/empresa/dashboard')
     } catch (err: any) {
+      setQuotaExceeded(err?.code === 'QUOTA_EXCEEDED')
       setError(err.message || 'Error al publicar la vacante.')
       setIsSubmitting(false)
     }
@@ -149,10 +158,29 @@ export default function PublicarEmpleoPage() {
           </p>
         </div>
 
+        {billing && !isAdmin && (
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-xl bg-indigo-50 border border-indigo-100 text-xs text-indigo-900">
+            <span>
+              Plan <strong className="capitalize">{billing.plan}</strong>: usaste <strong>{billing.avisosUsados}</strong> de{' '}
+              <strong>{billing.avisosLimite}</strong> avisos este mes.
+            </span>
+            {billing.plan === 'gratis' && (
+              <Link href="/planes" className="font-bold text-indigo-700 hover:underline">
+                Ver planes
+              </Link>
+            )}
+          </div>
+        )}
+
         {error && (
           <div className="flex items-center gap-2 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
+            {quotaExceeded && (
+              <Link href="/planes" className="ml-auto shrink-0 font-bold text-indigo-700 hover:underline">
+                Mejorar mi plan
+              </Link>
+            )}
           </div>
         )}
 

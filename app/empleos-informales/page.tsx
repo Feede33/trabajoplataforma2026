@@ -36,6 +36,8 @@ import { InformalJob } from '@/lib/supabase/database.types'
 import { fetchInformalJobs, createInformalJob, deleteInformalJob, parseInformalJobWithAI, formatWhatsAppUrl, formatGmailUrl } from '@/lib/data'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/lib/context/AuthContext'
+import { AI_ALLOWED_ROLES } from '@/lib/billing'
+import { fetchBillingStatus } from '@/lib/billing-client'
 
 export default function EmpleosInformalesPage() {
   const { profile, isAdmin, getAccessToken } = useAuth()
@@ -45,6 +47,7 @@ export default function EmpleosInformalesPage() {
   const [selectedRubro, setSelectedRubro] = useState('Todos')
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
   const [showAdminNotice, setShowAdminNotice] = useState(false)
+  const [credits, setCredits] = useState<number | null>(null)
 
   // AI Modal states
   const [aiTab, setAiTab] = useState<'image' | 'text'>('image')
@@ -98,8 +101,20 @@ export default function EmpleosInformalesPage() {
     load()
   }, [])
 
+  const canUseAi = isAdmin || (!!profile && AI_ALLOWED_ROLES.includes(profile.role as 'candidato' | 'empresa'))
+
+  const loadCredits = async () => {
+    if (!profile || isAdmin) return
+    try {
+      const status = await fetchBillingStatus(profile.id)
+      setCredits(status.creditos)
+    } catch {
+      setCredits(null)
+    }
+  }
+
   const handleOpenAiModal = () => {
-    if (!isAdmin) {
+    if (!canUseAi) {
       setShowAdminNotice(true)
       return
     }
@@ -107,6 +122,7 @@ export default function EmpleosInformalesPage() {
     setPublishError('')
     setPublishSuccess(false)
     setPublishSuccessMessage('')
+    loadCredits()
   }
 
   const handleFileChosen = (file: File) => {
@@ -182,7 +198,8 @@ export default function EmpleosInformalesPage() {
   }
 
   const handleProcessWithGemini = async (publishNow?: boolean) => {
-    const shouldPublish = typeof publishNow === 'boolean' ? publishNow : autoPublishDirectly
+    // Los usuarios no admin siempre publican directo (se descuenta 1 crédito por uso)
+    const shouldPublish = !isAdmin ? true : typeof publishNow === 'boolean' ? publishNow : autoPublishDirectly
     setPublishError('')
     setIsAnalyzing(true)
 
@@ -225,6 +242,9 @@ export default function EmpleosInformalesPage() {
       if (shouldPublish) {
         // Se publicó directamente en Supabase
         setJobs((prev) => [...returnedJobs, ...prev])
+        if (!isAdmin) {
+          loadCredits()
+        }
         setPublishSuccess(true)
         setPublishSuccessMessage(
           `¡Éxito! Se interpretó y publicó ${returnedJobs.length} oferta(s) de empleo automáticamente.`
@@ -376,12 +396,12 @@ export default function EmpleosInformalesPage() {
               </p>
             </div>
 
-            {/* AI Assistant Button (Only Admin or Subscription Preview) */}
+            {/* AI Assistant Button */}
             <div className="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
               <button
                 onClick={handleOpenAiModal}
                 className={`w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl font-bold text-sm shadow-md transition-all ${
-                  isAdmin
+                  canUseAi
                     ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-amber-500/25 hover:shadow-lg transform hover:-translate-y-0.5'
                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
@@ -394,12 +414,20 @@ export default function EmpleosInformalesPage() {
                       Admin
                     </span>
                   </>
+                ) : canUseAi ? (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-200" />
+                    <span>Publicar con IA</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-800 text-amber-100 font-extrabold uppercase">
+                      IA Vision
+                    </span>
+                  </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4 text-slate-400" />
+                    <Sparkles className="w-4 h-4 text-amber-500" />
                     <span>Publicar con IA</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">
-                      Próximamente Suscripción
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-50 text-amber-800 font-bold border border-amber-200">
+                      Ver Planes
                     </span>
                   </>
                 )}
@@ -670,23 +698,30 @@ export default function EmpleosInformalesPage() {
         </div>
       </main>
 
-      {/* Modal: Aviso de Solo Administrador */}
+      {/* Modal: Aviso de Acceso a IA / Planes */}
       {showAdminNotice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
           <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 text-center space-y-5">
             <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
-              <Lock className="w-8 h-8" />
+              <Sparkles className="w-8 h-8" />
             </div>
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                Acceso Restringido
+                Publicador con IA
               </span>
               <h3 className="text-xl font-extrabold text-slate-900 mt-1">
-                Publicación con IA exclusiva para Administradores
+                Publicá avisos informales con Inteligencia Artificial
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed mt-2">
-                Por el momento, solo el administrador de la plataforma puede publicar e interpretar avisos con la IA.
-                Más adelante se habilitará para empresas y particulares mediante un <strong>sistema de suscripción</strong>.
+                {!profile ? (
+                  <>
+                    Subí una foto de un cartel, clasificado o captura de WhatsApp y la IA arma y publica el aviso al instante. Iniciá sesión con tu cuenta o consultá los packs de usos de IA.
+                  </>
+                ) : (
+                  <>
+                    Las cuentas de <strong>Empresa</strong> publican ofertas formales desde su panel (con 2 avisos gratis por mes o planes mensuales). Los avisos informales con IA están disponibles para administradores y cuentas de Candidato con créditos.
+                  </>
+                )}
               </p>
             </div>
             <div className="pt-2 flex flex-col gap-2">
@@ -695,22 +730,35 @@ export default function EmpleosInformalesPage() {
                   href="/auth/login?redirect=/empleos-informales"
                   className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-colors"
                 >
-                  Iniciar Sesión como Administrador
+                  Iniciar Sesión
                 </Link>
-              ) : null}
+              ) : (
+                <Link
+                  href="/empresa/publicar"
+                  className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-colors"
+                >
+                  Ir a Publicar Empleo Formal
+                </Link>
+              )}
+              <Link
+                href="/planes"
+                className="w-full py-2.5 px-5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs transition-colors"
+              >
+                Ver Planes y Créditos de IA
+              </Link>
               <button
                 onClick={() => setShowAdminNotice(false)}
                 className="w-full py-2.5 px-5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors"
               >
-                Entendido
+                Cerrar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Publicar con IA (Solo Admin) */}
-      {isAiModalOpen && isAdmin && (
+      {/* Modal: Publicar con IA (Admin o Usuario con Créditos) */}
+      {isAiModalOpen && canUseAi && (
         <div
           onPaste={handlePaste}
           className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
@@ -723,13 +771,19 @@ export default function EmpleosInformalesPage() {
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
                       Publicador Inteligente con Google Gemini
                     </h3>
-                    <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 uppercase">
-                      Admin Vision
-                    </span>
+                    {isAdmin ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 uppercase">
+                        Admin Vision
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900">
+                        Créditos IA: {credits ?? '...'}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500">
                     Subí fotos de clasificados, vidrieras, capturas de WhatsApp o pegá texto.
@@ -778,6 +832,17 @@ export default function EmpleosInformalesPage() {
 
             {/* Scrollable Body */}
             <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
+              {!isAdmin && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-900">
+                  <span>
+                    Disponés de <strong>{credits ?? '...'}</strong> uso(s) de IA (cada uso interpreta y publica hasta 5 avisos).
+                  </span>
+                  <Link href="/planes" className="font-extrabold text-amber-800 underline hover:text-amber-950">
+                    Comprar más usos
+                  </Link>
+                </div>
+              )}
+
               {publishSuccess && (
                 <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2 animate-in fade-in">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -786,9 +851,16 @@ export default function EmpleosInformalesPage() {
               )}
 
               {publishError && (
-                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2 animate-in fade-in">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>{publishError}</span>
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center justify-between gap-2 animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{publishError}</span>
+                  </div>
+                  {!isAdmin && (
+                    <Link href="/planes" className="shrink-0 font-extrabold text-rose-800 underline">
+                      Comprar créditos
+                    </Link>
+                  )}
                 </div>
               )}
 
@@ -884,17 +956,23 @@ export default function EmpleosInformalesPage() {
 
                       {/* Modo Toggle */}
                       <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={autoPublishDirectly}
-                            onChange={(e) => setAutoPublishDirectly(e.target.checked)}
-                            className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
-                          />
-                          <span className="text-xs font-bold text-slate-700">
-                            Publicar automáticamente si la extracción es exitosa
+                        {isAdmin ? (
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={autoPublishDirectly}
+                              onChange={(e) => setAutoPublishDirectly(e.target.checked)}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                            />
+                            <span className="text-xs font-bold text-slate-700">
+                              Publicar automáticamente si la extracción es exitosa
+                            </span>
+                          </label>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-600">
+                            Se descontará 1 uso de IA al interpretar y publicar
                           </span>
-                        </label>
+                        )}
 
                         <button
                           type="button"
@@ -911,7 +989,7 @@ export default function EmpleosInformalesPage() {
                             <>
                               <Sparkles className="w-4 h-4" />
                               <span>
-                                {autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer Campos'}
+                                {!isAdmin || autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer Campos'}
                               </span>
                             </>
                           )}
@@ -968,17 +1046,23 @@ export default function EmpleosInformalesPage() {
                     />
 
                     <div className="flex items-center justify-between pt-1">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={autoPublishDirectly}
-                          onChange={(e) => setAutoPublishDirectly(e.target.checked)}
-                          className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
-                        />
-                        <span className="text-xs font-bold text-slate-700">
-                          Publicar directo automáticamente
+                      {isAdmin ? (
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={autoPublishDirectly}
+                            onChange={(e) => setAutoPublishDirectly(e.target.checked)}
+                            className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                          />
+                          <span className="text-xs font-bold text-slate-700">
+                            Publicar directo automáticamente
+                          </span>
+                        </label>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-600">
+                          Se descontará 1 uso de IA al interpretar y publicar
                         </span>
-                      </label>
+                      )}
 
                       <button
                         type="button"
@@ -995,7 +1079,7 @@ export default function EmpleosInformalesPage() {
                           <>
                             <Sparkles className="w-3.5 h-3.5 text-amber-200" />
                             <span>
-                              {autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer con Gemini'}
+                              {!isAdmin || autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer con Gemini'}
                             </span>
                           </>
                         )}
@@ -1194,21 +1278,23 @@ export default function EmpleosInformalesPage() {
                 >
                   Cerrar
                 </button>
-                <button
-                  type="button"
-                  disabled={!parsedPreview || isPublishing}
-                  onClick={handlePublishFromAI}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-amber-200 transition-all"
-                >
-                  {isPublishing ? (
-                    <span>Guardando...</span>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Publicar Aviso</span>
-                    </>
-                  )}
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    disabled={!parsedPreview || isPublishing}
+                    onClick={handlePublishFromAI}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-amber-200 transition-all"
+                  >
+                    {isPublishing ? (
+                      <span>Guardando...</span>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Publicar Aviso</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

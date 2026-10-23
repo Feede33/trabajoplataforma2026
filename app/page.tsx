@@ -390,13 +390,19 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="pt-6">
+            <div className="pt-6 flex flex-wrap items-center gap-3">
               <Link
                 href="/empresa/publicar"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm transition-colors shadow-md shadow-emerald-500/20"
               >
-                <span>Publicar Empleo Gratis</span>
+                <span>Publicar Empleo (2 gratis/mes)</span>
                 <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/planes"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition-colors"
+              >
+                <span>Ver Planes</span>
               </Link>
             </div>
           </div>

@@ -95,6 +95,17 @@ export function Navbar() {
               </span>
             </Link>
 
+            <Link
+              href="/planes"
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                pathname === '/planes'
+                  ? 'text-indigo-600 bg-indigo-50 font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              Planes
+            </Link>
+
             {isEmpresa && (
               <>
                 <Link
@@ -331,6 +342,15 @@ export function Navbar() {
               <span className="px-2 py-0.5 text-[10px] bg-amber-200 text-amber-900 rounded-full font-bold">
                 WhatsApp
               </span>
+            </Link>
+
+            <Link
+              href="/planes"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              Planes
             </Link>
 
             {isEmpresa && (

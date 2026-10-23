@@ -1,59 +1,86 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { parseInformalJobWithAI } from '@/lib/data'
 import { extractJobsFromImage, extractJobsFromText, ExtractedInformalJob } from '@/lib/gemini'
-import { isUserAdmin, isProfileAdmin } from '@/lib/auth-utils'
+import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/server/auth'
+import { AI_ALLOWED_ROLES, MAX_AVISOS_POR_USO_IA } from '@/lib/billing'
 
 export async function POST(request: Request) {
+  let refundUserId: string | null = null
+  const service = getServiceClient()
+
+  const refundCredit = async () => {
+    if (refundUserId && service) {
+      const { error } = await service.rpc('refund_ai_credit', { p_user: refundUserId })
+      if (error) console.error('No se pudo devolver el crédito de IA:', error)
+      refundUserId = null
+    }
+  }
+
   try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const backendReady = isBackendConfigured()
+    let isAdmin = false
 
-    // Verificación de seguridad: Autenticación y Autorización de Administrador
-    if (url && key && !url.includes('your-supabase-project')) {
-      const authHeader = request.headers.get('authorization')
-      const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : null
+    // Verificación de seguridad: Autenticación y Autorización (admin o usuario con créditos)
+    if (backendReady) {
+      const ctx = await getAuthedContext(request)
 
-      if (!token) {
+      if (!ctx) {
         return NextResponse.json(
-          { error: 'No autorizado. Debes iniciar sesión como administrador para utilizar esta función.' },
+          { error: 'No autorizado. Debes iniciar sesión para utilizar esta función.' },
           { status: 401 }
         )
       }
 
-      const supabaseAuth = createClient(url, key)
-      const {
-        data: { user },
-        error: authError,
-      } = await supabaseAuth.auth.getUser(token)
+      isAdmin = ctx.isAdmin
 
-      if (authError || !user) {
-        return NextResponse.json(
-          { error: 'Sesión inválida o expirada. Por favor iniciá sesión nuevamente.' },
-          { status: 401 }
-        )
-      }
+      if (!isAdmin) {
+        if (!ctx.role || !AI_ALLOWED_ROLES.includes(ctx.role as 'candidato' | 'empresa')) {
+          return NextResponse.json(
+            {
+              error:
+                'Acceso denegado. La publicación con IA está disponible para el administrador y para usuarios con cuenta de Candidato que compren créditos.',
+            },
+            { status: 403 }
+          )
+        }
 
-      // Verificar si es admin dinámicamente en la base de datos o por email de respaldo
-      const { data: userProfile } = await supabaseAuth
-        .from('profiles')
-        .select('is_admin, role, email')
-        .eq('id', user.id)
-        .single()
+        if (!service) {
+          return NextResponse.json(
+            { error: 'El servicio no está configurado correctamente. Contactá al administrador.' },
+            { status: 503 }
+          )
+        }
 
-      if (!isProfileAdmin(userProfile || { email: user.email })) {
-        return NextResponse.json(
-          {
-            error:
-              'Acceso denegado. Solo el administrador de la plataforma tiene permisos para publicar o procesar avisos con IA.',
-          },
-          { status: 403 }
-        )
+        // Cobro: 1 crédito por uso. Se descuenta de forma atómica antes de llamar a la IA.
+        const { data: consumed, error: creditError } = await service.rpc('consume_ai_credit', { p_user: ctx.userId })
+        if (creditError) {
+          console.error('Error consumiendo crédito de IA:', creditError)
+          return NextResponse.json({ error: 'No se pudo verificar tu saldo de créditos.' }, { status: 500 })
+        }
+        if (!consumed) {
+          return NextResponse.json(
+            { error: 'No tenés créditos de IA disponibles. Comprá un paquete para continuar.', code: 'NO_CREDITS' },
+            { status: 402 }
+          )
+        }
+        refundUserId = ctx.userId
       }
     }
 
     const body = await request.json()
-    const autoPublish = body.autoPublish !== false // true por defecto
+
+    // Los usuarios no admin solo pueden usar la IA (imagen o texto) y siempre se publica directo.
+    // Así se evita publicar avisos estructurados a mano sin pagar el uso.
+    const sendsRawContent = (typeof body.image === 'string' && body.image) || (typeof body.text === 'string' && body.text)
+    if (backendReady && !isAdmin && !sendsRawContent) {
+      await refundCredit()
+      return NextResponse.json(
+        { error: 'Solo se pueden publicar avisos enviando una imagen o un texto para interpretar con IA.' },
+        { status: 400 }
+      )
+    }
+
+    const autoPublish = isAdmin || !backendReady ? body.autoPublish !== false : true // true por defecto
 
     let extractedJobs: ExtractedInformalJob[] = []
 
@@ -63,6 +90,7 @@ export async function POST(request: Request) {
         extractedJobs = await extractJobsFromImage(body.image, body.mimeType || 'image/jpeg')
       } catch (geminiErr: any) {
         console.error('Error procesando imagen con Gemini:', geminiErr)
+        await refundCredit()
         return NextResponse.json(
           { error: `Error interpretando imagen con IA: ${geminiErr.message}` },
           { status: 500 }
@@ -84,7 +112,7 @@ export async function POST(request: Request) {
         extractedJobs = [fallback]
       }
     }
-    // 3. Caso: El cliente ya envía los datos estructurados directamente
+    // 3. Caso: El cliente ya envía los datos estructurados directamente (solo admin)
     else if (body.cargo) {
       extractedJobs = [
         {
@@ -104,6 +132,7 @@ export async function POST(request: Request) {
         },
       ]
     } else {
+      await refundCredit()
       return NextResponse.json(
         {
           error:
@@ -114,10 +143,16 @@ export async function POST(request: Request) {
     }
 
     if (!extractedJobs || extractedJobs.length === 0) {
+      await refundCredit()
       return NextResponse.json(
         { error: 'No se detectó ninguna oferta de empleo en el contenido proporcionado.' },
         { status: 422 }
       )
+    }
+
+    // Un uso de IA publica como máximo N avisos (el admin no tiene tope)
+    if (backendReady && !isAdmin) {
+      extractedJobs = extractedJobs.slice(0, MAX_AVISOS_POR_USO_IA)
     }
 
     // Preparar registros para la base de datos
@@ -139,7 +174,7 @@ export async function POST(request: Request) {
       activo: true,
     }))
 
-    // Si solo se solicitó interpretar sin publicar
+    // Si solo se solicitó interpretar sin publicar (solo admin)
     if (!autoPublish) {
       return NextResponse.json({
         success: true,
@@ -150,15 +185,20 @@ export async function POST(request: Request) {
     }
 
     // Publicar en Supabase si está configurado
-    if (url && key && !url.includes('your-supabase-project')) {
-      const supabase = createClient(url, key)
-      const { data, error } = await supabase
-        .from('informal_jobs')
-        .insert(jobsToInsert)
-        .select()
+    if (backendReady) {
+      if (!service) {
+        await refundCredit()
+        return NextResponse.json(
+          { error: 'El servicio no está configurado para publicar avisos (falta SUPABASE_SERVICE_ROLE_KEY).' },
+          { status: 503 }
+        )
+      }
+
+      const { data, error } = await service.from('informal_jobs').insert(jobsToInsert).select()
 
       if (error) {
         console.error('Error insertando empleos informales en Supabase:', error)
+        await refundCredit()
         return NextResponse.json(
           {
             error: 'Error guardando en la base de datos: ' + error.message,
@@ -167,6 +207,8 @@ export async function POST(request: Request) {
           { status: 500 }
         )
       }
+
+      refundUserId = null // el crédito quedó consumido correctamente
 
       return NextResponse.json({
         success: true,
@@ -189,6 +231,7 @@ export async function POST(request: Request) {
       })),
     })
   } catch (error: any) {
+    await refundCredit()
     return NextResponse.json(
       { error: error.message || 'Error procesando la solicitud' },
       { status: 500 }
@@ -199,6 +242,6 @@ export async function POST(request: Request) {
 export async function GET() {
   return NextResponse.json({
     status: 'online',
-    description: 'Endpoint protegido de ingesta e interpretación con Google Gemini Vision para administradores',
+    description: 'Endpoint protegido de ingesta e interpretación con Google Gemini Vision (administradores y usuarios con créditos)',
   })
 }
