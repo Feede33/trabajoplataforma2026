@@ -16,12 +16,11 @@ import {
   Users,
   Search,
   Sparkles,
-  Database,
   Zap
 } from 'lucide-react'
 
 export function Navbar() {
-  const { profile, role, isAdmin, logout, isConfigured } = useAuth()
+  const { profile, role, isAdmin, logout } = useAuth()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -56,15 +55,6 @@ export function Navbar() {
                 </span>
               </div>
             </Link>
-
-            {/* Backend status badge */}
-            {isConfigured && (
-              <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-emerald-200 bg-emerald-50 text-emerald-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <Database className="w-3 h-3 text-emerald-600" />
-                <span>Supabase Conectado</span>
-              </div>
-            )}
           </div>
 
           {/* Desktop Navigation */}
@@ -311,15 +301,6 @@ export function Navbar() {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-5 pt-3 pb-6 space-y-4">
-          {isConfigured && (
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-emerald-200 bg-emerald-50 text-emerald-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Backend Conectado</span>
-              </div>
-            </div>
-          )}
-
           <div className="space-y-1">
             <Link
               href="/empleos"
