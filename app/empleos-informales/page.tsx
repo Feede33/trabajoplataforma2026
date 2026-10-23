@@ -30,7 +30,10 @@ import {
   FileText,
   Layers,
   ChevronRight,
-  Trash2
+  Trash2,
+  Plus,
+  RefreshCw,
+  PauseCircle
 } from 'lucide-react'
 import { InformalJob } from '@/lib/supabase/database.types'
 import { fetchInformalJobs, deleteInformalJob, formatWhatsAppUrl, formatGmailUrl } from '@/lib/data'
@@ -39,6 +42,54 @@ import { useAuth } from '@/lib/context/AuthContext'
 import { AI_ALLOWED_ROLES } from '@/lib/billing'
 import { fetchBillingStatus } from '@/lib/billing-client'
 import { CompanyContactsSidebar } from '@/components/empleos-informales/CompanyContactsSidebar'
+
+const MAX_BATCH_IMAGES = 20
+const API_COOLDOWN_MS = 2500
+
+interface QueuedImageItem {
+  id: string
+  name: string
+  fileSignature: string
+  dataUrl: string
+  mimeType: string
+  status: 'pending' | 'processing' | 'cooldown' | 'done' | 'skipped' | 'error'
+  publishedCount: number
+  skippedCount: number
+  errorMessage?: string
+}
+
+function compressImageToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error(`No se pudo leer el archivo ${file.name}`))
+    reader.onload = (e) => {
+      const originalDataUrl = e.target?.result as string
+      const img = new window.Image()
+      img.onerror = () => reject(new Error(`No se pudo cargar la imagen ${file.name}`))
+      img.onload = () => {
+        const MAX_SIDE = 1280
+        let { width, height } = img
+        if (width > MAX_SIDE || height > MAX_SIDE) {
+          if (width >= height) {
+            height = Math.round((height * MAX_SIDE) / width)
+            width = MAX_SIDE
+          } else {
+            width = Math.round((width * MAX_SIDE) / height)
+            height = MAX_SIDE
+          }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', 0.8))
+      }
+      img.src = originalDataUrl
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function EmpleosInformalesPage() {
   const { profile, isAdmin, getAccessToken } = useAuth()
@@ -53,11 +104,13 @@ export default function EmpleosInformalesPage() {
   // AI Modal states
   const [inputMode, setInputMode] = useState<'image' | 'text'>('image')
   const [rawText, setRawText] = useState('')
+  const [imageQueue, setImageQueue] = useState<QueuedImageItem[]>([])
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageMime, setImageMime] = useState('image/jpeg')
   const [imageName, setImageName] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isStoppingBatch, setIsStoppingBatch] = useState(false)
   const [autoPublishDirectly, setAutoPublishDirectly] = useState(true)
   const [extractedList, setExtractedList] = useState<(Partial<InformalJob> & { fecha_detectada?: string | null })[]>([])
   const [activeExtractedIndex, setActiveExtractedIndex] = useState(0)
@@ -74,6 +127,13 @@ export default function EmpleosInformalesPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageQueueRef = useRef<QueuedImageItem[]>([])
+  const stopBatchRef = useRef(false)
+  const queueItemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  useEffect(() => {
+    imageQueueRef.current = imageQueue
+  }, [imageQueue])
 
   const handleConfirmDelete = async () => {
     if (!jobToDelete) return
@@ -126,53 +186,113 @@ export default function EmpleosInformalesPage() {
     loadCredits()
   }
 
-  const handleFileChosen = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setPublishError('El archivo seleccionado debe ser una imagen (JPG, PNG, WEBP, etc.)')
+  const handleFilesChosen = async (fileList: FileList | File[]) => {
+    const incomingFiles = Array.from(fileList)
+    const validImageFiles = incomingFiles.filter((f) => f.type.startsWith('image/'))
+
+    if (validImageFiles.length === 0) {
+      setPublishError('Los archivos seleccionados deben ser imágenes (JPG, PNG, WEBP, etc.)')
       return
     }
-    setPublishError('')
-    setImageName(file.name)
 
-    // Comprimir imagen client-side antes de enviarla (fotos de celular pueden pesar 5-15 MB)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const originalDataUrl = e.target?.result as string
-      const img = new window.Image()
-      img.onload = () => {
-        const MAX_SIDE = 1280
-        let { width, height } = img
-        if (width > MAX_SIDE || height > MAX_SIDE) {
-          if (width >= height) {
-            height = Math.round((height * MAX_SIDE) / width)
-            width = MAX_SIDE
-          } else {
-            width = Math.round((width * MAX_SIDE) / height)
-            height = MAX_SIDE
-          }
-        }
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')!
-        ctx.drawImage(img, 0, 0, width, height)
-        // Exportar siempre como JPEG al 80% de calidad (~150-250 KB)
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
-        setImageMime('image/jpeg')
-        setImagePreview(compressedDataUrl)
-        setExtractedList([])
-        setParsedPreview(null)
-      }
-      img.src = originalDataUrl
+    setPublishError('')
+    setPublishSuccess(false)
+
+    const currentQueue = imageQueueRef.current
+    const remainingSlots = MAX_BATCH_IMAGES - currentQueue.length
+
+    if (remainingSlots <= 0) {
+      setPublishError(`Ya alcanzaste el límite máximo de ${MAX_BATCH_IMAGES} imágenes en la cola.`)
+      return
     }
-    reader.readAsDataURL(file)
+
+    // Filtrar archivos idénticos que ya estén cargados en la cola actual
+    const uniqueFiles = validImageFiles.filter((file) => {
+      const sig = `${file.name}-${file.size}-${file.lastModified}`
+      return !currentQueue.some((item) => item.fileSignature === sig)
+    })
+
+    if (uniqueFiles.length === 0) {
+      setPublishError('Esa(s) imagen(es) ya se encuentran cargadas en la cola actual.')
+      return
+    }
+
+    const filesToProcess = uniqueFiles.slice(0, remainingSlots)
+    if (uniqueFiles.length > remainingSlots) {
+      setPublishError(
+        `Se agregaron ${remainingSlots} imagen(es) hasta alcanzar el tope de ${MAX_BATCH_IMAGES} fotos por tanda.`
+      )
+    }
+
+    const newQueueItems: QueuedImageItem[] = []
+    for (const file of filesToProcess) {
+      try {
+        const compressedDataUrl = await compressImageToDataUrl(file)
+        newQueueItems.push({
+          id: 'img-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+          name: file.name || 'Captura.jpg',
+          fileSignature: `${file.name}-${file.size}-${file.lastModified}`,
+          dataUrl: compressedDataUrl,
+          mimeType: 'image/jpeg',
+          status: 'pending',
+          publishedCount: 0,
+          skippedCount: 0,
+        })
+      } catch (err) {
+        console.warn('No se pudo comprimir imagen:', file.name, err)
+      }
+    }
+
+    if (newQueueItems.length > 0) {
+      const updated = [...imageQueueRef.current, ...newQueueItems]
+      imageQueueRef.current = updated
+      setImageQueue(updated)
+      setImageMime('image/jpeg')
+      setImagePreview(updated[0].dataUrl)
+      setImageName(updated[0].name)
+      setExtractedList([])
+      setParsedPreview(null)
+    }
+  }
+
+  const handleRemoveQueuedImage = (id: string) => {
+    const updated = imageQueueRef.current.filter((item) => item.id !== id)
+    imageQueueRef.current = updated
+    setImageQueue(updated)
+    if (updated.length === 0) {
+      setImagePreview(null)
+      setImageName('')
+      setExtractedList([])
+      setParsedPreview(null)
+    } else {
+      setImagePreview(updated[0].dataUrl)
+      setImageName(updated[0].name)
+    }
+  }
+
+  const handleClearQueue = () => {
+    if (isAnalyzing) return
+    imageQueueRef.current = []
+    setImageQueue([])
+    setImagePreview(null)
+    setImageName('')
+    setExtractedList([])
+    setParsedPreview(null)
+    setPublishError('')
+    setPublishSuccess(false)
+    setPublishSuccessMessage('')
+  }
+
+  const handleStopBatch = () => {
+    stopBatchRef.current = true
+    setIsStoppingBatch(true)
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileChosen(e.dataTransfer.files[0])
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesChosen(e.dataTransfer.files)
     }
   }
 
@@ -186,25 +306,184 @@ export default function EmpleosInformalesPage() {
     setIsDragging(false)
   }
 
-  // Permite pegar una captura de pantalla directamente con Ctrl + V
+  // Permite pegar una o varias capturas de pantalla directamente con Ctrl + V
   const handlePaste = (e: React.ClipboardEvent) => {
     if (e.clipboardData.files && e.clipboardData.files.length > 0) {
-      const file = e.clipboardData.files[0]
-      if (file.type.startsWith('image/')) {
+      const imageFiles = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
+      if (imageFiles.length > 0) {
         e.preventDefault()
         setInputMode('image')
-        handleFileChosen(file)
+        handleFilesChosen(imageFiles)
       }
     }
   }
 
+  const updateQueueItem = (id: string, patch: Partial<QueuedImageItem>) => {
+    const next = imageQueueRef.current.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    imageQueueRef.current = next
+    setImageQueue(next)
+  }
+
   const handleProcessWithGemini = async (publishNow?: boolean) => {
-    // Los usuarios no admin siempre publican directo (se descuenta 1 crédito por uso)
-    const shouldPublish = !isAdmin ? true : typeof publishNow === 'boolean' ? publishNow : autoPublishDirectly
+    // Si hay más de 1 imagen en la cola o el usuario no es admin, siempre se procesa en modo secuencial auto-publicable
+    const isMultiBatch = inputMode === 'image' && imageQueueRef.current.length > 1
+    const shouldPublish =
+      !isAdmin || isMultiBatch
+        ? true
+        : typeof publishNow === 'boolean'
+          ? publishNow
+          : autoPublishDirectly
+
     setPublishError('')
+    setPublishSuccess(false)
+    setPublishSuccessMessage('')
     setIsAnalyzing(true)
+    stopBatchRef.current = false
+    setIsStoppingBatch(false)
 
     try {
+      // MODO IMAGEN CON COLA PROGRESIVA (1 a 20 imágenes secuenciales)
+      if (inputMode === 'image' && shouldPublish) {
+        if (imageQueueRef.current.length === 0) {
+          throw new Error('Primero debés seleccionar o arrastrar al menos una imagen.')
+        }
+
+        // Si había imágenes con error, pasarlas nuevamente a 'pending' para reintentar
+        const resetQueue = imageQueueRef.current.map((item) =>
+          item.status === 'error' || item.status === 'cooldown'
+            ? { ...item, status: 'pending' as const, errorMessage: undefined }
+            : item
+        )
+        imageQueueRef.current = resetQueue
+        setImageQueue(resetQueue)
+
+        const pendingIds = resetQueue
+          .filter((item) => item.status === 'pending')
+          .map((item) => item.id)
+
+        if (pendingIds.length === 0) {
+          throw new Error('Todas las imágenes de la lista ya fueron procesadas. Agregá nuevas fotos o vaciá la lista.')
+        }
+
+        let totalNewJobs = 0
+        let totalSkippedDuplicates = 0
+        let processedPhotos = 0
+
+        for (let idx = 0; idx < pendingIds.length; idx++) {
+          if (stopBatchRef.current) {
+            break
+          }
+
+          const currentId = pendingIds[idx]
+          const currentItem = imageQueueRef.current.find((it) => it.id === currentId)
+          if (!currentItem) continue
+
+          // 1. Marcar imagen actual como "Interpretando con IA..."
+          updateQueueItem(currentId, { status: 'processing', errorMessage: undefined })
+
+          // Hacer scroll suave hacia la tarjeta que se está procesando
+          setTimeout(() => {
+            queueItemRefs.current[currentId]?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+            })
+          }, 50)
+
+          try {
+            const token = await getAccessToken()
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            if (token) {
+              headers['Authorization'] = `Bearer ${token}`
+            }
+
+            const res = await fetch('/api/ai-publish', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                autoPublish: true,
+                image: currentItem.dataUrl,
+                mimeType: currentItem.mimeType,
+              }),
+            })
+
+            const data = await res.json()
+
+            if (!res.ok) {
+              updateQueueItem(currentId, {
+                status: 'error',
+                errorMessage: data.error || 'No se pudo procesar esta imagen.',
+              })
+              // Si se quedó sin créditos (402), cortamos la cola para no seguir intentando
+              if (res.status === 402) {
+                setPublishError(data.error || 'No tenés créditos suficientes para continuar con el lote.')
+                break
+              }
+            } else {
+              const returnedJobs: InformalJob[] = data.jobs || []
+              const skippedInPhoto: number = data.skippedDuplicates || 0
+
+              if (returnedJobs.length > 0) {
+                setJobs((prev) => [...returnedJobs, ...prev])
+                totalNewJobs += returnedJobs.length
+              }
+              totalSkippedDuplicates += skippedInPhoto
+              processedPhotos++
+
+              if (!isAdmin) {
+                loadCredits()
+              }
+
+              if (returnedJobs.length === 0 && skippedInPhoto > 0) {
+                updateQueueItem(currentId, {
+                  status: 'skipped',
+                  publishedCount: 0,
+                  skippedCount: skippedInPhoto,
+                })
+              } else {
+                updateQueueItem(currentId, {
+                  status: 'done',
+                  publishedCount: returnedJobs.length,
+                  skippedCount: skippedInPhoto,
+                })
+              }
+            }
+          } catch (itemErr: any) {
+            updateQueueItem(currentId, {
+              status: 'error',
+              errorMessage: itemErr.message || 'Error de red al procesar imagen.',
+            })
+          }
+
+          // 2. Si queda otra imagen pendiente en la cola y no se pidió detener, hacer pausa anti-saturación
+          const nextId = pendingIds[idx + 1]
+          if (nextId && !stopBatchRef.current) {
+            updateQueueItem(nextId, { status: 'cooldown' })
+            setTimeout(() => {
+              queueItemRefs.current[nextId]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+              })
+            }, 50)
+            await new Promise((resolve) => setTimeout(resolve, API_COOLDOWN_MS))
+          }
+        }
+
+        if (processedPhotos > 0 || totalSkippedDuplicates > 0) {
+          setPublishSuccess(true)
+          const dupText =
+            totalSkippedDuplicates > 0
+              ? ` (${totalSkippedDuplicates} duplicado(s) omitido(s) automáticamente)`
+              : ''
+          setPublishSuccessMessage(
+            stopBatchRef.current
+              ? `Cola pausada: se publicaron ${totalNewJobs} oferta(s) nuevas en ${processedPhotos} foto(s)${dupText}.`
+              : `¡Proceso completado! Se publicaron ${totalNewJobs} oferta(s) de empleo en ${processedPhotos} imagen(es)${dupText}.`
+          )
+        }
+        return
+      }
+
+      // MODO EXTRACCIÓN MANUAL DE 1 IMAGEN (sin auto-publicar) O MODO TEXTO
       if (inputMode === 'image' && !imagePreview) {
         throw new Error('Primero debés seleccionar o arrastrar una imagen.')
       }
@@ -245,7 +524,6 @@ export default function EmpleosInformalesPage() {
       const returnedJobs: any[] = data.jobs || []
 
       if (shouldPublish) {
-        // Se publicó directamente en Supabase
         setJobs((prev) => [...returnedJobs, ...prev])
         if (!isAdmin) {
           loadCredits()
@@ -254,16 +532,7 @@ export default function EmpleosInformalesPage() {
         setPublishSuccessMessage(
           `¡Éxito! Se interpretó y publicó ${returnedJobs.length} oferta(s) de empleo automáticamente.`
         )
-        setTimeout(() => {
-          setPublishSuccess(false)
-          setIsAiModalOpen(false)
-          setImagePreview(null)
-          setRawText('')
-          setExtractedList([])
-          setParsedPreview(null)
-        }, 2000)
       } else {
-        // Solo interpretar para revisar antes
         setExtractedList(returnedJobs)
         if (returnedJobs.length > 0) {
           setActiveExtractedIndex(0)
@@ -274,6 +543,8 @@ export default function EmpleosInformalesPage() {
       setPublishError(err.message || 'Error al conectar con la IA.')
     } finally {
       setIsAnalyzing(false)
+      setIsStoppingBatch(false)
+      stopBatchRef.current = false
     }
   }
 
@@ -888,29 +1159,32 @@ export default function EmpleosInformalesPage() {
 
               {/* SUBIR FOTO / CAPTURA O PEGAR CONVERSACIÓN */}
               {inputMode === 'image' ? (
-                <div className="space-y-4">
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className="space-y-4"
+                >
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    capture="environment"
+                    multiple
                     className="hidden"
                     onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleFileChosen(e.target.files[0])
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleFilesChosen(e.target.files)
+                        e.target.value = ''
                       }
                     }}
                   />
 
-                  {!imagePreview ? (
+                  {imageQueue.length === 0 ? (
                     <div
-                      onDrop={handleDrop}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
                       onClick={() => fileInputRef.current?.click()}
                       className={`cursor-pointer border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
                         isDragging
-                          ? 'border-amber-500 bg-amber-50'
+                          ? 'border-amber-500 bg-amber-50 scale-[1.01]'
                           : 'border-slate-200 hover:border-amber-400 bg-slate-50/50 hover:bg-amber-50/20'
                       }`}
                     >
@@ -918,12 +1192,15 @@ export default function EmpleosInformalesPage() {
                         <UploadCloud className="w-7 h-7" />
                       </div>
                       <h4 className="text-sm font-extrabold text-slate-800">
-                        Arrastrá tu foto aquí o hacé clic para seleccionarla
+                        Arrastrá hasta {MAX_BATCH_IMAGES} fotos aquí o hacé clic para seleccionarlas
                       </h4>
-                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        Recortes del diario (El Gallito), fotos de carteles en vidrieras o capturas de historias y WhatsApp.
+                      <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                        Podés cargar varias imágenes juntas. La plataforma las irá interpretando y publicando <strong>una por una de forma progresiva</strong> para no saturar la IA.
                       </p>
                       <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-[11px] font-bold text-amber-900">
+                          Hasta {MAX_BATCH_IMAGES} imágenes por tanda
+                        </span>
                         <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
                           Soporta JPG, PNG, WEBP
                         </span>
@@ -933,89 +1210,324 @@ export default function EmpleosInformalesPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={imagePreview}
-                              alt="Vista previa"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-800 truncate max-w-[140px] sm:max-w-xs">
-                              {imageName || 'Imagen cargada'}
-                            </p>
-                            <p className="text-[11px] text-slate-500">Lista para interpretar con IA</p>
-                          </div>
-                        </div>
+                    <div
+                      className={`p-4 rounded-2xl border transition-all space-y-3.5 ${
+                        isDragging
+                          ? 'border-amber-500 bg-amber-50/60'
+                          : 'border-slate-200 bg-slate-50'
+                      }`}
+                    >
+                      {/* Encabezado de la cola y barra de progreso general */}
+                      {(() => {
+                        const total = imageQueue.length
+                        const completed = imageQueue.filter(
+                          (it) => it.status === 'done' || it.status === 'skipped'
+                        ).length
+                        const errored = imageQueue.filter((it) => it.status === 'error').length
+                        const pending = imageQueue.filter(
+                          (it) => it.status === 'pending' || it.status === 'cooldown'
+                        ).length
+                        const activeIdx = imageQueue.findIndex(
+                          (it) => it.status === 'processing' || it.status === 'cooldown'
+                        )
+                        const totalPublishedJobs = imageQueue.reduce(
+                          (acc, it) => acc + (it.publishedCount || 0),
+                          0
+                        )
+                        const totalSkippedJobs = imageQueue.reduce(
+                          (acc, it) => acc + (it.skippedCount || 0),
+                          0
+                        )
+                        const progressPct =
+                          total > 0 ? Math.round(((completed + errored) / total) * 100) : 0
 
-                        <div className="flex items-center gap-2 shrink-0 ml-auto">
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-700"
-                          >
-                            Cambiar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setImagePreview(null)
-                              setImageName('')
-                              setExtractedList([])
-                              setParsedPreview(null)
-                            }}
-                            className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200"
-                            title="Eliminar imagen"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
+                        return (
+                          <div className="space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 font-extrabold text-xs">
+                                  {total} / {MAX_BATCH_IMAGES} {total === 1 ? 'imagen' : 'imágenes'}
+                                </span>
+                                {isAnalyzing && activeIdx !== -1 && (
+                                  <span className="text-xs font-bold text-amber-800 flex items-center gap-1.5 animate-pulse">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                                    Procesando foto {activeIdx + 1} de {total}...
+                                  </span>
+                                )}
+                                {!isAnalyzing && completed > 0 && (
+                                  <span className="text-xs font-bold text-emerald-700">
+                                    {completed} completada(s) • {totalPublishedJobs} aviso(s) publicado(s)
+                                    {totalSkippedJobs > 0 ? ` • ${totalSkippedJobs} duplicado(s) omitido(s)` : ''}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5 ml-auto">
+                                {imageQueue.length < MAX_BATCH_IMAGES && (
+                                  <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 text-xs font-bold text-amber-900 transition-colors"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Agregar fotos</span>
+                                  </button>
+                                )}
+                                {!isAnalyzing && (
+                                  <button
+                                    type="button"
+                                    onClick={handleClearQueue}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-slate-600 hover:text-rose-600 transition-colors"
+                                    title="Vaciar toda la lista"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Vaciar</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Barra de progreso general cuando hay más de 1 imagen o está analizando */}
+                            {(total > 1 || isAnalyzing || completed > 0) && (
+                              <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-500"
+                                  style={{
+                                    width: `${Math.max(progressPct, isAnalyzing ? 8 : 0)}%`,
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {pending > 1 && !isAnalyzing && (
+                              <p className="text-[11px] text-slate-500">
+                                💡 Las imágenes se procesan <strong>de a una por vez</strong> con una breve pausa automática entre cada una para cuidar la API.
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Lista de imágenes en la cola con estado individual */}
+                      <div className="max-h-[38vh] overflow-y-auto space-y-2 pr-1">
+                        {imageQueue.map((item, idx) => {
+                          const isCurrent = item.status === 'processing'
+                          const isCooldown = item.status === 'cooldown'
+                          const isDone = item.status === 'done'
+                          const isSkipped = item.status === 'skipped'
+                          const isError = item.status === 'error'
+
+                          return (
+                            <div
+                              key={item.id}
+                              ref={(el) => {
+                                queueItemRefs.current[item.id] = el
+                              }}
+                              className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                                isCurrent
+                                  ? 'border-amber-500 bg-amber-50/90 shadow-md ring-2 ring-amber-400/30'
+                                  : isCooldown
+                                    ? 'border-amber-300 bg-amber-50/40'
+                                    : isDone
+                                      ? 'border-emerald-200 bg-emerald-50/50'
+                                      : isSkipped
+                                        ? 'border-slate-200 bg-slate-100/80'
+                                        : isError
+                                          ? 'border-rose-200 bg-rose-50/60'
+                                          : 'border-slate-200 bg-white'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={item.dataUrl}
+                                    alt={item.name}
+                                    className={`w-full h-full object-cover transition-opacity ${
+                                      isCurrent ? 'opacity-60' : 'opacity-100'
+                                    }`}
+                                  />
+                                  {isCurrent && (
+                                    <div className="absolute inset-0 bg-amber-900/30 flex items-center justify-center">
+                                      <Loader2 className="w-6 h-6 text-white animate-spin drop-shadow" />
+                                    </div>
+                                  )}
+                                  {isDone && (
+                                    <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow">
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-extrabold text-[10px] shrink-0">
+                                      #{idx + 1}
+                                    </span>
+                                    <p className="text-xs font-bold text-slate-800 truncate">
+                                      {item.name}
+                                    </p>
+                                  </div>
+
+                                  {/* Estado detallado de esta imagen */}
+                                  {isCurrent && (
+                                    <div className="space-y-1">
+                                      <p className="text-[11px] font-extrabold text-amber-700 flex items-center gap-1.5">
+                                        <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                                        <span>Interpretando con IA y publicando automáticamente...</span>
+                                      </p>
+                                      <div className="w-full h-1.5 rounded-full bg-amber-200/70 overflow-hidden">
+                                        <div className="h-full w-2/3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 animate-pulse rounded-full" />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {isCooldown && (
+                                    <p className="text-[11px] font-semibold text-amber-700 flex items-center gap-1">
+                                      <Clock className="w-3 h-3 animate-spin shrink-0" />
+                                      <span>Preparando siguiente imagen (pausa anti-saturación)...</span>
+                                    </p>
+                                  )}
+
+                                  {item.status === 'pending' && (
+                                    <p className="text-[11px] text-slate-500">
+                                      En espera para interpretar con IA
+                                    </p>
+                                  )}
+
+                                  {isDone && (
+                                    <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 flex-wrap">
+                                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                      <span>
+                                        ¡Publicado! ({item.publishedCount}{' '}
+                                        {item.publishedCount === 1 ? 'aviso nuevo' : 'avisos nuevos'})
+                                      </span>
+                                      {item.skippedCount > 0 && (
+                                        <span className="text-[10px] font-semibold text-amber-700">
+                                          • {item.skippedCount} duplicado(s) omitido(s)
+                                        </span>
+                                      )}
+                                    </p>
+                                  )}
+
+                                  {isSkipped && (
+                                    <p className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      <span>
+                                        Duplicado omitido automáticamente (el aviso ya estaba publicado)
+                                      </span>
+                                    </p>
+                                  )}
+
+                                  {isError && (
+                                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
+                                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                      <span className="truncate">
+                                        {item.errorMessage || 'Error al interpretar imagen'}
+                                      </span>
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Botón para quitar de la cola si no se está procesando */}
+                              {!isCurrent && !isAnalyzing && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveQueuedImage(item.id)}
+                                  className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+                                  title="Quitar imagen de la lista"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
 
-                      {/* Modo Toggle */}
+                      {/* Barra de control inferior para iniciar o detener la cola */}
                       <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        {isAdmin ? (
+                        {isAdmin && imageQueue.length === 1 ? (
                           <label className="flex items-center gap-2 cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={autoPublishDirectly}
                               onChange={(e) => setAutoPublishDirectly(e.target.checked)}
+                              disabled={isAnalyzing}
                               className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
                             />
                             <span className="text-xs font-bold text-slate-700">
                               Publicar automáticamente si la extracción es exitosa
                             </span>
                           </label>
+                        ) : imageQueue.length > 1 ? (
+                          <span className="text-xs font-semibold text-slate-600">
+                            Se procesarán una por una y se omitirán duplicados automáticamente
+                          </span>
                         ) : (
                           <span className="text-xs font-medium text-slate-600">
-                            Se descontará 1 uso de IA al interpretar y publicar
+                            Se descontará 1 uso de IA por imagen procesada con éxito
                           </span>
                         )}
 
-                        <button
-                          type="button"
-                          disabled={isAnalyzing}
-                          onClick={() => handleProcessWithGemini()}
-                          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all"
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Gemini Vision analizando foto...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-4 h-4" />
-                              <span>
-                                {!isAdmin || autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer Campos'}
-                              </span>
-                            </>
+                        <div className="flex items-center gap-2 ml-auto">
+                          {isAnalyzing && imageQueue.length > 1 && (
+                            <button
+                              type="button"
+                              disabled={isStoppingBatch}
+                              onClick={handleStopBatch}
+                              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors"
+                            >
+                              <PauseCircle className="w-4 h-4" />
+                              <span>{isStoppingBatch ? 'Deteniendo...' : 'Pausar cola'}</span>
+                            </button>
                           )}
-                        </button>
+
+                          <button
+                            type="button"
+                            disabled={
+                              isAnalyzing ||
+                              imageQueue.every(
+                                (it) => it.status === 'done' || it.status === 'skipped'
+                              )
+                            }
+                            onClick={() => handleProcessWithGemini()}
+                            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all"
+                          >
+                            {isAnalyzing ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>
+                                  {imageQueue.length > 1
+                                    ? 'Procesando lote paso a paso...'
+                                    : 'Gemini Vision analizando foto...'}
+                                </span>
+                              </>
+                            ) : imageQueue.some((it) => it.status === 'error') &&
+                              imageQueue.every((it) => it.status !== 'pending') ? (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                <span>Reintentar con error</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4" />
+                                <span>
+                                  {imageQueue.length > 1
+                                    ? `Iniciar Publicación Progresiva (${
+                                        imageQueue.filter(
+                                          (it) => it.status === 'pending' || it.status === 'error'
+                                        ).length
+                                      } fotos)`
+                                    : !isAdmin || autoPublishDirectly
+                                      ? 'Interpretar y Publicar'
+                                      : 'Extraer Campos'}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
