@@ -38,6 +38,7 @@ import { formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/lib/context/AuthContext'
 import { AI_ALLOWED_ROLES } from '@/lib/billing'
 import { fetchBillingStatus } from '@/lib/billing-client'
+import { CompanyContactsSidebar } from '@/components/empleos-informales/CompanyContactsSidebar'
 
 export default function EmpleosInformalesPage() {
   const { profile, isAdmin, getAccessToken } = useAuth()
@@ -355,7 +356,7 @@ export default function EmpleosInformalesPage() {
     <div className="min-h-screen bg-slate-50/60 dark:bg-background pb-20">
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-indigo-50/70 via-slate-100/40 to-transparent dark:from-slate-900/90 dark:via-indigo-950/30 dark:to-transparent border-b border-slate-300/60 dark:border-slate-800 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-[1440px] mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="max-w-2xl space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold tracking-wide">
@@ -447,9 +448,15 @@ export default function EmpleosInformalesPage() {
         </div>
       </section>
 
-      {/* Main Content List */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-6">
+      {/* Main Content List & Sidebar */}
+      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <div className="flex flex-col lg:flex-row items-start gap-8">
+          {/* Columna Izquierda: Contactos de Empresas WhatsApp (Área izquierda de la pantalla) */}
+          <CompanyContactsSidebar isAdmin={isAdmin} />
+
+          {/* Columna Derecha: Avisos Clasificados */}
+          <div className="flex-1 min-w-0 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-6">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
             Mostrando {filteredJobs.length} {filteredJobs.length === 1 ? 'aviso disponible' : 'avisos disponibles'}
           </p>
@@ -692,6 +699,8 @@ export default function EmpleosInformalesPage() {
             <p className="text-blue-700">
               Ningún empleador legítimo debe pedirte dinero ni transferencias por adelantado para entrevistas, exámenes o materiales.
             </p>
+          </div>
+        </div>
           </div>
         </div>
       </main>

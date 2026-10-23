@@ -49,6 +49,18 @@ export type JobWithEmpresa = Job & {
   empresa: Pick<Profile, 'nombre' | 'avatar_url' | 'website' | 'ubicacion'>
 }
 
+export interface CompanyContact {
+  id: string
+  nombre: string
+  whatsapp: string
+  categoria: string
+  zona?: string | null
+  nota?: string | null
+  activo: boolean
+  created_at: string
+  updated_at?: string
+}
+
 export interface InformalJob {
   id: string
   titulo: string

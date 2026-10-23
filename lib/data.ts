@@ -1,10 +1,12 @@
 import { isSupabaseConfigured, createClient } from './supabase/client'
 import { MOCK_JOBS, MOCK_APPLICATIONS, MOCK_INFORMAL_JOBS } from './mock-data'
-import { JobWithEmpresa, ApplicationWithDetails, Job, JobEstado, ApplicationEstado, InformalJob } from './supabase/database.types'
+import { JobWithEmpresa, ApplicationWithDetails, Job, JobEstado, ApplicationEstado, InformalJob, CompanyContact } from './supabase/database.types'
+export type { CompanyContact } from './supabase/database.types'
 
 const LOCAL_STORAGE_JOBS_KEY = 'empleos_custom_jobs'
 const LOCAL_STORAGE_APPS_KEY = 'empleos_custom_apps'
 const LOCAL_STORAGE_INFORMAL_KEY = 'empleos_custom_informal_jobs'
+const LOCAL_STORAGE_CONTACTS_KEY = 'empleos_custom_company_contacts'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -797,3 +799,155 @@ Muchas gracias, quedo a las órdenes.`
 
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
+
+export const DEFAULT_COMPANY_CONTACTS: CompanyContact[] = [
+  {
+    id: 'cc0265cd-02b6-4b28-9242-1fb8eec39788',
+    nombre: 'Empresa 1',
+    whatsapp: '096123123',
+    categoria: 'Limpieza',
+    zona: 'Montevideo',
+    nota: 'Contacto directo para personal de limpieza y mantenimiento',
+    activo: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '119e704d-e855-49bb-a230-0def67602681',
+    nombre: 'Distribuidora Logística Sur',
+    whatsapp: '099555444',
+    categoria: 'Logística',
+    zona: 'Canelones',
+    nota: 'Recepción de CVs para fletes y repartos',
+    activo: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: '931d98e2-78da-4d88-8505-838c35b4844d',
+    nombre: 'Servicios Gastronómicos UY',
+    whatsapp: '091223344',
+    categoria: 'Gastronomía',
+    zona: 'Punta del Este',
+    nota: 'Contrataciones de cocineros y bacheros',
+    activo: true,
+    created_at: new Date().toISOString(),
+  },
+]
+
+function getStoredCompanyContacts(): CompanyContact[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_CONTACTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveStoredCompanyContacts(contacts: CompanyContact[]) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(LOCAL_STORAGE_CONTACTS_KEY, JSON.stringify(contacts))
+  } catch {}
+}
+
+export async function fetchCompanyContacts(): Promise<CompanyContact[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('company_contacts')
+        .select('*')
+        .eq('activo', true)
+        .order('created_at', { ascending: false })
+
+      if (!error && data && data.length > 0) {
+        return data as CompanyContact[]
+      }
+    } catch (err) {
+      console.warn('Error al consultar company_contacts en Supabase, usando respaldo local:', err)
+    }
+  }
+
+  const stored = getStoredCompanyContacts()
+  if (stored.length > 0) return stored
+  return DEFAULT_COMPANY_CONTACTS
+}
+
+export async function createCompanyContact(
+  contactData: Omit<CompanyContact, 'id' | 'created_at' | 'updated_at'>
+): Promise<CompanyContact> {
+  const newContact: CompanyContact = {
+    ...contactData,
+    id: 'cnt-' + Date.now(),
+    activo: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('company_contacts')
+        .insert([contactData])
+        .select()
+        .single()
+
+      if (!error && data) {
+        return data as CompanyContact
+      }
+    } catch (err) {
+      console.warn('Error al insertar company_contact en Supabase, guardando en local:', err)
+    }
+  }
+
+  const existing = getStoredCompanyContacts()
+  const list = existing.length > 0 ? existing : DEFAULT_COMPANY_CONTACTS
+  const updated = [newContact, ...list]
+  saveStoredCompanyContacts(updated)
+  return newContact
+}
+
+export async function deleteCompanyContact(id: string): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('company_contacts')
+        .delete()
+        .eq('id', id)
+
+      if (!error) return true
+    } catch (err) {
+      console.warn('Error al eliminar company_contact en Supabase:', err)
+    }
+  }
+
+  const existing = getStoredCompanyContacts()
+  const list = existing.length > 0 ? existing : DEFAULT_COMPANY_CONTACTS
+  const updated = list.filter((c) => c.id !== id)
+  saveStoredCompanyContacts(updated)
+  return true
+}
+
+export function formatContactWhatsAppUrl(phone: string, companyName: string, categoria?: string): string {
+  let cleaned = phone.replace(/\D/g, '')
+  if (cleaned.startsWith('09') && cleaned.length === 9) {
+    cleaned = '598' + cleaned.substring(1)
+  } else if (cleaned.startsWith('9') && cleaned.length === 8) {
+    cleaned = '598' + cleaned
+  }
+  const msg = encodeURIComponent(
+    `¡Hola ${companyName}! Vi su contacto en postulauy.com para el rubro ${categoria || 'empleo'} y me gustaría comunicarme por oportunidades laborales.`
+  )
+  return `https://wa.me/${cleaned}?text=${msg}`
+}
+
+export function formatPhoneNumberDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length === 9 && digits.startsWith('09')) {
+    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
+  }
+  return phone
+}
+
