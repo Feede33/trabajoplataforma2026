@@ -656,7 +656,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
             {/* PASO 1: SUBIR IMAGEN O PEGAR TEXTO */}
             {aiStep === 'upload' && (
-              <div className="space-y-4 overflow-y-auto pr-1">
+              <div className="space-y-4">
                 {/* Selector de modo: Imagen vs Texto */}
                 <div className="flex bg-slate-800/80 p-1 rounded-2xl border border-slate-700/60 max-w-xs mx-auto">
                   <button
@@ -693,7 +693,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     onDragLeave={() => setIsDragging(false)}
                     onClick={() => fileInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 ${isDragging
-                      ? 'border-emerald-400 bg-emerald-500/10 scale-[1.01]'
+                      ? 'border-emerald-400 bg-emerald-500/10'
                       : imagePreview
                         ? 'border-emerald-500/50 bg-slate-800/50'
                         : 'border-slate-700 hover:border-slate-500 bg-slate-800/30 hover:bg-slate-800/50'
@@ -752,7 +752,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                 )}
 
                 {/* Botón de Procesar con IA */}
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsAiModalOpen(false)}
@@ -764,7 +764,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     type="button"
                     disabled={isAnalyzing || (inputMode === 'image' && !imagePreview) || (inputMode === 'text' && !rawText.trim())}
                     onClick={handleProcessWithAi}
-                    className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
+                    className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95 disabled:opacity-50"
                   >
                     {isAnalyzing ? (
                       <>
@@ -784,7 +784,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
             {/* PASO 2: REVISIÓN, DEDUPLICACIÓN Y CONFIRMACIÓN */}
             {aiStep === 'review' && (
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div className="flex-1 space-y-4 overflow-hidden">
                 {/* Métricas y resumen de deduplicación */}
                 <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-center">
                   <div>
@@ -999,7 +999,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                       type="button"
                       disabled={isBulkSaving || selectedCount === 0}
                       onClick={handleSaveBulk}
-                      className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
+                      className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/30 transition-all active:scale-95 disabled:opacity-50"
                     >
                       {isBulkSaving ? (
                         <>
