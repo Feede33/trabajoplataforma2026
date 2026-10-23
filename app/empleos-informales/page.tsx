@@ -96,7 +96,8 @@ export default function EmpleosInformalesPage() {
   const [jobs, setJobs] = useState<InformalJob[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [selectedRubro, setSelectedRubro] = useState('Todos')
+  const [selectedFecha, setSelectedFecha] = useState('todas')
+  const [selectedUbicacion, setSelectedUbicacion] = useState('Todos')
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
   const [showAdminNotice, setShowAdminNotice] = useState(false)
   const [credits, setCredits] = useState<number | null>(null)
@@ -612,16 +613,33 @@ export default function EmpleosInformalesPage() {
     }
   }
 
-  const rubrosList = [
-    'Todos',
-    'Transporte y Choferes',
-    'Mecánica y Talleres',
-    'Gastronomía',
-    'Belleza y Estética',
-    'Oficios y Mantenimiento',
-    'Comercio',
-    'Servicios y Limpieza'
+  const departamentosList = [
+    'Montevideo',
+    'Canelones',
+    'Maldonado',
+    'Colonia',
+    'Salto',
+    'Paysandú',
+    'Rivera',
+    'Tacuarembó',
+    'Cerro Largo',
+    'Rocha',
+    'San José',
+    'Soriano',
+    'Florida',
+    'Lavalleja',
+    'Durazno',
+    'Río Negro',
+    'Treinta y Tres',
+    'Flores',
+    'Artigas',
   ]
+
+  const normalizeStr = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
 
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
@@ -630,10 +648,64 @@ export default function EmpleosInformalesPage() {
       (job.zona && job.zona.toLowerCase().includes(search.toLowerCase())) ||
       job.descripcion.toLowerCase().includes(search.toLowerCase())
 
-    const matchesRubro =
-      selectedRubro === 'Todos' || job.rubro.toLowerCase() === selectedRubro.toLowerCase()
+    // Filtro por Fecha
+    let matchesFecha = true
+    if (selectedFecha !== 'todas' && job.created_at) {
+      const createdTime = new Date(job.created_at).getTime()
+      const nowTime = Date.now()
+      const diffDays = (nowTime - createdTime) / (1000 * 60 * 60 * 24)
 
-    return matchesSearch && matchesRubro
+      if (selectedFecha === 'hoy') {
+        matchesFecha = diffDays <= 1
+      } else if (selectedFecha === '1_semana') {
+        matchesFecha = diffDays <= 7
+      } else if (selectedFecha === '2_semanas') {
+        matchesFecha = diffDays <= 14
+      } else if (selectedFecha === '3_semanas') {
+        matchesFecha = diffDays <= 21
+      } else if (selectedFecha === 'este_mes') {
+        matchesFecha = diffDays <= 31
+      }
+    }
+
+    // Filtro por Ubicación (Departamento)
+    let matchesUbicacion = true
+    if (selectedUbicacion !== 'Todos') {
+      const depNorm = normalizeStr(selectedUbicacion)
+      const zonaNorm = normalizeStr(job.zona || '')
+      const dirNorm = normalizeStr(job.direccion || '')
+      const titNorm = normalizeStr(job.titulo || '')
+      const combined = `${zonaNorm} ${dirNorm} ${titNorm}`
+
+      if (combined.includes(depNorm)) {
+        matchesUbicacion = true
+      } else if (selectedUbicacion === 'Montevideo') {
+        const barriosMvd = [
+          'pocitos', 'centro', 'cordon', 'paso molino', 'malvin', 'union', 'carrasco',
+          'tres cruces', 'blanqueada', 'aguada', 'ciudad vieja', 'prado', 'sayago',
+          'colon', 'cerro', 'buceo', 'punta carretas', 'palermo', 'parque rodo',
+          'goes', 'reducto', 'brazo oriental', 'jacinto vera', 'larranaga', 'maronas',
+          'manga', 'piedras blancas', 'penarol', 'belvedere', 'la teja', 'nuevo paris',
+          'punta gorda', 'portones', 'villa biarritz', 'parque batlle', 'bella vista',
+          'capurro', 'atahualpa', 'aires puros', 'cerrito', 'ituzaingo', 'carrasco norte'
+        ]
+        matchesUbicacion = barriosMvd.some((b) => combined.includes(b))
+      } else if (selectedUbicacion === 'Canelones') {
+        const locCanelones = [
+          'las piedras', 'la paz', 'pando', 'ciudad de la costa', 'solymar', 'lagomar',
+          'shangrila', 'el pinar', 'atlantida', 'barros blancos', 'progreso', 'sauce',
+          'santa lucia', 'paso carrasco', 'colonia nicolich', 'salinas', 'parque del plata'
+        ]
+        matchesUbicacion = locCanelones.some((l) => combined.includes(l))
+      } else if (selectedUbicacion === 'Maldonado') {
+        const locMaldonado = ['punta del este', 'san carlos', 'piriapolis', 'pan de azucar', 'la barra', 'jose ignacio']
+        matchesUbicacion = locMaldonado.some((l) => combined.includes(l))
+      } else {
+        matchesUbicacion = false
+      }
+    }
+
+    return matchesSearch && matchesFecha && matchesUbicacion
   })
 
   return (
@@ -695,8 +767,8 @@ export default function EmpleosInformalesPage() {
             </div>
           </div>
 
-          {/* Search bar & Rubros */}
-          <div className="mt-8 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          {/* Search bar & 2 Filtros Simplificados: Fecha y Ubicación */}
+          <div className="mt-8 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <div className="relative">
               <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
               <input
@@ -708,25 +780,47 @@ export default function EmpleosInformalesPage() {
               />
             </div>
 
-            {/* Rubro Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 scrollbar-none">
-              <span className="text-xs font-semibold text-slate-500 px-2 flex items-center gap-1 shrink-0">
-                <Filter className="w-3.5 h-3.5" />
-                Rubro:
-              </span>
-              {rubrosList.map((rubro) => (
-                <button
-                  key={rubro}
-                  onClick={() => setSelectedRubro(rubro)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 border ${
-                    selectedRubro === rubro
-                      ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 border-transparent dark:border-slate-700/70 hover:bg-amber-50 hover:text-amber-800 dark:hover:bg-slate-700 dark:hover:text-amber-300'
-                  }`}
+            {/* Filtros Simplificados: Fecha y Ubicación */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Categoría 1: Fecha */}
+              <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/70 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                  Fecha:
+                </span>
+                <select
+                  value={selectedFecha}
+                  onChange={(e) => setSelectedFecha(e.target.value)}
+                  className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
                 >
-                  {rubro}
-                </button>
-              ))}
+                  <option value="todas">Todas las fechas</option>
+                  <option value="hoy">Hoy</option>
+                  <option value="1_semana">Esta semana</option>
+                  <option value="2_semanas">Últimas dos semanas</option>
+                  <option value="3_semanas">Últimas tres semanas</option>
+                  <option value="este_mes">Este mes</option>
+                </select>
+              </div>
+
+              {/* Categoría 2: Ubicación */}
+              <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/70 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
+                  <MapPin className="w-4 h-4 text-amber-500" />
+                  Ubicación:
+                </span>
+                <select
+                  value={selectedUbicacion}
+                  onChange={(e) => setSelectedUbicacion(e.target.value)}
+                  className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
+                >
+                  <option value="Todos">Todos los departamentos</option>
+                  {departamentosList.map((dep) => (
+                    <option key={dep} value={dep}>
+                      {dep}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -772,7 +866,8 @@ export default function EmpleosInformalesPage() {
             <button
               onClick={() => {
                 setSearch('')
-                setSelectedRubro('Todos')
+                setSelectedFecha('todas')
+                setSelectedUbicacion('Todos')
               }}
               className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
