@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -25,12 +25,55 @@ import { fetchJobs } from '@/lib/data'
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { JobCard } from '@/components/jobs/JobCard'
 
+const KEYWORD_SUGGESTIONS = [
+  'Chofer', 'Repartidor', 'Fletes', 'Logística', 'Almacén',
+  'Programador', 'Desarrollador Web', 'Frontend', 'Backend', 'Full Stack',
+  'Diseñador Gráfico', 'UI/UX', 'Community Manager', 'Marketing Digital',
+  'Administrativo', 'Contabilidad', 'Recursos Humanos', 'Atención al Cliente',
+  'Electricista', 'Plomero', 'Construcción', 'Enfermero', 'Médico', 'Seguridad',
+  'Vendedor', 'Cajero', 'Repositor', 'Cocinero', 'Mozo', 'Limpieza',
+]
+
+const LOCATION_SUGGESTIONS = [
+  'Montevideo', 'Canelones', 'Punta del Este', 'Maldonado', 'Salto',
+  'Paysandú', 'Rivera', 'Melo', 'Tacuarembó', 'Minas', 'Trinidad',
+  'Las Piedras', 'Ciudad de la Costa', 'Florida', 'Durazno',
+  'Remoto', '100% Remoto', 'Híbrido',
+]
+
 export default function HomePage() {
   const router = useRouter()
   const [jobs, setJobs] = useState<JobWithEmpresa[]>([])
   const [keyword, setKeyword] = useState('')
   const [location, setLocation] = useState('')
   const [loading, setLoading] = useState(true)
+
+  const [keywordFocused, setKeywordFocused] = useState(false)
+  const [locationFocused, setLocationFocused] = useState(false)
+  const keywordRef = useRef<HTMLDivElement>(null)
+  const locationRef = useRef<HTMLDivElement>(null)
+
+  // Cerrar dropdowns al hacer click afuera
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (keywordRef.current && !keywordRef.current.contains(e.target as Node)) {
+        setKeywordFocused(false)
+      }
+      if (locationRef.current && !locationRef.current.contains(e.target as Node)) {
+        setLocationFocused(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filteredKeywords = keyword.trim()
+    ? KEYWORD_SUGGESTIONS.filter((s) => s.toLowerCase().includes(keyword.toLowerCase()))
+    : KEYWORD_SUGGESTIONS.slice(0, 8)
+
+  const filteredLocations = location.trim()
+    ? LOCATION_SUGGESTIONS.filter((s) => s.toLowerCase().includes(location.toLowerCase()))
+    : LOCATION_SUGGESTIONS
 
   useEffect(() => {
     async function load() {
@@ -88,28 +131,72 @@ export default function HomePage() {
             onSubmit={handleSearch}
             className="max-w-3xl mx-auto bg-white p-2.5 sm:p-3 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:flex-row items-center gap-2 border border-slate-200/50"
           >
-            <div className="flex-1 w-full flex items-center gap-3 px-3.5 py-2">
-              <Search className="w-5 h-5 text-slate-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Puesto, habilidad o palabra clave..."
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                className="w-full text-slate-800 text-sm focus:outline-none placeholder-slate-400"
-              />
+            {/* Keyword input with suggestions */}
+            <div ref={keywordRef} className="relative flex-1 w-full">
+              <div className="flex items-center gap-3 px-3.5 py-2">
+                <Search className="w-5 h-5 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Puesto, habilidad o palabra clave..."
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  onFocus={() => setKeywordFocused(true)}
+                  className="w-full text-slate-800 text-sm focus:outline-none placeholder-slate-400"
+                  autoComplete="off"
+                />
+              </div>
+              {keywordFocused && filteredKeywords.length > 0 && (
+                <ul className="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 max-h-56 overflow-y-auto">
+                  {filteredKeywords.map((s) => (
+                    <li
+                      key={s}
+                      onMouseDown={() => {
+                        setKeyword(s)
+                        setKeywordFocused(false)
+                      }}
+                      className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors"
+                    >
+                      <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
-            <div className="hidden sm:block w-px h-8 bg-slate-200" />
+            <div className="hidden sm:block w-px h-8 bg-slate-200 shrink-0" />
 
-            <div className="flex-1 w-full flex items-center gap-3 px-3.5 py-2">
-              <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Ciudad, zona o 'Remoto'..."
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full text-slate-800 text-sm focus:outline-none placeholder-slate-400"
-              />
+            {/* Location input with suggestions */}
+            <div ref={locationRef} className="relative flex-1 w-full">
+              <div className="flex items-center gap-3 px-3.5 py-2">
+                <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Ciudad, zona o 'Remoto'..."
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  onFocus={() => setLocationFocused(true)}
+                  className="w-full text-slate-800 text-sm focus:outline-none placeholder-slate-400"
+                  autoComplete="off"
+                />
+              </div>
+              {locationFocused && filteredLocations.length > 0 && (
+                <ul className="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 max-h-56 overflow-y-auto">
+                  {filteredLocations.map((s) => (
+                    <li
+                      key={s}
+                      onMouseDown={() => {
+                        setLocation(s)
+                        setLocationFocused(false)
+                      }}
+                      className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <button
