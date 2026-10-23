@@ -145,7 +145,7 @@ export default function PublicarEmpleoPage() {
         Volver al panel de empresa
       </Link>
 
-      <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-8">
+      <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm space-y-8">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
             Nueva Búsqueda Laboral
@@ -314,17 +314,17 @@ export default function PublicarEmpleoPage() {
           </div>
 
           {/* Submit CTA */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3">
             <Link
               href="/empresa/dashboard"
-              className="px-5 py-3 text-sm font-semibold text-slate-600 hover:text-slate-800"
+              className="w-full sm:w-auto px-5 py-3 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl text-center transition-colors"
             >
               Cancelar
             </Link>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-8 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 hover:shadow-lg transition-all disabled:opacity-50"
+              className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 hover:shadow-lg transition-all disabled:opacity-50"
             >
               {isSubmitting ? 'Publicando...' : 'Publicar Empleo Ahora'}
             </button>

@@ -126,7 +126,7 @@ export default function EmpresaDashboard() {
 
         <Link
           href="/empresa/publicar"
-          className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-indigo-200 hover:shadow-lg shrink-0"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-indigo-200 hover:shadow-lg shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
           <span>Publicar Nuevo Empleo</span>
@@ -170,14 +170,14 @@ export default function EmpresaDashboard() {
 
       {/* Jobs Table */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Tus Publicaciones</h2>
             <p className="text-xs text-slate-500">Administrá el estado de tus búsquedas laborales</p>
           </div>
           <Link
             href="/empresa/postulaciones"
-            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0"
           >
             <span>Ver todas las postulaciones</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -200,74 +200,133 @@ export default function EmpresaDashboard() {
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Puesto</th>
-                  <th className="px-6 py-4 font-semibold">Rubro / Modalidad</th>
-                  <th className="px-6 py-4 font-semibold">Publicado</th>
-                  <th className="px-6 py-4 font-semibold">Estado</th>
-                  <th className="px-6 py-4 font-semibold text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
+          <>
+            {/* Mobile Cards List */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {jobs.map((job) => (
+                <div key={job.id} className="p-5 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
                       <Link
                         href={`/empleos/${job.slug}`}
-                        className="font-bold text-slate-900 hover:text-indigo-600 flex items-center gap-1.5"
+                        className="font-bold text-slate-900 hover:text-indigo-600 flex items-center gap-1.5 text-sm"
                       >
-                        {job.titulo}
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="truncate">{job.titulo}</span>
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       </Link>
-                      <p className="text-xs text-slate-500">{job.zona}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="primary" size="sm">{job.rubro}</Badge>
-                        <Badge variant="outline" size="sm" className="capitalize">{job.modalidad}</Badge>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-500">
-                      {formatRelativeTime(job.created_at)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge
-                        variant={job.estado === 'activo' ? 'success' : 'default'}
-                        size="sm"
-                        className="capitalize"
-                      >
-                        {job.estado}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleToggleStatus(job.id, job.estado)}
-                          className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors ${
-                            job.estado === 'activo'
-                              ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100'
-                              : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                          }`}
-                        >
-                          {job.estado === 'activo' ? 'Pausar' : 'Reactivar'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteJob(job.id, job.titulo)}
-                          title="Eliminar oferta permanentemente"
-                          className="p-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                      <p className="text-xs text-slate-500 mt-0.5">{job.zona}</p>
+                    </div>
+                    <Badge
+                      variant={job.estado === 'activo' ? 'success' : 'default'}
+                      size="sm"
+                      className="capitalize shrink-0"
+                    >
+                      {job.estado}
+                    </Badge>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="primary" size="sm">{job.rubro}</Badge>
+                      <Badge variant="outline" size="sm" className="capitalize">{job.modalidad}</Badge>
+                    </div>
+                    <span className="text-slate-400 text-[11px]">{formatRelativeTime(job.created_at)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => handleToggleStatus(job.id, job.estado)}
+                      className={`flex-1 text-xs font-semibold py-2 px-3 rounded-xl border transition-colors ${
+                        job.estado === 'activo'
+                          ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100'
+                          : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                      }`}
+                    >
+                      {job.estado === 'activo' ? 'Pausar aviso' : 'Reactivar aviso'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteJob(job.id, job.titulo)}
+                      title="Eliminar oferta permanentemente"
+                      className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Eliminar</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Puesto</th>
+                    <th className="px-6 py-4 font-semibold">Rubro / Modalidad</th>
+                    <th className="px-6 py-4 font-semibold">Publicado</th>
+                    <th className="px-6 py-4 font-semibold">Estado</th>
+                    <th className="px-6 py-4 font-semibold text-right">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {jobs.map((job) => (
+                    <tr key={job.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <Link
+                          href={`/empleos/${job.slug}`}
+                          className="font-bold text-slate-900 hover:text-indigo-600 flex items-center gap-1.5"
+                        >
+                          {job.titulo}
+                          <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                        </Link>
+                        <p className="text-xs text-slate-500">{job.zona}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="primary" size="sm">{job.rubro}</Badge>
+                          <Badge variant="outline" size="sm" className="capitalize">{job.modalidad}</Badge>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-500">
+                        {formatRelativeTime(job.created_at)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <Badge
+                          variant={job.estado === 'activo' ? 'success' : 'default'}
+                          size="sm"
+                          className="capitalize"
+                        >
+                          {job.estado}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleToggleStatus(job.id, job.estado)}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors ${
+                              job.estado === 'activo'
+                                ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100'
+                                : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {job.estado === 'activo' ? 'Pausar' : 'Reactivar'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteJob(job.id, job.titulo)}
+                            title="Eliminar oferta permanentemente"
+                            className="p-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

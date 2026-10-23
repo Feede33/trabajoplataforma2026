@@ -125,12 +125,12 @@ export default function EmpresaPostulacionesPage() {
         </div>
 
         {/* Filter buttons */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 bg-white p-1.5 rounded-2xl border border-slate-200">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full scrollbar-none bg-white p-1.5 rounded-2xl border border-slate-200">
           {['todos', 'pendiente', 'visto', 'entrevista', 'rechazado'].map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all shrink-0 ${
                 filterStatus === status
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -217,12 +217,12 @@ export default function EmpresaPostulacionesPage() {
               </div>
 
               {/* Status Update Dropdown */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-slate-400">
                   {formatRelativeTime(app.created_at)}
                 </span>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 ml-auto">
                   <span className="text-[11px] text-slate-500 font-medium">Cambiar estado:</span>
                   <select
                     value={app.estado}
