@@ -1,4 +1,4 @@
-import { JobWithEmpresa, Profile, ApplicationWithDetails, InformalJob } from './supabase/database.types'
+﻿import { JobWithEmpresa, Profile, ApplicationWithDetails, InformalJob } from './supabase/database.types'
 
 export const MOCK_EMPRESAS: Profile[] = [
   {
@@ -8,7 +8,7 @@ export const MOCK_EMPRESAS: Profile[] = [
     email: 'careers@mercadolibre.com',
     avatar_url: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&w=120&h=120&q=80',
     bio: 'Líder en comercio electrónico y soluciones fintech en América Latina.',
-    ubicacion: 'Buenos Aires, Argentina',
+    ubicacion: 'Montevideo, Uruguay',
     cv_url: null,
     website: 'https://mercadolibre.com',
     created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
@@ -34,7 +34,7 @@ export const MOCK_EMPRESAS: Profile[] = [
     email: 'talent@globant.com',
     avatar_url: 'https://images.unsplash.com/photo-1572021335469-31706a17aaef?auto=format&fit=crop&w=120&h=120&q=80',
     bio: 'Compañía de servicios de tecnología que reinventa las industrias con software innovador.',
-    ubicacion: 'Córdoba, Argentina',
+    ubicacion: 'Salto, Uruguay',
     cv_url: null,
     website: 'https://globant.com',
     created_at: new Date(Date.now() - 45 * 86400000).toISOString(),
@@ -47,7 +47,7 @@ export const MOCK_EMPRESAS: Profile[] = [
     email: 'contacto@nutrisalud.com',
     avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
     bio: 'Grupo de clínicas y servicios de salud y nutrición con alcance nacional.',
-    ubicacion: 'CABA, Argentina',
+    ubicacion: 'Punta del Este, Uruguay',
     cv_url: null,
     website: 'https://nutrisalud.com',
     created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
@@ -60,7 +60,7 @@ export const MOCK_EMPRESAS: Profile[] = [
     email: 'hola@pixelagencia.com',
     avatar_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&h=120&q=80',
     bio: 'Agencia de marketing digital, branding y diseño enfocada en startups de alto crecimiento.',
-    ubicacion: 'Mendoza, Argentina',
+    ubicacion: 'Maldonado, Uruguay',
     cv_url: null,
     website: 'https://pixelagencia.com',
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
@@ -93,7 +93,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
 - Cobertura médica prepaga de primer nivel (Swiss Medical o OSDE 310) para vos y tu grupo familiar.
 - Presupuesto anual de capacitación y home office.`,
     rubro: 'Tecnología',
-    zona: 'Remoto (Argentina)',
+    zona: 'Remoto (Uruguay)',
     modalidad: 'remoto',
     tipo_contrato: 'full-time',
     salario_rango: '$2.500.000 - $3.200.000 ARS',
@@ -106,7 +106,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
       nombre: 'MercadoLibre Tech',
       avatar_url: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&w=120&h=120&q=80',
       website: 'https://mercadolibre.com',
-      ubicacion: 'Buenos Aires, Argentina',
+      ubicacion: 'Montevideo, Uruguay',
     }
   },
   {
@@ -179,7 +179,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
       nombre: 'Globant Studios',
       avatar_url: 'https://images.unsplash.com/photo-1572021335469-31706a17aaef?auto=format&fit=crop&w=120&h=120&q=80',
       website: 'https://globant.com',
-      ubicacion: 'Córdoba, Argentina',
+      ubicacion: 'Salto, Uruguay',
     }
   },
   {
@@ -212,7 +212,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
       nombre: 'Agencia Digital Pixel',
       avatar_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&h=120&q=80',
       website: 'https://pixelagencia.com',
-      ubicacion: 'Mendoza, Argentina',
+      ubicacion: 'Maldonado, Uruguay',
     }
   },
   {
@@ -245,7 +245,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
       nombre: 'NutriSalud Group',
       avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
       website: 'https://nutrisalud.com',
-      ubicacion: 'CABA, Argentina',
+      ubicacion: 'Punta del Este, Uruguay',
     }
   },
   {
@@ -264,7 +264,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
 - Salario de convenio + viáticos y adicionales por servicio.
 - Vehículo a cargo de la empresa con seguro y mantenimiento al día.`,
     rubro: 'Logística',
-    zona: 'Buenos Aires (GBA Norte)',
+    zona: 'Montevideo (Norte)',
     modalidad: 'presencial',
     tipo_contrato: 'full-time',
     salario_rango: '$950.000 - $1.200.000 ARS',
@@ -289,7 +289,7 @@ export const MOCK_CANDIDATO: Profile = {
   email: 'martin.gomez@ejemplo.com',
   avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80',
   bio: 'Desarrollador frontend apasionado por React, TypeScript y arquitecturas web modernas con 3 años de experiencia.',
-  ubicacion: 'Buenos Aires, Argentina',
+  ubicacion: 'Montevideo, Uruguay',
   cv_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
   website: 'https://martingomez.dev',
   created_at: new Date(Date.now() - 90 * 86400000).toISOString(),
@@ -313,7 +313,7 @@ export const MOCK_APPLICATIONS: ApplicationWithDetails[] = [
       email: 'martin.gomez@ejemplo.com',
       cv_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
       bio: 'Desarrollador frontend con 3 años de experiencia en React y Next.js.',
-      ubicacion: 'Buenos Aires, Argentina',
+      ubicacion: 'Montevideo, Uruguay',
     }
   },
   {
@@ -332,7 +332,7 @@ export const MOCK_APPLICATIONS: ApplicationWithDetails[] = [
       email: 'martin.gomez@ejemplo.com',
       cv_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
       bio: 'Desarrollador frontend con 3 años de experiencia en React y Next.js.',
-      ubicacion: 'Buenos Aires, Argentina',
+      ubicacion: 'Montevideo, Uruguay',
     }
   }
 ]

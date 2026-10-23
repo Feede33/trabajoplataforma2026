@@ -76,7 +76,7 @@ export function JobFilters({ filters, onChange, onReset, totalCount }: JobFilter
           <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Ej: Buenos Aires, Rosario, Remoto..."
+            placeholder="Ej: Montevideo, Canelones, Remoto..."
             value={filters.zona}
             onChange={(e) => handleChange('zona', e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400"

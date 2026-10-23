@@ -68,7 +68,7 @@ export default function HomePage() {
         <div className="relative max-w-5xl mx-auto text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-medium backdrop-blur-md text-indigo-200">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span>La plataforma laboral más moderna de Argentina</span>
+            <span>La plataforma laboral más moderna de Uruguay</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">
@@ -80,7 +80,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Conectamos a postulantes y empresas de fletes, logística, tecnología, marketing y servicios en todo el país.
+            Conectamos a postulantes y empresas de fletes, logística, tecnología, marketing y servicios en todo Uruguay.
           </p>
 
           {/* Search Form */}

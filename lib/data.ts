@@ -323,7 +323,7 @@ export async function submitApplication(data: {
       email: data.candidato_email,
       cv_url: data.cv_url || null,
       bio: '',
-      ubicacion: 'Argentina',
+      ubicacion: 'Uruguay',
     }
   }
 

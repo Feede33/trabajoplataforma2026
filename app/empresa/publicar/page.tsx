@@ -34,7 +34,7 @@ export default function PublicarEmpleoPage() {
     if (profile?.ubicacion) {
       setZona(profile.ubicacion)
     } else {
-      setZona('Buenos Aires, Argentina')
+      setZona('Montevideo, Uruguay')
     }
   }, [profile])
 
@@ -68,7 +68,7 @@ export default function PublicarEmpleoPage() {
           titulo,
           descripcion,
           rubro,
-          zona: zona || 'Argentina',
+          zona: zona || 'Uruguay',
           modalidad,
           tipo_contrato: tipoContrato,
           salario_rango: salario || null,

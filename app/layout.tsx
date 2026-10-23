@@ -18,7 +18,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: 'EmpleosYa — Plataforma de Empleos, Fletes y Profesionales',
-  description: 'Conectamos a las mejores empresas con talentos en todo el país. Publicá tus vacantes o postulate a cientos de empleos.',
+  description: 'Conectamos a las mejores empresas con talentos en todo Uruguay. Publicá tus vacantes o postulate a cientos de empleos.',
 }
 
 export default function RootLayout({

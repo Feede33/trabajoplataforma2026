@@ -22,7 +22,7 @@ export function Footer() {
             </p>
             <div className="flex items-center gap-4 text-xs text-slate-400 pt-2">
               <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-indigo-400" /> Argentina
+                <MapPin className="w-4 h-4 text-indigo-400" /> Uruguay
               </span>
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" /> Empleos Verificados
