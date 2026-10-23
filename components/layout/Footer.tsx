@@ -9,13 +9,13 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand & mission */}
           <div className="lg:col-span-2 space-y-4">
-            <Link href="/" className="inline-flex items-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logo.png"
-                alt="PostulaUY.com - Plataforma Laboral"
-                className="h-14 w-auto max-w-[224px] object-contain"
-              />
+            <Link href="/" className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
+                <Briefcase className="w-5 h-5" />
+              </div>
+              <span className="font-extrabold text-xl text-white tracking-tight flex items-center">
+                Postula<span className="text-indigo-400">UY</span><span className="text-xs text-indigo-300 font-bold ml-0.5">.com</span>
+              </span>
             </Link>
             <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
               La plataforma que conecta a las empresas líderes con el mejor talento del país. Fletes, tecnología, logística, diseño, administración y más.

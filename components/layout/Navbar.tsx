@@ -39,17 +39,22 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-3 sm:px-5 lg:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center group shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logo.png"
-                alt="PostulaUY.com - Plataforma Laboral"
-                className="h-14 w-auto max-w-[224px] object-contain group-hover:scale-[1.03] transition-transform"
-              />
+            <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
+                <Briefcase className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-extrabold text-xl text-slate-900 tracking-tight flex items-center">
+                  Postula<span className="text-indigo-600">UY</span><span className="text-xs text-indigo-500 font-bold ml-0.5">.com</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium -mt-1 uppercase tracking-wider">
+                  Plataforma Laboral
+                </span>
+              </div>
             </Link>
 
             {/* Backend status badge */}
