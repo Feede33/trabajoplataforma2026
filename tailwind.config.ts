@@ -52,11 +52,40 @@ const config: Config = {
       },
       animation: {
         'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear',
+        'float-slow': 'float-slow 9s ease-in-out infinite',
+        'float-reverse': 'float-reverse 11s ease-in-out infinite',
+        'glass-shimmer': 'glass-shimmer 4s ease-in-out infinite',
       },
       keyframes: {
         'border-beam': {
           '100%': {
             'offset-distance': '100%',
+          },
+        },
+        'float-slow': {
+          '0%, 100%': {
+            transform: 'translate(0px, 0px) scale(1)',
+          },
+          '50%': {
+            transform: 'translate(24px, -18px) scale(1.08)',
+          },
+        },
+        'float-reverse': {
+          '0%, 100%': {
+            transform: 'translate(0px, 0px) scale(1)',
+          },
+          '50%': {
+            transform: 'translate(-22px, 16px) scale(1.06)',
+          },
+        },
+        'glass-shimmer': {
+          '0%, 100%': {
+            opacity: '0.4',
+            transform: 'translateX(-100%) skewX(-15deg)',
+          },
+          '50%': {
+            opacity: '0.8',
+            transform: 'translateX(200%) skewX(-15deg)',
           },
         },
       },

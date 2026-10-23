@@ -1,4 +1,4 @@
-﻿import { JobWithEmpresa, Profile, ApplicationWithDetails, InformalJob } from './supabase/database.types'
+import { JobWithEmpresa, Profile, ApplicationWithDetails, InformalJob } from './supabase/database.types'
 
 export const MOCK_EMPRESAS: Profile[] = [
   {
@@ -10,20 +10,20 @@ export const MOCK_EMPRESAS: Profile[] = [
     bio: 'Líder en comercio electrónico y soluciones fintech en América Latina.',
     ubicacion: 'Montevideo, Uruguay',
     cv_url: null,
-    website: 'https://mercadolibre.com',
+    website: 'https://mercadolibre.com.uy',
     created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
   {
     id: 'emp-2',
     role: 'empresa',
-    nombre: 'Logística TransAndes',
-    email: 'rrhh@transandes.com.ar',
+    nombre: 'Logística Oriental',
+    email: 'rrhh@logisticaoriental.com.uy',
     avatar_url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=120&h=120&q=80',
-    bio: 'Operador logístico integral con más de 20 años conectando rutas y empresas en todo el país.',
-    ubicacion: 'Rosario, Santa Fe',
+    bio: 'Operador logístico integral con más de 20 años conectando rutas y empresas en los 19 departamentos del Uruguay.',
+    ubicacion: 'Canelones, Uruguay',
     cv_url: null,
-    website: 'https://transandes.com.ar',
+    website: 'https://logisticaoriental.com.uy',
     created_at: new Date(Date.now() - 60 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -44,12 +44,12 @@ export const MOCK_EMPRESAS: Profile[] = [
     id: 'emp-4',
     role: 'empresa',
     nombre: 'NutriSalud Group',
-    email: 'contacto@nutrisalud.com',
+    email: 'contacto@nutrisalud.com.uy',
     avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
     bio: 'Grupo de clínicas y servicios de salud y nutrición con alcance nacional.',
-    ubicacion: 'Punta del Este, Uruguay',
+    ubicacion: 'Punta del Este, Maldonado',
     cv_url: null,
-    website: 'https://nutrisalud.com',
+    website: 'https://nutrisalud.com.uy',
     created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -57,12 +57,12 @@ export const MOCK_EMPRESAS: Profile[] = [
     id: 'emp-5',
     role: 'empresa',
     nombre: 'Agencia Digital Pixel',
-    email: 'hola@pixelagencia.com',
+    email: 'hola@pixelagencia.com.uy',
     avatar_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&h=120&q=80',
     bio: 'Agencia de marketing digital, branding y diseño enfocada en startups de alto crecimiento.',
     ubicacion: 'Maldonado, Uruguay',
     cv_url: null,
-    website: 'https://pixelagencia.com',
+    website: 'https://pixelagencia.com.uy',
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -73,7 +73,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
     id: 'job-1',
     empresa_id: 'emp-1',
     titulo: 'Desarrollador Full Stack Senior (React + Node.js)',
-    descripcion: `Estamos en búsqueda de un Desarrollador Full Stack Senior para sumarse a nuestro equipo de producto.
+    descripcion: `Estamos en búsqueda de un Desarrollador Full Stack Senior para sumarse a nuestro equipo de producto en Uruguay.
     
 **Responsabilidades principales:**
 - Diseñar e implementar microservicios escalables de alta concurrencia.
@@ -88,15 +88,15 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
 - Capacidad para trabajar de manera autónoma con metodologías ágiles.
 
 **Beneficios:**
-- Trabajo 100% remoto con horario flexible.
+- Trabajo 100% remoto desde cualquier departamento del Uruguay con horario flexible.
 - Bono anual por desempeño.
-- Cobertura médica prepaga de primer nivel (Swiss Medical o OSDE 310) para vos y tu grupo familiar.
-- Presupuesto anual de capacitación y home office.`,
+- Seguro médico privado de primer nivel (MP o Summum) para vos y tu grupo familiar.
+- Presupuesto anual de capacitación y equipamiento para home office.`,
     rubro: 'Tecnología',
     zona: 'Remoto (Uruguay)',
     modalidad: 'remoto',
     tipo_contrato: 'full-time',
-    salario_rango: '$2.500.000 - $3.200.000 ARS',
+    salario_rango: '$85.000 - $120.000 UYU',
     estado: 'activo',
     slug: 'desarrollador-full-stack-senior-react-node',
     tags: ['React', 'Node.js', 'TypeScript', 'PostgreSQL', 'Docker'],
@@ -105,7 +105,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
     empresa: {
       nombre: 'MercadoLibre Tech',
       avatar_url: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?auto=format&fit=crop&w=120&h=120&q=80',
-      website: 'https://mercadolibre.com',
+      website: 'https://mercadolibre.com.uy',
       ubicacion: 'Montevideo, Uruguay',
     }
   },
@@ -113,46 +113,46 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
     id: 'job-2',
     empresa_id: 'emp-2',
     titulo: 'Coordinador de Logística y Flota de Transporte',
-    descripcion: `Importante empresa de transporte y logística incorpora Coordinador de Operaciones para su centro de distribución.
+    descripcion: `Importante empresa de transporte y logística incorpora Coordinador de Operaciones para su centro de distribución en Ruta 101.
 
 **Responsabilidades:**
-- Planificación y optimización de rutas de distribución urbana y de larga distancia.
+- Planificación y optimización de rutas de distribución en Montevideo, área metropolitana e interior del país.
 - Supervisión del estado general de la flota de camiones y utilitarios.
-- Asignación de cargas, hojas de ruta y gestión de personal choferes.
-- Control de remitos, hojas de ruta satelital y tiempos de entrega.
+- Asignación de cargas, hojas de ruta y gestión de personal de choferes.
+- Control de remitos, seguimiento satelital y tiempos de entrega.
 
 **Requisitos:**
 - Experiencia mínima de 3 años en puestos similares de logística y distribución.
 - Manejo avanzado de sistemas de ruteo y planillas de cálculo.
 - Disponibilidad para realizar turnos rotativos.
-- Residencia en zona Rosario o alrededores.
+- Residencia en Canelones, Ciudad de la Costa o Montevideo.
 
 **Ofrecemos:**
-- Contratación directa por tiempo indeterminado.
+- Contratación directa en planilla.
 - Almuerzo a cargo de la empresa.
 - Excelente clima laboral y plan de carrera en expansión.`,
     rubro: 'Logística',
-    zona: 'Rosario, Santa Fe',
+    zona: 'Canelones (Ruta 101)',
     modalidad: 'presencial',
     tipo_contrato: 'full-time',
-    salario_rango: '$1.400.000 - $1.800.000 ARS',
+    salario_rango: '$55.000 - $72.000 UYU',
     estado: 'activo',
     slug: 'coordinador-logistica-flota-transporte',
     tags: ['Logística', 'Ruteo', 'Flota', 'Distribución', 'Excel'],
     created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 4 * 86400000).toISOString(),
     empresa: {
-      nombre: 'Logística TransAndes',
+      nombre: 'Logística Oriental',
       avatar_url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=120&h=120&q=80',
-      website: 'https://transandes.com.ar',
-      ubicacion: 'Rosario, Santa Fe',
+      website: 'https://logisticaoriental.com.uy',
+      ubicacion: 'Canelones, Uruguay',
     }
   },
   {
     id: 'job-3',
     empresa_id: 'emp-3',
     titulo: 'Diseñador UI/UX & Product Designer',
-    descripcion: `Sumate a nuestro estudio de diseño para cocrear productos digitales de clase mundial.
+    descripcion: `Sumate a nuestro estudio de diseño para cocrear productos digitales de clase mundial desde Uruguay.
     
 **Qué harás:**
 - Diseñar flujos de usuario intuitivos, wireframes interactivos y prototipos de alta fidelidad en Figma.
@@ -166,10 +166,10 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
 - Experiencia en diseño web y mobile (iOS / Android).
 - Inglés intermedio / avanzado.`,
     rubro: 'Diseño',
-    zona: 'Córdoba / Remoto',
+    zona: 'Montevideo / Remoto',
     modalidad: 'hibrido',
     tipo_contrato: 'full-time',
-    salario_rango: '$1.800.000 - $2.400.000 ARS',
+    salario_rango: '$68.000 - $92.000 UYU',
     estado: 'activo',
     slug: 'disenador-ui-ux-product-designer',
     tags: ['Figma', 'UI/UX', 'Design Systems', 'User Research', 'Mobile'],
@@ -199,7 +199,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
 - Manejo analítico riguroso con Google Analytics 4 y Looker Studio.
 - Proactividad, orientación a resultados y mentalidad de experimentación constante.`,
     rubro: 'Marketing',
-    zona: 'Remoto (Latinoamérica)',
+    zona: 'Maldonado / Remoto',
     modalidad: 'remoto',
     tipo_contrato: 'freelance',
     salario_rango: 'USD $1.200 - $1.800 / mes',
@@ -211,7 +211,7 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
     empresa: {
       nombre: 'Agencia Digital Pixel',
       avatar_url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&h=120&q=80',
-      website: 'https://pixelagencia.com',
+      website: 'https://pixelagencia.com.uy',
       ubicacion: 'Maldonado, Uruguay',
     }
   },
@@ -219,65 +219,65 @@ export const MOCK_JOBS: JobWithEmpresa[] = [
     id: 'job-5',
     empresa_id: 'emp-4',
     titulo: 'Analista Contable y de Facturación',
-    descripcion: `Clínica de salud líder incorpora profesional o estudiante avanzado de Contador Público o Administración de Empresas.
+    descripcion: `Clínica de salud líder incorpora profesional o estudiante avanzado de Contador Público (FCEA / UdelaR o universidades privadas) o Administración de Empresas.
 
 **Tareas principales:**
-- Conciliaciones bancarias y de cuentas corrientes de obras sociales y prepagas.
-- Facturación electrónica mediante AFIP y control impositivo.
+- Conciliaciones bancarias y de cuentas corrientes de mutualistas y seguros médicos.
+- Facturación electrónica (CFE) ante DGI, liquidaciones de BPS y control impositivo.
 - Carga de comprobantes y gestión de pagos a proveedores.
 - Asistencia en la elaboración de balances mensuales.
 
 **Requisitos:**
-- Al menos 2 años de experiencia en áreas contables o de administración de salud.
-- Manejo de sistemas de gestión contable (Tango, Bejerman o similares).
+- Al menos 2 años de experiencia en áreas contables o de administración de salud en Uruguay.
+- Manejo de sistemas de gestión contable (Memory Conty, GNS, ZetaSoftware o similares).
 - Atención a los detalles y buenas relaciones interpersonales.`,
     rubro: 'Administración',
-    zona: 'CABA (Palermo)',
+    zona: 'Montevideo (Pocitos)',
     modalidad: 'presencial',
     tipo_contrato: 'full-time',
-    salario_rango: '$1.100.000 - $1.350.000 ARS',
+    salario_rango: '$48.000 - $62.000 UYU',
     estado: 'activo',
     slug: 'analista-contable-facturacion-salud',
-    tags: ['Contabilidad', 'Facturación', 'AFIP', 'Tango', 'Excel'],
+    tags: ['Contabilidad', 'Facturación', 'DGI', 'BPS', 'Excel'],
     created_at: new Date(Date.now() - 8 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 8 * 86400000).toISOString(),
     empresa: {
       nombre: 'NutriSalud Group',
       avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120&q=80',
-      website: 'https://nutrisalud.com',
-      ubicacion: 'Punta del Este, Uruguay',
+      website: 'https://nutrisalud.com.uy',
+      ubicacion: 'Punta del Este, Maldonado',
     }
   },
   {
     id: 'job-6',
     empresa_id: 'emp-2',
-    titulo: 'Chofer de Mudanzas y Fletes con Licencia Profesional',
+    titulo: 'Chofer de Mudanzas y Fletes con Libreta Profesional',
     descripcion: `Buscamos choferes responsables para unidad utilitaria (Master / Sprinter) y camión liviano para servicios de fletes, transportes y mudanzas particulares y corporativas.
 
 **Requisitos:**
-- Licencia nacional de conducir profesional al día (LINTI / CNRT deseable).
-- Experiencia mínima de 2 años en reparto, fletes o mudanzas urbanas en CABA y GBA.
+- Libreta de conducir profesional al día (Categoría B, C o E).
+- Experiencia mínima de 2 años en reparto, fletes o mudanzas urbanas en Montevideo y Área Metropolitana.
 - Excelente trato con los clientes y vocación de servicio.
 - Disponibilidad horaria incluyendo sábados por la mañana.
 
 **Se ofrece:**
-- Salario de convenio + viáticos y adicionales por servicio.
+- Salario por laudo del sector + viáticos y adicionales por servicio.
 - Vehículo a cargo de la empresa con seguro y mantenimiento al día.`,
     rubro: 'Logística',
-    zona: 'Montevideo (Norte)',
+    zona: 'Montevideo (Zona Prado / Paso Molino)',
     modalidad: 'presencial',
     tipo_contrato: 'full-time',
-    salario_rango: '$950.000 - $1.200.000 ARS',
+    salario_rango: '$42.000 - $54.000 UYU',
     estado: 'activo',
     slug: 'chofer-mudanzas-fletes-licencia-profesional',
-    tags: ['Chofer', 'Mudanzas', 'Fletes', 'Licencia Profesional', 'GBA'],
+    tags: ['Chofer', 'Mudanzas', 'Fletes', 'Libreta Profesional', 'Montevideo'],
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     empresa: {
-      nombre: 'Logística TransAndes',
+      nombre: 'Logística Oriental',
       avatar_url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=120&h=120&q=80',
-      website: 'https://transandes.com.ar',
-      ubicacion: 'Rosario, Santa Fe',
+      website: 'https://logisticaoriental.com.uy',
+      ubicacion: 'Canelones, Uruguay',
     }
   }
 ]

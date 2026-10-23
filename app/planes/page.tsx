@@ -3,11 +3,12 @@
 import React, { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle2, Sparkles, Zap, Building2, User, Loader2, AlertCircle, Clock, Crown } from 'lucide-react'
+import { CheckCircle2, Sparkles, Zap, Building2, User, Loader2, AlertCircle, Clock, Crown, Camera, Wand2 } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
 import { FREE_AVISOS_MES, MAX_AVISOS_POR_USO_IA, PRODUCTS, ProductId, formatUYU, totalConIva } from '@/lib/billing'
 import { BillingStatus, fetchBillingStatus, startCheckout } from '@/lib/billing-client'
 import { FeaturedGlowCard } from '@/components/ui/border-beam'
+import { LiquidGlassShowcase, LiquidGlassCard } from '@/components/ui/liquid-glass'
 
 function PlanesContent() {
   const { profile, isAdmin, isLoading, getAccessToken } = useAuth()
@@ -56,13 +57,22 @@ function PlanesContent() {
 
   const loginHref = '/auth/login?redirect=/planes'
 
-  const renderBuyButton = (product: ProductId, label: string, highlighted = false) => {
+  const renderBuyButton = (
+    product: ProductId,
+    label: string,
+    highlighted = false,
+    glassVariant?: 'crystal' | 'crystal-amber'
+  ) => {
     const p = PRODUCTS[product]
-    const baseClass = `relative z-10 w-full py-3 px-5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-      highlighted
-        ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/35 hover:-translate-y-0.5'
-        : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border dark:border-slate-700 text-white'
-    }`
+    const variantClass = glassVariant === 'crystal-amber'
+      ? 'bg-gradient-to-r from-amber-500/90 via-orange-500/90 to-amber-600/90 hover:from-amber-500 hover:to-orange-500 text-white backdrop-blur-md border border-white/40 dark:border-amber-300/30 shadow-[0_8px_24px_-4px_rgba(245,158,11,0.35),inset_0_1px_1px_rgba(255,255,255,0.5)] hover:shadow-[0_10px_28px_-4px_rgba(245,158,11,0.5)] hover:-translate-y-0.5'
+      : glassVariant === 'crystal'
+      ? 'bg-slate-900/75 hover:bg-slate-900/90 dark:bg-white/10 dark:hover:bg-white/20 text-white backdrop-blur-md border border-white/30 dark:border-white/20 shadow-[0_8px_20px_-6px_rgba(15,23,42,0.25),inset_0_1px_1px_rgba(255,255,255,0.35)] hover:-translate-y-0.5'
+      : highlighted
+      ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/35 hover:-translate-y-0.5'
+      : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border dark:border-slate-700 text-white'
+
+    const baseClass = `relative z-10 w-full py-3 px-5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${variantClass}`
 
     if (isLoading) {
       return <div className="h-11 rounded-2xl bg-slate-100 animate-pulse" />
@@ -299,52 +309,114 @@ function PlanesContent() {
         </div>
       </section>
 
-      {/* Créditos de IA para particulares */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-xl font-extrabold text-slate-900">Publicá avisos informales con IA</h2>
-            <p className="text-xs text-slate-500">
-              Subí una foto o captura de pantalla y la IA arma el aviso por vos. Para cuentas de Candidato.
-            </p>
-          </div>
-        </div>
-
-        {isCandidato && billing && (
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
-            Te quedan <strong>{billing.creditos}</strong> usos de IA.
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-3xl">
-          {(['creditos_5', 'creditos_20'] as ProductId[]).map((id) => {
-            const p = PRODUCTS[id]
-            const unit = p.neto / (p.creditos || 1)
-            return (
-              <div key={id} className="bg-white rounded-3xl border border-slate-200 p-7 flex flex-col justify-between gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-amber-600" />
-                    <h3 className="text-lg font-extrabold text-slate-900">{p.nombre}</h3>
-                  </div>
-                  {priceBlock(p.neto, '', `${formatUYU(unit)} + IVA por uso`)}
-                  {features([
-                    `Hasta ${MAX_AVISOS_POR_USO_IA} avisos por cada uso`,
-                    'Los créditos no vencen',
-                    'Si la IA falla, no se descuenta el uso',
-                  ])}
-                </div>
-                {renderBuyButton(id, `Comprar ${p.creditos} usos`)}
+      {/* Créditos de IA para particulares — Efecto Liquid Glass / Transparencia */}
+      <section>
+        <LiquidGlassShowcase>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400/90 to-orange-500/90 text-white flex items-center justify-center shrink-0 shadow-[0_8px_20px_-4px_rgba(245,158,11,0.45),inset_0_1px_1px_rgba(255,255,255,0.6)] border border-white/40 backdrop-blur-md">
+                <Sparkles className="w-6 h-6 drop-shadow-sm" />
               </div>
-            )
-          })}
-        </div>
-        <p className="text-xs text-slate-500">
-          Ver avisos informales y contactar por WhatsApp o email siempre es gratis. La IA es opcional.
-        </p>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+                    Publicá avisos informales con IA
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/55 dark:bg-white/10 backdrop-blur-md border border-white/70 dark:border-white/15 text-amber-700 dark:text-amber-300 shadow-sm">
+                    Visión Artificial
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                  Subí una foto o captura de pantalla y la IA arma el aviso por vos. Para cuentas de Candidato.
+                </p>
+              </div>
+            </div>
+
+            {/* Píldoras translúcidas de proceso (Cristal esmerilado) */}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/[0.07] backdrop-blur-md border border-white/75 dark:border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-none">
+                <Camera className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                1. Captura o foto
+              </span>
+              <span className="text-slate-400 font-bold">→</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/[0.07] backdrop-blur-md border border-white/75 dark:border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-none">
+                <Wand2 className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                2. Lectura con IA
+              </span>
+              <span className="text-slate-400 font-bold">→</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/50 dark:bg-white/[0.07] backdrop-blur-md border border-white/75 dark:border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-none">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                3. Aviso listo
+              </span>
+            </div>
+          </div>
+
+          {isCandidato && billing && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 backdrop-blur-md border border-amber-400/40 dark:border-amber-400/30 text-sm text-amber-900 dark:text-amber-200 flex items-center justify-between">
+              <span>
+                Te quedan <strong>{billing.creditos}</strong> usos de IA disponibles en tu cuenta.
+              </span>
+              <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-7 max-w-4xl py-1">
+            {(['creditos_5', 'creditos_20'] as ProductId[]).map((id) => {
+              const p = PRODUCTS[id]
+              const unit = p.neto / (p.creditos || 1)
+              const isBestPack = id === 'creditos_20'
+              return (
+                <LiquidGlassCard
+                  key={id}
+                  accent={isBestPack ? 'amber' : 'cyan'}
+                  className="p-7"
+                >
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/80 dark:border-white/15 flex items-center justify-center shadow-sm">
+                          <User className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <h3 className="text-lg font-extrabold text-slate-900">{p.nombre}</h3>
+                      </div>
+                      {isBestPack ? (
+                        <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 dark:bg-amber-400/20 backdrop-blur-md border border-amber-500/40 dark:border-amber-300/30 text-amber-900 dark:text-amber-200 shadow-sm">
+                          25% OFF por uso
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/55 dark:bg-white/10 backdrop-blur-md border border-white/75 dark:border-white/15 text-slate-700">
+                          Para empezar
+                        </span>
+                      )}
+                    </div>
+
+                    {priceBlock(p.neto, '', `${formatUYU(unit)} + IVA por uso`)}
+
+                    <div className="h-px bg-gradient-to-r from-transparent via-slate-300/60 dark:via-white/15 to-transparent" />
+
+                    {features([
+                      `Hasta ${MAX_AVISOS_POR_USO_IA} avisos extraídos por cada uso`,
+                      'Los créditos no vencen nunca',
+                      'Si la IA falla, no se descuenta el uso',
+                    ])}
+                  </div>
+
+                  {renderBuyButton(
+                    id,
+                    `Comprar ${p.creditos} usos`,
+                    false,
+                    isBestPack ? 'crystal-amber' : 'crystal'
+                  )}
+                </LiquidGlassCard>
+              )
+            })}
+          </div>
+
+          <p className="text-xs text-slate-600 flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Ver avisos informales y contactar por WhatsApp o email siempre es gratis. La IA es opcional.
+          </p>
+        </LiquidGlassShowcase>
       </section>
 
       <p className="text-center text-xs text-slate-500">

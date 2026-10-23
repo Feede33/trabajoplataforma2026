@@ -258,14 +258,14 @@ export default function PublicarEmpleoPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                Ubicación / Zona *
+                Ubicación / Departamento (Uruguay) *
               </label>
               <input
                 type="text"
                 required
                 value={zona}
                 onChange={(e) => setZona(e.target.value)}
-                placeholder="Ej: CABA, Rosario, Córdoba, Remoto..."
+                placeholder="Ej: Montevideo, Canelones, Maldonado, Remoto..."
                 className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
               />
             </div>
@@ -278,7 +278,7 @@ export default function PublicarEmpleoPage() {
                 type="text"
                 value={salario}
                 onChange={(e) => setSalario(e.target.value)}
-                placeholder="Ej: $1.200.000 - $1.600.000 ARS o USD 1500"
+                placeholder="Ej: $45.000 - $65.000 UYU o USD 1.500"
                 className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
               />
             </div>
