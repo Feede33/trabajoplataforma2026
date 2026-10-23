@@ -50,7 +50,7 @@ function LoginContent() {
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900">Iniciar Sesión</h1>
           <p className="text-xs text-slate-500">
-            Ingresá las credenciales de tu cuenta registrada en EmpleosYa
+            Ingresá las credenciales de tu cuenta registrada en Postulauy.com
           </p>
         </div>
 

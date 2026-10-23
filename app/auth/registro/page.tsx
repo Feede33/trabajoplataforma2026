@@ -81,7 +81,7 @@ function RegistroContent() {
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900">Crear una Cuenta</h1>
           <p className="text-xs text-slate-500">
-            Elegí tu perfil y empezá a conectar en EmpleosYa
+            Elegí tu perfil y empezá a conectar en Postulauy.com
           </p>
         </div>
 

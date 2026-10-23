@@ -299,7 +299,7 @@ export default function JobDetailPage() {
 
             <div className="pt-2 text-xs text-slate-500 flex items-center gap-1.5 border-t border-slate-100">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span>Aviso verificado por el equipo de EmpleosYa</span>
+              <span>Aviso verificado por el equipo de Postulauy.com</span>
             </div>
           </div>
         </div>

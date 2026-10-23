@@ -48,8 +48,8 @@ export function Navbar() {
                 <Briefcase className="w-5 h-5" />
               </div>
               <div className="flex flex-col">
-                <span className="font-extrabold text-xl text-slate-900 tracking-tight flex items-center gap-1">
-                  Empleos<span className="text-indigo-600">Ya</span>
+                <span className="font-extrabold text-xl text-slate-900 tracking-tight flex items-center">
+                  Postula<span className="text-indigo-600">UY</span><span className="text-xs text-indigo-500 font-bold ml-0.5">.com</span>
                 </span>
                 <span className="text-[10px] text-slate-500 font-medium -mt-1 uppercase tracking-wider">
                   Plataforma Laboral
