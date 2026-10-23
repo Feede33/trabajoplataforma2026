@@ -93,7 +93,8 @@ export default function JobDetailPage() {
   }[job.modalidad]
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs text-slate-500">
         <Link href="/" className="hover:text-slate-800 transition-colors">
@@ -305,12 +306,14 @@ export default function JobDetailPage() {
         </div>
       </div>
 
+      </div>
+
       {/* Apply Modal */}
       <ApplyModal
         job={job}
         isOpen={isApplyModalOpen}
         onClose={() => setIsApplyModalOpen(false)}
       />
-    </div>
+    </>
   )
 }
