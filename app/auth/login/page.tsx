@@ -28,6 +28,8 @@ function LoginContent() {
     if (res.success) {
       if (redirect) {
         router.push(redirect)
+      } else if (res.isAdmin) {
+        router.push('/empleos-informales')
       } else if (res.role === 'empresa') {
         router.push('/empresa/dashboard')
       } else {

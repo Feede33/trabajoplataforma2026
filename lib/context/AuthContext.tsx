@@ -3,13 +3,15 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { Profile, UserRole } from '../supabase/database.types'
 import { isSupabaseConfigured, createClient } from '../supabase/client'
+import { isProfileAdmin } from '../auth-utils'
 
 interface AuthContextType {
   profile: Profile | null
   role: UserRole | null
+  isAdmin: boolean
   isLoading: boolean
   isConfigured: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole }>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole; isAdmin?: boolean }>
   signup: (
     email: string,
     password: string,
@@ -18,6 +20,7 @@ interface AuthContextType {
   ) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean; message?: string }>
   logout: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
+  getAccessToken: () => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -126,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (
     email: string,
     password: string
-  ): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
+  ): Promise<{ success: boolean; error?: string; role?: UserRole; isAdmin?: boolean }> => {
     if (!isConfigured) {
       return { success: false, error: 'Supabase no está configurado en el archivo .env' }
     }
@@ -173,7 +176,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(tempProfile)
       }
 
-      return { success: true, role: userRole }
+      const isCurrentlyAdmin = isProfileAdmin(p || { email: data.user.email })
+
+      return { success: true, role: userRole, isAdmin: isCurrentlyAdmin }
     } catch (err: any) {
       return { success: false, error: err.message || 'Error al iniciar sesión' }
     }
@@ -189,6 +194,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Supabase no está configurado en el archivo .env' }
     }
 
+    // Regla de seguridad: Garantizar que el rol solo pueda ser 'empresa' o 'candidato'
+    const sanitizedRole: UserRole = targetRole === 'empresa' ? 'empresa' : 'candidato'
+
     try {
       const supabase = createClient()
       const { data, error } = await supabase.auth.signUp({
@@ -196,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         options: {
           data: {
-            role: targetRole,
+            role: sanitizedRole,
             nombre,
           },
         },
@@ -222,7 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Si la sesión se creó inmediatamente (confirmación de email desactivada)
       const newProfile: Profile = {
         id: data.user.id,
-        role: targetRole,
+        role: sanitizedRole,
         nombre,
         email,
         avatar_url: null,
@@ -258,6 +266,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const getAccessToken = async (): Promise<string | null> => {
+    if (!isConfigured) return null
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      return session?.access_token || null
+    } catch {
+      return null
+    }
+  }
+
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!profile) return
     const updated = { ...profile, ...updates, updated_at: new Date().toISOString() }
@@ -273,17 +292,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(updated)
   }
 
+  const isAdmin = isProfileAdmin(profile)
+
   return (
     <AuthContext.Provider
       value={{
         profile,
         role: profile?.role || null,
+        isAdmin,
         isLoading,
         isConfigured,
         login,
         signup,
         logout,
         updateProfile,
+        getAccessToken,
       }}
     >
       {children}

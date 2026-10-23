@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   MessageCircle,
@@ -22,15 +22,23 @@ import {
   ArrowRight,
   Filter,
   Lock,
-  ExternalLink
+  ExternalLink,
+  Camera,
+  UploadCloud,
+  Loader2,
+  Image as ImageIcon,
+  FileText,
+  Layers,
+  ChevronRight,
+  Trash2
 } from 'lucide-react'
 import { InformalJob } from '@/lib/supabase/database.types'
-import { fetchInformalJobs, createInformalJob, parseInformalJobWithAI, formatWhatsAppUrl } from '@/lib/data'
+import { fetchInformalJobs, createInformalJob, deleteInformalJob, parseInformalJobWithAI, formatWhatsAppUrl } from '@/lib/data'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/lib/context/AuthContext'
 
 export default function EmpleosInformalesPage() {
-  const { profile } = useAuth()
+  const { profile, isAdmin, getAccessToken } = useAuth()
   const [jobs, setJobs] = useState<InformalJob[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -38,19 +46,47 @@ export default function EmpleosInformalesPage() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
   const [showAdminNotice, setShowAdminNotice] = useState(false)
 
-  // Verificación de Administrador
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'nicodelcerro33@gmail.com'
-  const isAdmin =
-    profile?.email === adminEmail ||
-    profile?.email?.toLowerCase().includes('admin') ||
-    (profile?.role as string) === 'admin'
-
-  // AI Modal state
+  // AI Modal states
+  const [aiTab, setAiTab] = useState<'image' | 'text'>('image')
   const [rawText, setRawText] = useState('')
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageMime, setImageMime] = useState('image/jpeg')
+  const [imageName, setImageName] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [autoPublishDirectly, setAutoPublishDirectly] = useState(true)
+  const [extractedList, setExtractedList] = useState<Partial<InformalJob>[]>([])
+  const [activeExtractedIndex, setActiveExtractedIndex] = useState(0)
+
   const [parsedPreview, setParsedPreview] = useState<Partial<InformalJob> | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishSuccess, setPublishSuccess] = useState(false)
+  const [publishSuccessMessage, setPublishSuccessMessage] = useState('')
   const [publishError, setPublishError] = useState('')
+
+  // Admin delete states
+  const [jobToDelete, setJobToDelete] = useState<InformalJob | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleConfirmDelete = async () => {
+    if (!jobToDelete) return
+    setIsDeleting(true)
+    try {
+      const token = await getAccessToken()
+      await deleteInformalJob(jobToDelete.id, token)
+      setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id))
+      setToastMessage(`Publicación "${jobToDelete.cargo}" eliminada correctamente.`)
+      setTimeout(() => setToastMessage(null), 3500)
+      setJobToDelete(null)
+    } catch (err: any) {
+      alert('Error al eliminar aviso: ' + (err.message || 'Error desconocido'))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -70,25 +106,165 @@ export default function EmpleosInformalesPage() {
     setIsAiModalOpen(true)
     setPublishError('')
     setPublishSuccess(false)
+    setPublishSuccessMessage('')
   }
 
-  const handleInterpretAI = () => {
-    if (!rawText.trim()) return
-    const parsed = parseInformalJobWithAI(rawText)
-    setParsedPreview(parsed)
+  const handleFileChosen = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setPublishError('El archivo seleccionado debe ser una imagen (JPG, PNG, WEBP, etc.)')
+      return
+    }
+    setPublishError('')
+    setImageName(file.name)
+
+    // Comprimir imagen client-side antes de enviarla (fotos de celular pueden pesar 5-15 MB)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const originalDataUrl = e.target?.result as string
+      const img = new window.Image()
+      img.onload = () => {
+        const MAX_SIDE = 1280
+        let { width, height } = img
+        if (width > MAX_SIDE || height > MAX_SIDE) {
+          if (width >= height) {
+            height = Math.round((height * MAX_SIDE) / width)
+            width = MAX_SIDE
+          } else {
+            width = Math.round((width * MAX_SIDE) / height)
+            height = MAX_SIDE
+          }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, width, height)
+        // Exportar siempre como JPEG al 80% de calidad (~150-250 KB)
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+        setImageMime('image/jpeg')
+        setImagePreview(compressedDataUrl)
+        setExtractedList([])
+        setParsedPreview(null)
+      }
+      img.src = originalDataUrl
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileChosen(e.dataTransfer.files[0])
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  // Permite pegar una captura de pantalla directamente con Ctrl + V
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const file = e.clipboardData.files[0]
+      if (file.type.startsWith('image/')) {
+        e.preventDefault()
+        setAiTab('image')
+        handleFileChosen(file)
+      }
+    }
+  }
+
+  const handleProcessWithGemini = async (publishNow?: boolean) => {
+    const shouldPublish = typeof publishNow === 'boolean' ? publishNow : autoPublishDirectly
+    setPublishError('')
+    setIsAnalyzing(true)
+
+    try {
+      let payload: any = { autoPublish: shouldPublish }
+
+      if (aiTab === 'image') {
+        if (!imagePreview) {
+          throw new Error('Primero debés seleccionar o arrastrar una imagen.')
+        }
+        payload.image = imagePreview
+        payload.mimeType = imageMime
+      } else {
+        if (!rawText.trim()) {
+          throw new Error('Primero debés pegar o escribir el texto del aviso.')
+        }
+        payload.text = rawText
+      }
+
+      const token = await getAccessToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const res = await fetch('/api/ai-publish', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al procesar con IA.')
+      }
+
+      const returnedJobs: any[] = data.jobs || []
+
+      if (shouldPublish) {
+        // Se publicó directamente en Supabase
+        setJobs((prev) => [...returnedJobs, ...prev])
+        setPublishSuccess(true)
+        setPublishSuccessMessage(
+          `¡Éxito! Se interpretó y publicó ${returnedJobs.length} oferta(s) de empleo automáticamente.`
+        )
+        setTimeout(() => {
+          setPublishSuccess(false)
+          setIsAiModalOpen(false)
+          setImagePreview(null)
+          setRawText('')
+          setExtractedList([])
+          setParsedPreview(null)
+        }, 2000)
+      } else {
+        // Solo interpretar para revisar antes
+        setExtractedList(returnedJobs)
+        if (returnedJobs.length > 0) {
+          setActiveExtractedIndex(0)
+          setParsedPreview(returnedJobs[0])
+        }
+      }
+    } catch (err: any) {
+      setPublishError(err.message || 'Error al conectar con la IA.')
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   const handlePublishFromAI = async () => {
-    if (!parsedPreview?.cargo) {
+    const jobToSave = parsedPreview || extractedList[activeExtractedIndex]
+
+    if (!jobToSave?.cargo) {
       setPublishError('Por favor asegurate de que haya al menos un cargo o título detectado.')
       return
     }
 
     if (
-      !parsedPreview.whatsapp &&
-      !parsedPreview.telefono &&
-      !parsedPreview.email &&
-      !parsedPreview.direccion
+      !jobToSave.whatsapp &&
+      !jobToSave.telefono &&
+      !jobToSave.email &&
+      !jobToSave.direccion
     ) {
       setPublishError('Debés indicar al menos un canal de contacto (WhatsApp, teléfono, email o dirección).')
       return
@@ -98,30 +274,40 @@ export default function EmpleosInformalesPage() {
     setPublishError('')
 
     try {
-      const created = await createInformalJob({
-        titulo: parsedPreview.titulo || parsedPreview.cargo,
-        cargo: parsedPreview.cargo,
-        rubro: parsedPreview.rubro || 'General',
-        zona: parsedPreview.zona || null,
-        horario: parsedPreview.horario || null,
-        descripcion: parsedPreview.descripcion || rawText,
-        whatsapp: parsedPreview.whatsapp || parsedPreview.contacto_whatsapp || null,
-        telefono: parsedPreview.telefono || null,
-        email: parsedPreview.email || null,
-        direccion: parsedPreview.direccion || null,
-        contacto_whatsapp: parsedPreview.whatsapp || parsedPreview.contacto_whatsapp || null,
-        contacto_indicaciones: parsedPreview.contacto_indicaciones || null,
-        salario: parsedPreview.salario || null,
-        raw_text: rawText,
-        activo: true,
+      const token = await getAccessToken()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const res = await fetch('/api/ai-publish', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ...jobToSave,
+          raw_text: rawText || (imageName ? `Foto: ${imageName}` : null),
+          autoPublish: true,
+        }),
       })
 
-      setJobs((prev) => [created, ...prev])
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al publicar el aviso.')
+      }
+
+      const created = data.jobs?.[0] || data.job
+      if (created) {
+        setJobs((prev) => [created, ...prev])
+      }
+
       setPublishSuccess(true)
+      setPublishSuccessMessage('¡Aviso publicado exitosamente en la plataforma!')
       setTimeout(() => {
         setPublishSuccess(false)
         setIsAiModalOpen(false)
         setRawText('')
+        setImagePreview(null)
+        setExtractedList([])
         setParsedPreview(null)
       }, 1500)
     } catch (err: any) {
@@ -313,13 +499,35 @@ export default function EmpleosInformalesPage() {
                   <div className="space-y-3">
                     {/* Top Badges */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                        {job.rubro}
-                      </span>
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(job.created_at)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          {job.rubro}
+                        </span>
+                        {isAdmin && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-900 uppercase">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                          <Clock className="w-3 h-3" />
+                          {formatRelativeTime(job.created_at)}
+                        </span>
+
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => setJobToDelete(job)}
+                            title="Eliminar publicación como Administrador"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold transition-all shadow-sm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Eliminar</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Title & Position */}
@@ -481,7 +689,7 @@ export default function EmpleosInformalesPage() {
             <div className="pt-2 flex flex-col gap-2">
               {!profile ? (
                 <Link
-                  href="/auth/login"
+                  href="/auth/login?redirect=/empleos-informales"
                   className="w-full py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-colors"
                 >
                   Iniciar Sesión como Administrador
@@ -500,25 +708,28 @@ export default function EmpleosInformalesPage() {
 
       {/* Modal: Publicar con IA (Solo Admin) */}
       {isAiModalOpen && isAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] flex flex-col">
+        <div
+          onPaste={handlePaste}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
+        >
+          <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden max-h-[92vh] flex flex-col">
             {/* Header */}
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-sm">
-                  <Sparkles className="w-5 h-5 text-amber-600" />
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                  <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-extrabold text-slate-900">
-                      Publicador Asistido por IA
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                      Publicador Inteligente con Google Gemini
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 uppercase">
-                      Panel Admin
+                    <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 uppercase">
+                      Admin Vision
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Pegá cualquier aviso de clasificados o WhatsApp. La IA extraerá los datos adaptables.
+                    Subí fotos de clasificados, vidrieras, capturas de WhatsApp o pegá texto.
                   </p>
                 </div>
               </div>
@@ -530,82 +741,302 @@ export default function EmpleosInformalesPage() {
               </button>
             </div>
 
+            {/* Tabs Selector */}
+            <div className="flex border-b border-slate-100 bg-slate-50/70 p-1.5 gap-1.5 px-6">
+              <button
+                type="button"
+                onClick={() => setAiTab('image')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
+                  aiTab === 'image'
+                    ? 'bg-white text-amber-700 shadow-sm border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <Camera className="w-4 h-4 text-amber-600" />
+                <span>📸 Foto o Captura (Vision AI)</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold">
+                  NUEVO
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAiTab('text')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
+                  aiTab === 'text'
+                    ? 'bg-white text-amber-700 shadow-sm border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <FileText className="w-4 h-4 text-amber-600" />
+                <span>✍️ Pegar Texto Crudo</span>
+              </button>
+            </div>
+
             {/* Scrollable Body */}
-            <div className="p-6 space-y-6 overflow-y-auto">
+            <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
               {publishSuccess && (
-                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>¡Aviso interpretado y publicado exitosamente en la plataforma!</span>
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>{publishSuccessMessage || '¡Aviso interpretado y publicado con éxito!'}</span>
                 </div>
               )}
 
               {publishError && (
-                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                   <span>{publishError}</span>
                 </div>
               )}
 
-              {/* Botones de prueba rápida con clasificados reales */}
-              <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Cargar clasificados de ejemplo (Del recorte):
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => loadExample('taxi')}
-                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
-                  >
-                    🚕 Chofer Taxi (WhatsApp / Cel)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadExample('mecanico')}
-                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
-                  >
-                    🔧 Mecánico (Solo Email)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadExample('comida')}
-                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
-                  >
-                    🍔 Cajera Paso Molino
-                  </button>
+              {/* TAB 1: SUBIR FOTO */}
+              {aiTab === 'image' && (
+                <div className="space-y-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleFileChosen(e.target.files[0])
+                      }
+                    }}
+                  />
+
+                  {!imagePreview ? (
+                    <div
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`cursor-pointer border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
+                        isDragging
+                          ? 'border-amber-500 bg-amber-50 scale-[1.01]'
+                          : 'border-slate-200 hover:border-amber-400 bg-slate-50/50 hover:bg-amber-50/20'
+                      }`}
+                    >
+                      <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                        <UploadCloud className="w-7 h-7" />
+                      </div>
+                      <h4 className="text-sm font-extrabold text-slate-800">
+                        Arrastrá tu foto aquí o hacé clic para seleccionarla
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                        Recortes del diario (El Gallito), fotos de carteles en vidrieras o capturas de historias y WhatsApp.
+                      </p>
+                      <div className="mt-3 flex items-center justify-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
+                          Soporta JPG, PNG, WEBP
+                        </span>
+                        <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
+                          Podés pegar con Ctrl+V
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={imagePreview}
+                              alt="Vista previa"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">
+                              {imageName || 'Imagen cargada'}
+                            </p>
+                            <p className="text-[11px] text-slate-500">Lista para interpretar con IA</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-700"
+                          >
+                            Cambiar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImagePreview(null)
+                              setImageName('')
+                              setExtractedList([])
+                              setParsedPreview(null)
+                            }}
+                            className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200"
+                            title="Eliminar imagen"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Modo Toggle */}
+                      <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={autoPublishDirectly}
+                            onChange={(e) => setAutoPublishDirectly(e.target.checked)}
+                            className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                          />
+                          <span className="text-xs font-bold text-slate-700">
+                            Publicar automáticamente si la extracción es exitosa
+                          </span>
+                        </label>
+
+                        <button
+                          type="button"
+                          disabled={isAnalyzing}
+                          onClick={() => handleProcessWithGemini()}
+                          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all"
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Gemini Vision analizando foto...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              <span>
+                                {autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer Campos'}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
-              {/* Input raw text */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                  Texto del Aviso / Clasificado
-                </label>
-                <textarea
-                  rows={4}
-                  value={rawText}
-                  onChange={(e) => setRawText(e.target.value)}
-                  placeholder="Pegá aquí el texto del aviso tal cual lo copiaste..."
-                  className="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-xs sm:text-sm text-slate-800 resize-none font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={handleInterpretAI}
-                  disabled={!rawText.trim()}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow-sm"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-                  <span>Interpretar Campos con IA</span>
-                </button>
-              </div>
+              {/* TAB 2: PEGAR TEXTO */}
+              {aiTab === 'text' && (
+                <div className="space-y-4">
+                  {/* Botones de prueba rápida */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Ejemplos de clasificados reales de Uruguay:
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => loadExample('taxi')}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
+                      >
+                        🚕 Chofer Taxi (WhatsApp / Cel)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => loadExample('mecanico')}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
+                      >
+                        🔧 Mecánico (Solo Email)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => loadExample('comida')}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
+                      >
+                        🍔 Cajera Paso Molino
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Live Extracted Preview */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                      Texto del Aviso / Clasificado
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={rawText}
+                      onChange={(e) => setRawText(e.target.value)}
+                      placeholder="Pegá aquí el texto del aviso copiado de WhatsApp o la web..."
+                      className="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-xs sm:text-sm text-slate-800 resize-none font-mono"
+                    />
+
+                    <div className="flex items-center justify-between pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={autoPublishDirectly}
+                          onChange={(e) => setAutoPublishDirectly(e.target.checked)}
+                          className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+                        />
+                        <span className="text-xs font-bold text-slate-700">
+                          Publicar directo automáticamente
+                        </span>
+                      </label>
+
+                      <button
+                        type="button"
+                        disabled={!rawText.trim() || isAnalyzing}
+                        onClick={() => handleProcessWithGemini()}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow-sm"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Gemini analizando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                            <span>
+                              {autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer con Gemini'}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Selector si Gemini detectó múltiples avisos en una misma foto */}
+              {extractedList.length > 1 && (
+                <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-2xl">
+                  <span className="text-xs font-bold text-amber-900 block mb-2">
+                    🎯 Gemini detectó {extractedList.length} ofertas de empleo en la misma imagen:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {extractedList.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setActiveExtractedIndex(idx)
+                          setParsedPreview(item)
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                          activeExtractedIndex === idx
+                            ? 'bg-amber-700 text-white shadow-sm'
+                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+                        }`}
+                      >
+                        #{idx + 1}: {item.cargo || 'Aviso'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Live Extracted Preview / Editable Form */}
               {parsedPreview && (
-                <div className="p-5 rounded-2xl border border-amber-200 bg-amber-50/50 space-y-4">
+                <div className="p-5 rounded-2xl border border-amber-200 bg-amber-50/50 space-y-4 animate-in fade-in">
                   <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
                     <span className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      Extracción Adaptable (Solo completa lo que existe):
+                      Campos Detectados (Podés editarlos antes de guardar):
                     </span>
                   </div>
 
@@ -727,37 +1158,103 @@ export default function EmpleosInformalesPage() {
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 font-medium"
                       />
                     </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-slate-600 font-semibold mb-1">
+                        Descripción extraída:
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={parsedPreview.descripcion || ''}
+                        onChange={(e) =>
+                          setParsedPreview((prev) => ({ ...prev, descripcion: e.target.value }))
+                        }
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 text-xs"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-5 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50">
+            <div className="p-4 sm:p-5 border-t border-slate-100 flex items-center justify-between gap-3 bg-slate-50">
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                Potenciado por <strong>Gemini Flash Multimodal</strong>
+              </span>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  disabled={!parsedPreview || isPublishing}
+                  onClick={handlePublishFromAI}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-amber-200 transition-all"
+                >
+                  {isPublishing ? (
+                    <span>Guardando...</span>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Publicar Aviso</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmación de Eliminación para Administrador */}
+      {jobToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                ¿Eliminar esta publicación?
+              </h3>
+              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                Estás por eliminar el aviso de <strong>{jobToDelete.cargo}</strong> ({jobToDelete.titulo}).
+                Esta acción removerá la vacante de la cartelera de forma inmediata.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setIsAiModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 transition-colors"
+                disabled={isDeleting}
+                onClick={() => setJobToDelete(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                disabled={!parsedPreview || isPublishing}
-                onClick={handlePublishFromAI}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-amber-200 transition-all"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-200 transition-colors"
               >
-                {isPublishing ? (
-                  <span>Guardando...</span>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Publicar Aviso Inmediatamente</span>
-                  </>
-                )}
+                {isDeleting ? 'Eliminando...' : 'Sí, eliminar aviso'}
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-xl animate-in slide-in-from-bottom-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

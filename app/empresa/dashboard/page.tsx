@@ -10,9 +10,10 @@ import {
   ExternalLink,
   ArrowRight,
   Lock,
-  Building2
+  Building2,
+  Trash2
 } from 'lucide-react'
-import { fetchJobsByEmpresa, fetchApplicationsForEmpresa, toggleJobState } from '@/lib/data'
+import { fetchJobsByEmpresa, fetchApplicationsForEmpresa, toggleJobState, deleteJob } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails, JobEstado } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
 import { Badge } from '@/components/ui/Badge'
@@ -51,6 +52,14 @@ export default function EmpresaDashboard() {
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, estado: nextStatus } : j))
     )
+  }
+
+  const handleDeleteJob = async (jobId: string, titulo: string) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la búsqueda "${titulo}"?`)) {
+      return
+    }
+    await deleteJob(jobId)
+    setJobs((prev) => prev.filter((j) => j.id !== jobId))
   }
 
   const activeJobs = jobs.filter((j) => j.estado === 'activo')
@@ -234,16 +243,25 @@ export default function EmpresaDashboard() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleToggleStatus(job.id, job.estado)}
-                        className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors ${
-                          job.estado === 'activo'
-                            ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100'
-                            : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                        }`}
-                      >
-                        {job.estado === 'activo' ? 'Pausar / Cerrar' : 'Reactivar'}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleToggleStatus(job.id, job.estado)}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors ${
+                            job.estado === 'activo'
+                              ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100'
+                              : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {job.estado === 'activo' ? 'Pausar' : 'Reactivar'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteJob(job.id, job.titulo)}
+                          title="Eliminar oferta permanentemente"
+                          className="p-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

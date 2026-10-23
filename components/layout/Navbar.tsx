@@ -21,13 +21,21 @@ import {
 } from 'lucide-react'
 
 export function Navbar() {
-  const { profile, role, logout, isConfigured } = useAuth()
+  const { profile, role, isAdmin, logout, isConfigured } = useAuth()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
   const isEmpresa = role === 'empresa'
   const isCandidato = role === 'candidato'
+
+  // Mostrar el rol real del usuario; si is_admin=false en Supabase, nunca mostrar "Admin"
+  const userRoleLabel = (() => {
+    if (isAdmin) return 'Admin'
+    const r = profile?.role
+    if (!r || r === 'admin') return 'Usuario'   // rol 'admin' en DB pero is_admin=false → no mostrar
+    return r.charAt(0).toUpperCase() + r.slice(1) // 'empresa' → 'Empresa', 'candidato' → 'Candidato'
+  })()
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
@@ -151,7 +159,7 @@ export function Navbar() {
                       {profile.nombre || profile.email}
                     </p>
                     <p className="text-[10px] text-slate-500 capitalize">
-                      {profile.role}
+                      {userRoleLabel}
                     </p>
                   </div>
                   <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs overflow-hidden border border-indigo-200">
@@ -169,9 +177,15 @@ export function Navbar() {
                     <div className="px-4 py-2 border-b border-slate-100">
                       <p className="text-xs text-slate-400 uppercase tracking-wider">Conectado como</p>
                       <p className="text-sm font-semibold text-slate-900 truncate">{profile.nombre}</p>
-                      <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] rounded-full bg-indigo-50 text-indigo-700 font-medium capitalize">
-                        {profile.role}
-                      </span>
+                      {isAdmin ? (
+                        <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-extrabold uppercase">
+                          Administrador
+                        </span>
+                      ) : (
+                        <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] rounded-full bg-indigo-50 text-indigo-700 font-medium capitalize">
+                          {userRoleLabel}
+                        </span>
+                      )}
                     </div>
 
                     {isEmpresa ? (
@@ -368,7 +382,7 @@ export function Navbar() {
                 <div className="px-3 py-2 bg-slate-50 rounded-xl">
                   <p className="text-xs text-slate-500">Sesión actual</p>
                   <p className="text-sm font-semibold text-slate-900">{profile.nombre}</p>
-                  <p className="text-xs text-indigo-600 capitalize">{profile.role}</p>
+                  <p className="text-xs text-indigo-600 capitalize">{userRoleLabel}</p>
                 </div>
                 <button
                   onClick={() => {

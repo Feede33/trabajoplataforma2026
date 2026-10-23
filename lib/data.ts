@@ -185,6 +185,41 @@ export async function toggleJobState(jobId: string, newState: JobEstado): Promis
   return true
 }
 
+export async function deleteJob(jobId: string, accessToken?: string | null): Promise<boolean> {
+  let token = accessToken
+  if (!token && typeof window !== 'undefined' && isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      token = session?.access_token || null
+    } catch {}
+  }
+
+  if (token) {
+    const res = await fetch('/api/admin/delete-job', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ jobId, type: 'formal' }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al eliminar el empleo')
+    }
+
+    const existing = getStoredJobs()
+    saveStoredJobs(existing.filter((j) => j.id !== jobId))
+    return true
+  }
+
+  const existing = getStoredJobs()
+  saveStoredJobs(existing.filter((j) => j.id !== jobId))
+  return true
+}
+
 export async function fetchApplicationsForEmpresa(empresaId?: string): Promise<ApplicationWithDetails[]> {
   if (isSupabaseConfigured()) {
     try {
@@ -396,6 +431,42 @@ export async function createInformalJob(
   const existing = getStoredInformalJobs()
   saveStoredInformalJobs([newJob, ...existing])
   return newJob
+}
+
+export async function deleteInformalJob(jobId: string, accessToken?: string | null): Promise<boolean> {
+  let token = accessToken
+  if (!token && typeof window !== 'undefined' && isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      token = session?.access_token || null
+    } catch {}
+  }
+
+  if (token) {
+    const res = await fetch('/api/admin/delete-job', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ jobId, type: 'informal' }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al eliminar el aviso')
+    }
+
+    const existing = getStoredInformalJobs()
+    saveStoredInformalJobs(existing.filter((j) => j.id !== jobId))
+    return true
+  }
+
+  // Fallback si no hay supabase o modo local
+  const existing = getStoredInformalJobs()
+  saveStoredInformalJobs(existing.filter((j) => j.id !== jobId))
+  return true
 }
 
 export function parseInformalJobWithAI(text: string): {

@@ -1,4 +1,4 @@
-export type UserRole = 'empresa' | 'candidato'
+export type UserRole = 'empresa' | 'candidato' | 'admin'
 export type JobModalidad = 'presencial' | 'remoto' | 'hibrido'
 export type JobTipoContrato = 'full-time' | 'part-time' | 'freelance' | 'pasantia'
 export type JobEstado = 'activo' | 'cerrado' | 'borrador'
@@ -7,6 +7,7 @@ export type ApplicationEstado = 'pendiente' | 'visto' | 'entrevista' | 'rechazad
 export interface Profile {
   id: string
   role: UserRole
+  is_admin?: boolean
   nombre: string | null
   email: string | null
   avatar_url: string | null
