@@ -115,8 +115,8 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-3xl shadow-2xl border border-slate-100">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -207,12 +207,12 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
           </div>
         ) : (
           /* Formulario de Postulación de Candidato */
-          <form onSubmit={handleSubmit} className="p-7 space-y-5">
-            <div>
+          <form onSubmit={handleSubmit} className="p-5 sm:p-7 space-y-5">
+            <div className="pr-8">
               <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
                 Postulación Laboral
               </span>
-              <h2 className="text-xl font-bold text-slate-900 mt-1">{job.titulo}</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-1 break-words">{job.titulo}</h2>
               <p className="text-xs text-slate-500 mt-0.5">en {job.empresa.nombre}</p>
             </div>
 
@@ -257,14 +257,14 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                   Currículum Vitae (PDF o Word) *
                 </label>
-                <label className="flex items-center justify-between p-3 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50 hover:bg-indigo-50/30 cursor-pointer transition-colors group">
-                  <div className="flex items-center gap-2.5 text-xs text-slate-600">
-                    <FileText className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" />
-                    <span className="font-medium truncate max-w-[240px]">
+                <label className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50 hover:bg-indigo-50/30 cursor-pointer transition-colors group">
+                  <div className="flex items-center gap-2.5 text-xs text-slate-600 min-w-0">
+                    <FileText className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                    <span className="font-medium truncate max-w-[180px] sm:max-w-[240px]">
                       {cvFileName || 'Hacé clic para adjuntar tu CV'}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-indigo-600 group-hover:underline flex items-center gap-1">
+                  <span className="text-xs font-semibold text-indigo-600 group-hover:underline flex items-center gap-1 shrink-0 ml-auto">
                     <Upload className="w-3.5 h-3.5" />
                     {profile.cv_url && !cvFile ? 'Reemplazar' : 'Examinar'}
                   </span>
@@ -297,18 +297,18 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
               </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+            <div className="pt-3 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 border-t border-slate-100">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-800 rounded-xl transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-colors text-center"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-md shadow-indigo-200 hover:shadow-lg transition-all"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-md shadow-indigo-200 hover:shadow-lg transition-all"
               >
                 {isSubmitting ? (
                   <span>Subiendo y postulando...</span>

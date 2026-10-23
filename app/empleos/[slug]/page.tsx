@@ -108,10 +108,10 @@ export default function JobDetailPage() {
       </nav>
 
       {/* Main Header Card */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+      <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-start gap-4 sm:gap-5">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+          <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5 min-w-0">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
               {job.empresa?.avatar_url ? (
                 <img
                   src={job.empresa.avatar_url}
@@ -119,24 +119,24 @@ export default function JobDetailPage() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <Building2 className="w-8 h-8 text-slate-400" />
+                <Building2 className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400" />
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <div className="space-y-1.5 min-w-0">
+              <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight break-words">
                 {job.titulo}
               </h1>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
                 <span className="font-semibold text-slate-800">{job.empresa?.nombre}</span>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span className="flex items-center gap-1 text-slate-500">
-                  <MapPin className="w-4 h-4 text-slate-400" />
+                  <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
                   {job.zona}
                 </span>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span className="flex items-center gap-1 text-slate-400 text-xs">
-                  <Clock className="w-3.5 h-3.5" />
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
                   Publicado {formatRelativeTime(job.created_at)}
                 </span>
               </div>
@@ -156,10 +156,10 @@ export default function JobDetailPage() {
           </div>
 
           {/* Action CTAs */}
-          <div className="flex sm:flex-row md:flex-col lg:flex-row items-center gap-3 shrink-0">
+          <div className="flex flex-col-reverse sm:flex-row md:flex-col lg:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto shrink-0">
             <button
               onClick={handleShare}
-              className="flex items-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
               title="Copiar enlace"
             >
               {copied ? (

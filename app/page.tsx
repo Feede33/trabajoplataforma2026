@@ -104,19 +104,19 @@ export default function HomePage() {
   return (
     <div className="space-y-20 pb-20">
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-b from-indigo-900 via-slate-900 to-slate-950 text-white pt-20 pb-28 px-4 sm:px-6 lg:px-8">
+      <section className="relative bg-gradient-to-b from-indigo-900 via-slate-900 to-slate-950 text-white pt-14 pb-24 sm:pt-20 sm:pb-28 px-4 sm:px-6 lg:px-8">
         {/* Ambient background glow */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-tr from-indigo-500/20 via-purple-500/10 to-transparent blur-3xl" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-medium backdrop-blur-md text-indigo-200">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="relative max-w-5xl mx-auto text-center space-y-6 sm:space-y-8">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[11px] sm:text-xs font-medium backdrop-blur-md text-indigo-200">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span>La plataforma laboral más moderna de Uruguay</span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">
             Encontrá tu próximo trabajo o al{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-blue-300 to-teal-200">
               mejor talento
@@ -166,7 +166,7 @@ export default function HomePage() {
               )}
             </div>
 
-            <div className="hidden sm:block w-px h-8 bg-slate-200 shrink-0" />
+            <div className="w-full h-px sm:w-px sm:h-8 bg-slate-100 sm:bg-slate-200 shrink-0" />
 
             {/* Location input with suggestions */}
             <div ref={locationRef} className="relative flex-1 w-full">
@@ -344,9 +344,9 @@ export default function HomePage() {
 
       {/* Dual Value Proposition Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
           {/* For Candidates */}
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-3xl p-8 sm:p-10 flex flex-col justify-between">
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-3xl p-6 sm:p-10 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200">
                 <Users className="w-6 h-6" />
@@ -365,7 +365,7 @@ export default function HomePage() {
             <div className="pt-6">
               <Link
                 href="/auth/registro?tipo=candidato"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-md shadow-indigo-200"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-md shadow-indigo-200"
               >
                 <span>Crear Perfil de Candidato</span>
                 <ArrowRight className="w-4 h-4" />
@@ -374,7 +374,7 @@ export default function HomePage() {
           </div>
 
           {/* For Companies */}
-          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white border border-slate-800 rounded-3xl p-8 sm:p-10 flex flex-col justify-between">
+          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white border border-slate-800 rounded-3xl p-6 sm:p-10 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/30">
                 <Building2 className="w-6 h-6" />
@@ -390,17 +390,17 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="pt-6 flex flex-wrap items-center gap-3">
+            <div className="pt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <Link
                 href="/empresa/publicar"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm transition-colors shadow-md shadow-emerald-500/20"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm transition-colors shadow-md shadow-emerald-500/20"
               >
                 <span>Publicar Empleo (2 gratis/mes)</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
                 href="/planes"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition-colors"
               >
                 <span>Ver Planes</span>
               </Link>
@@ -411,22 +411,22 @@ export default function HomePage() {
 
       {/* CTA Banner */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-indigo-600 rounded-3xl p-8 sm:p-12 text-center text-white relative overflow-hidden shadow-xl">
+        <div className="bg-indigo-600 rounded-3xl p-6 sm:p-12 text-center text-white relative overflow-hidden shadow-xl">
           <div className="relative z-10 max-w-2xl mx-auto space-y-4">
-            <h2 className="text-3xl font-extrabold">¿Listo para dar el siguiente paso?</h2>
+            <h2 className="text-2xl sm:text-3xl font-extrabold">¿Listo para dar el siguiente paso?</h2>
             <p className="text-indigo-100 text-sm leading-relaxed">
               Unite a la comunidad de profesionales y empresas que ya están transformando el mercado laboral.
             </p>
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
+            <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
               <Link
                 href="/empleos"
-                className="px-6 py-3 rounded-xl bg-white text-indigo-700 font-bold text-sm hover:bg-indigo-50 transition-colors shadow"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white text-indigo-700 font-bold text-sm hover:bg-indigo-50 transition-colors shadow text-center"
               >
                 Explorar Todos los Empleos
               </Link>
               <Link
                 href="/auth/registro"
-                className="px-6 py-3 rounded-xl bg-indigo-700 text-white font-semibold text-sm hover:bg-indigo-800 transition-colors border border-indigo-500"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-700 text-white font-semibold text-sm hover:bg-indigo-800 transition-colors border border-indigo-500 text-center"
               >
                 Crear una Cuenta
               </Link>

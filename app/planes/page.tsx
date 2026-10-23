@@ -7,6 +7,7 @@ import { CheckCircle2, Sparkles, Zap, Building2, User, Loader2, AlertCircle, Clo
 import { useAuth } from '@/lib/context/AuthContext'
 import { FREE_AVISOS_MES, MAX_AVISOS_POR_USO_IA, PRODUCTS, ProductId, formatUYU, totalConIva } from '@/lib/billing'
 import { BillingStatus, fetchBillingStatus, startCheckout } from '@/lib/billing-client'
+import { FeaturedGlowCard } from '@/components/ui/border-beam'
 
 function PlanesContent() {
   const { profile, isAdmin, isLoading, getAccessToken } = useAuth()
@@ -57,10 +58,10 @@ function PlanesContent() {
 
   const renderBuyButton = (product: ProductId, label: string, highlighted = false) => {
     const p = PRODUCTS[product]
-    const baseClass = `w-full py-3 px-5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+    const baseClass = `relative z-10 w-full py-3 px-5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
       highlighted
-        ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-200'
-        : 'bg-slate-900 hover:bg-slate-800 text-white'
+        ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/35 hover:-translate-y-0.5'
+        : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border dark:border-slate-700 text-white'
     }`
 
     if (isLoading) {
@@ -211,11 +212,11 @@ function PlanesContent() {
           </div>
 
           {/* Mensual */}
-          <div className="relative bg-white rounded-3xl border-2 border-indigo-500 p-7 flex flex-col justify-between gap-6 shadow-xl shadow-indigo-100">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
-              <Zap className="w-3 h-3" /> Más popular
+          <FeaturedGlowCard className="p-7 flex flex-col justify-between gap-6">
+            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 px-3.5 py-1 rounded-full bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 text-white text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-indigo-500/30 border border-indigo-400/30">
+              <Zap className="w-3 h-3 fill-amber-300 text-amber-300" /> Más popular
             </span>
-            <div className="space-y-5">
+            <div className="relative z-10 space-y-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-extrabold text-slate-900">Mensual</h3>
                 {currentPlanBadge('mensual')}
@@ -229,7 +230,7 @@ function PlanesContent() {
               ])}
             </div>
             {renderBuyButton('mensual', 'Contratar plan mensual', true)}
-          </div>
+          </FeaturedGlowCard>
 
           {/* Anual */}
           <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-3xl p-7 flex flex-col justify-between gap-6">

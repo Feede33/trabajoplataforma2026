@@ -372,10 +372,10 @@ export default function EmpleosInformalesPage() {
             </div>
 
             {/* AI Assistant Button */}
-            <div className="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
+            <div className="shrink-0 w-full md:w-auto flex flex-col items-stretch sm:items-end gap-1.5">
               <button
                 onClick={handleOpenAiModal}
-                className={`w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl font-bold text-sm shadow-md transition-all ${
+                className={`w-full md:w-auto flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl font-bold text-sm shadow-md transition-all ${
                   canUseAi
                     ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-amber-500/25 hover:shadow-lg transform hover:-translate-y-0.5'
                     : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -449,7 +449,7 @@ export default function EmpleosInformalesPage() {
 
       {/* Main Content List */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-6">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
             Mostrando {filteredJobs.length} {filteredJobs.length === 1 ? 'aviso disponible' : 'avisos disponibles'}
           </p>
@@ -502,21 +502,21 @@ export default function EmpleosInformalesPage() {
                 >
                   <div className="space-y-3">
                     {/* Top Badges */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 truncate">
                           {job.rubro}
                         </span>
                         {isAdmin && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-900 uppercase">
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-900 uppercase shrink-0">
                             Admin
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                          <Clock className="w-3 h-3" />
+                      <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
+                        <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium whitespace-nowrap">
+                          <Clock className="w-3 h-3 shrink-0" />
                           {formatRelativeTime(job.created_at)}
                         </span>
 
@@ -525,7 +525,7 @@ export default function EmpleosInformalesPage() {
                             type="button"
                             onClick={() => setJobToDelete(job)}
                             title="Eliminar publicación como Administrador"
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold transition-all shadow-sm"
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold transition-all shadow-sm shrink-0"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Eliminar</span>
@@ -866,7 +866,7 @@ export default function EmpleosInformalesPage() {
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                       Recortes del diario (El Gallito), fotos de carteles en vidrieras o capturas de historias y WhatsApp.
                     </p>
-                    <div className="mt-3 flex items-center justify-center gap-2">
+                    <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                       <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
                         Soporta JPG, PNG, WEBP
                       </span>
@@ -877,9 +877,9 @@ export default function EmpleosInformalesPage() {
                   </div>
                 ) : (
                   <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={imagePreview}
@@ -887,15 +887,15 @@ export default function EmpleosInformalesPage() {
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate max-w-[140px] sm:max-w-xs">
                             {imageName || 'Imagen cargada'}
                           </p>
                           <p className="text-[11px] text-slate-500">Lista para interpretar con IA</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0 ml-auto">
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}

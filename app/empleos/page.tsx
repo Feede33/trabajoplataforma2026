@@ -108,23 +108,23 @@ function EmpleosContent() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           {/* Mobile Filter Toggle */}
           <button
             onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-            className="lg:hidden flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold shadow-sm"
+            className="lg:hidden flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold shadow-sm"
           >
-            <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+            <SlidersHorizontal className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>Filtros ({filteredJobs.length})</span>
           </button>
 
           {/* Sort Selector */}
-          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200 text-sm">
-            <ArrowUpDown className="w-4 h-4 text-slate-400" />
+          <div className="flex-1 sm:flex-initial flex items-center justify-center gap-2 bg-white px-3 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-sm">
+            <ArrowUpDown className="w-4 h-4 text-slate-400 shrink-0" />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent text-slate-700 font-medium text-xs sm:text-sm focus:outline-none cursor-pointer"
+              className="w-full sm:w-auto bg-transparent text-slate-700 font-medium text-xs sm:text-sm focus:outline-none cursor-pointer"
             >
               <option value="recientes">Más recientes</option>
               <option value="antiguos">Más antiguos</option>

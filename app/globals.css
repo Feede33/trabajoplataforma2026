@@ -265,6 +265,7 @@
   background-image: linear-gradient(to bottom right, rgba(49, 46, 129, 0.35), rgba(30, 58, 138, 0.25)) !important;
 }
 
+.dark .shadow-indigo-100,
 .dark .shadow-indigo-100\/50,
 .dark .shadow-indigo-200 {
   --tw-shadow-color: rgba(67, 56, 202, 0.25) !important;

@@ -107,20 +107,20 @@ export default function CandidatoDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           <Link
             href="/candidato/perfil"
-            className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5"
+            className="flex-1 sm:flex-initial justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5"
           >
-            <User className="w-4 h-4 text-slate-400" />
+            <User className="w-4 h-4 text-slate-400 shrink-0" />
             <span>Editar mi Perfil</span>
           </Link>
 
           <Link
             href="/empleos"
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-1.5"
+            className="flex-1 sm:flex-initial justify-center px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-1.5"
           >
-            <Briefcase className="w-4 h-4" />
+            <Briefcase className="w-4 h-4 shrink-0" />
             <span>Buscar Empleos</span>
           </Link>
         </div>
@@ -162,15 +162,15 @@ export default function CandidatoDashboard() {
       </div>
 
       {/* Recent Applications Section */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-8 space-y-6">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Tus Postulaciones Recientes</h2>
             <p className="text-xs text-slate-500">Estado de los procesos en los que estás participando</p>
           </div>
           <Link
             href="/candidato/postulaciones"
-            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0 whitespace-nowrap"
           >
             <span>Ver todas</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -232,14 +232,14 @@ export default function CandidatoDashboard() {
 
       {/* Recommended Jobs */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Empleos Recomendados para Vos</h2>
             <p className="text-xs text-slate-500">Basado en las búsquedas más solicitadas</p>
           </div>
           <Link
             href="/empleos"
-            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0 whitespace-nowrap"
           >
             <span>Ver más empleos</span>
             <ArrowRight className="w-3.5 h-3.5" />
