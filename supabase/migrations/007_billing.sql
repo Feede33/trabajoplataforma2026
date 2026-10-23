@@ -163,9 +163,7 @@ BEGIN
         RETURN 'amount_mismatch';
     END IF;
 
-    UPDATE public.orders
-       SET status = 'paid', mp_payment_id = p_payment, paid_at = now()
-     WHERE id = o.id;
+    UPDATE public.orders SET status = 'paid', mp_payment_id = p_payment, paid_at = now() WHERE id = o.id;
 
     IF o.kind = 'plan' THEN
         INSERT INTO public.subscriptions (user_id, plan, avisos_mes_limite, current_period_end)
@@ -192,9 +190,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION public.consume_ai_credit(p_user UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
-    UPDATE public.ai_credits
-       SET balance = balance - 1, updated_at = now()
-     WHERE user_id = p_user AND balance > 0;
+    UPDATE public.ai_credits SET balance = balance - 1, updated_at = now() WHERE user_id = p_user AND balance > 0;
     RETURN FOUND;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -202,9 +198,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION public.refund_ai_credit(p_user UUID)
 RETURNS VOID AS $$
 BEGIN
-    UPDATE public.ai_credits
-       SET balance = balance + 1, updated_at = now()
-     WHERE user_id = p_user;
+    UPDATE public.ai_credits SET balance = balance + 1, updated_at = now() WHERE user_id = p_user;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
