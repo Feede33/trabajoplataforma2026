@@ -718,10 +718,10 @@ export default function EmpleosInformalesPage() {
                 <button
                   key={rubro}
                   onClick={() => setSelectedRubro(rubro)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 border ${
                     selectedRubro === rubro
-                      ? 'bg-amber-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                      : 'bg-slate-100 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 border-transparent dark:border-slate-700/70 hover:bg-amber-50 hover:text-amber-800 dark:hover:bg-slate-700 dark:hover:text-amber-300'
                   }`}
                 >
                   {rubro}
@@ -1052,18 +1052,18 @@ export default function EmpleosInformalesPage() {
       {isAiModalOpen && canUseAi && (
         <div
           onPaste={handlePaste}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in"
         >
-          <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden max-h-[92vh] flex flex-col">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[92vh] flex flex-col">
             {/* Header */}
-            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-md shadow-amber-500/20">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">
                       Publicador Inteligente con Google Gemini
                     </h3>
                     {isAdmin ? (
@@ -1076,14 +1076,14 @@ export default function EmpleosInformalesPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Subí una foto/captura o pegá una conversación. La IA filtra charla, interpreta fechas y detecta ofertas reales.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAiModalOpen(false)}
-                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1104,7 +1104,7 @@ export default function EmpleosInformalesPage() {
 
               {publishSuccess && (
                 <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center gap-2 animate-in fade-in">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>{publishSuccessMessage || '¡Aviso interpretado y publicado con éxito!'}</span>
                 </div>
               )}
@@ -1112,7 +1112,7 @@ export default function EmpleosInformalesPage() {
               {publishError && (
                 <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center justify-between gap-2 animate-in fade-in">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
                     <span>{publishError}</span>
                   </div>
                   {!isAdmin && (
@@ -1124,7 +1124,7 @@ export default function EmpleosInformalesPage() {
               )}
 
               {/* Selector de modo: Foto / Captura vs Pegar Texto */}
-              <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/60 max-w-xs mx-auto">
+              <div className="flex bg-slate-100 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/70 max-w-xs mx-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -1133,8 +1133,8 @@ export default function EmpleosInformalesPage() {
                   }}
                   className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     inputMode === 'image'
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'
                   }`}
                 >
                   <Camera className="w-3.5 h-3.5" />
@@ -1148,8 +1148,8 @@ export default function EmpleosInformalesPage() {
                   }}
                   className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     inputMode === 'text'
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/60'
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
@@ -1184,27 +1184,27 @@ export default function EmpleosInformalesPage() {
                       onClick={() => fileInputRef.current?.click()}
                       className={`cursor-pointer border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
                         isDragging
-                          ? 'border-amber-500 bg-amber-50 scale-[1.01]'
-                          : 'border-slate-200 hover:border-amber-400 bg-slate-50/50 hover:bg-amber-50/20'
+                          ? 'border-amber-500 bg-amber-50 dark:bg-slate-800/90 scale-[1.01]'
+                          : 'border-slate-200 dark:border-slate-700/80 hover:border-amber-500/70 dark:hover:border-amber-500/60 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-100/70 dark:hover:bg-slate-800/80'
                       }`}
                     >
-                      <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                      <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-3 shadow-inner">
                         <UploadCloud className="w-7 h-7" />
                       </div>
-                      <h4 className="text-sm font-extrabold text-slate-800">
+                      <h4 className="text-sm font-extrabold text-slate-800 dark:text-white">
                         Arrastrá hasta {MAX_BATCH_IMAGES} fotos aquí o hacé clic para seleccionarlas
                       </h4>
-                      <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
                         Podés cargar varias imágenes juntas. La plataforma las irá interpretando y publicando <strong>una por una de forma progresiva</strong> para no saturar la IA.
                       </p>
                       <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                         <span className="px-2.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-[11px] font-bold text-amber-900">
                           Hasta {MAX_BATCH_IMAGES} imágenes por tanda
                         </span>
-                        <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
+                        <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                           Soporta JPG, PNG, WEBP
                         </span>
-                        <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
+                        <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                           Podés pegar con Ctrl+V
                         </span>
                       </div>
@@ -1213,8 +1213,8 @@ export default function EmpleosInformalesPage() {
                     <div
                       className={`p-4 rounded-2xl border transition-all space-y-3.5 ${
                         isDragging
-                          ? 'border-amber-500 bg-amber-50/60'
-                          : 'border-slate-200 bg-slate-50'
+                          ? 'border-amber-500 bg-amber-50/40 dark:bg-slate-800/80'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60'
                       }`}
                     >
                       {/* Encabezado de la cola y barra de progreso general */}
@@ -1244,18 +1244,18 @@ export default function EmpleosInformalesPage() {
                         return (
                           <div className="space-y-2.5">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 font-extrabold text-xs">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-2.5 py-1 rounded-xl bg-slate-200/80 dark:bg-slate-800 border border-slate-300/80 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs">
                                   {total} / {MAX_BATCH_IMAGES} {total === 1 ? 'imagen' : 'imágenes'}
                                 </span>
                                 {isAnalyzing && activeIdx !== -1 && (
-                                  <span className="text-xs font-bold text-amber-800 flex items-center gap-1.5 animate-pulse">
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 animate-pulse">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
                                     Procesando foto {activeIdx + 1} de {total}...
                                   </span>
                                 )}
                                 {!isAnalyzing && completed > 0 && (
-                                  <span className="text-xs font-bold text-emerald-700">
+                                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
                                     {completed} completada(s) • {totalPublishedJobs} aviso(s) publicado(s)
                                     {totalSkippedJobs > 0 ? ` • ${totalSkippedJobs} duplicado(s) omitido(s)` : ''}
                                   </span>
@@ -1267,7 +1267,7 @@ export default function EmpleosInformalesPage() {
                                   <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 text-xs font-bold text-amber-900 transition-colors"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors"
                                   >
                                     <Plus className="w-3.5 h-3.5" />
                                     <span>Agregar fotos</span>
@@ -1277,7 +1277,7 @@ export default function EmpleosInformalesPage() {
                                   <button
                                     type="button"
                                     onClick={handleClearQueue}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-slate-600 hover:text-rose-600 transition-colors"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:border-rose-200 dark:hover:border-rose-500/40 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-300 transition-colors"
                                     title="Vaciar toda la lista"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -1287,11 +1287,11 @@ export default function EmpleosInformalesPage() {
                               </div>
                             </div>
 
-                            {/* Barra de progreso general cuando hay más de 1 imagen o está analizando */}
+                            {/* Barra de progreso general de un solo color limpio (verde esmeralda) */}
                             {(total > 1 || isAnalyzing || completed > 0) && (
-                              <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                              <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                                 <div
-                                  className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-500"
+                                  className="h-full bg-emerald-600 dark:bg-emerald-500 transition-all duration-500 rounded-full"
                                   style={{
                                     width: `${Math.max(progressPct, isAnalyzing ? 8 : 0)}%`,
                                   }}
@@ -1300,7 +1300,7 @@ export default function EmpleosInformalesPage() {
                             )}
 
                             {pending > 1 && !isAnalyzing && (
-                              <p className="text-[11px] text-slate-500">
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                 💡 Las imágenes se procesan <strong>de a una por vez</strong> con una breve pausa automática entre cada una para cuidar la API.
                               </p>
                             )}
@@ -1325,31 +1325,31 @@ export default function EmpleosInformalesPage() {
                               }}
                               className={`p-2.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
                                 isCurrent
-                                  ? 'border-amber-500 bg-amber-50/90 shadow-md ring-2 ring-amber-400/30'
+                                  ? 'border-emerald-500 dark:border-emerald-500/60 bg-white dark:bg-slate-900 shadow-sm ring-1 ring-emerald-500/25'
                                   : isCooldown
-                                    ? 'border-amber-300 bg-amber-50/40'
+                                    ? 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/90'
                                     : isDone
-                                      ? 'border-emerald-200 bg-emerald-50/50'
+                                      ? 'border-emerald-200 dark:border-emerald-500/35 bg-emerald-50/70 dark:bg-slate-900/95'
                                       : isSkipped
-                                        ? 'border-slate-200 bg-slate-100/80'
+                                        ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80'
                                         : isError
-                                          ? 'border-rose-200 bg-rose-50/60'
-                                          : 'border-slate-200 bg-white'
+                                          ? 'border-rose-200 dark:border-rose-500/40 bg-rose-50 dark:bg-slate-900/90'
+                                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-slate-300 dark:hover:border-slate-700'
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
+                                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-900/10 relative shrink-0">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
                                     src={item.dataUrl}
                                     alt={item.name}
                                     className={`w-full h-full object-cover transition-opacity ${
-                                      isCurrent ? 'opacity-60' : 'opacity-100'
+                                      isCurrent ? 'opacity-50' : 'opacity-100'
                                     }`}
                                   />
                                   {isCurrent && (
-                                    <div className="absolute inset-0 bg-amber-900/30 flex items-center justify-center">
-                                      <Loader2 className="w-6 h-6 text-white animate-spin drop-shadow" />
+                                    <div className="absolute inset-0 bg-slate-950/45 flex items-center justify-center">
+                                      <Loader2 className="w-6 h-6 text-emerald-400 animate-spin drop-shadow" />
                                     </div>
                                   )}
                                   {isDone && (
@@ -1361,49 +1361,49 @@ export default function EmpleosInformalesPage() {
 
                                 <div className="min-w-0 flex-1 space-y-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-extrabold text-[10px] shrink-0">
+                                    <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-extrabold text-[10px] shrink-0">
                                       #{idx + 1}
                                     </span>
-                                    <p className="text-xs font-bold text-slate-800 truncate">
+                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                                       {item.name}
                                     </p>
                                   </div>
 
                                   {/* Estado detallado de esta imagen */}
                                   {isCurrent && (
-                                    <div className="space-y-1">
-                                      <p className="text-[11px] font-extrabold text-amber-700 flex items-center gap-1.5">
+                                    <div className="space-y-1.5">
+                                      <p className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                                         <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                                         <span>Interpretando con IA y publicando automáticamente...</span>
                                       </p>
-                                      <div className="w-full h-1.5 rounded-full bg-amber-200/70 overflow-hidden">
-                                        <div className="h-full w-2/3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 animate-pulse rounded-full" />
+                                      <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                        <div className="h-full w-2/3 bg-emerald-600 dark:bg-emerald-500 animate-pulse rounded-full" />
                                       </div>
                                     </div>
                                   )}
 
                                   {isCooldown && (
-                                    <p className="text-[11px] font-semibold text-amber-700 flex items-center gap-1">
-                                      <Clock className="w-3 h-3 animate-spin shrink-0" />
+                                    <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                                      <Clock className="w-3 h-3 animate-spin shrink-0 text-emerald-600 dark:text-emerald-400" />
                                       <span>Preparando siguiente imagen (pausa anti-saturación)...</span>
                                     </p>
                                   )}
 
                                   {item.status === 'pending' && (
-                                    <p className="text-[11px] text-slate-500">
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                       En espera para interpretar con IA
                                     </p>
                                   )}
 
                                   {isDone && (
-                                    <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 flex-wrap">
+                                    <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 flex-wrap">
                                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                       <span>
                                         ¡Publicado! ({item.publishedCount}{' '}
                                         {item.publishedCount === 1 ? 'aviso nuevo' : 'avisos nuevos'})
                                       </span>
                                       {item.skippedCount > 0 && (
-                                        <span className="text-[10px] font-semibold text-amber-700">
+                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                                           • {item.skippedCount} duplicado(s) omitido(s)
                                         </span>
                                       )}
@@ -1411,8 +1411,8 @@ export default function EmpleosInformalesPage() {
                                   )}
 
                                   {isSkipped && (
-                                    <p className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                                       <span>
                                         Duplicado omitido automáticamente (el aviso ya estaba publicado)
                                       </span>
@@ -1420,7 +1420,7 @@ export default function EmpleosInformalesPage() {
                                   )}
 
                                   {isError && (
-                                    <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
+                                    <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1">
                                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                       <span className="truncate">
                                         {item.errorMessage || 'Error al interpretar imagen'}
@@ -1435,7 +1435,7 @@ export default function EmpleosInformalesPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveQueuedImage(item.id)}
-                                  className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+                                  className="p-1.5 rounded-xl text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors shrink-0"
                                   title="Quitar imagen de la lista"
                                 >
                                   <X className="w-4 h-4" />
@@ -1447,7 +1447,7 @@ export default function EmpleosInformalesPage() {
                       </div>
 
                       {/* Barra de control inferior para iniciar o detener la cola */}
-                      <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         {isAdmin && imageQueue.length === 1 ? (
                           <label className="flex items-center gap-2 cursor-pointer select-none">
                             <input
@@ -1457,16 +1457,16 @@ export default function EmpleosInformalesPage() {
                               disabled={isAnalyzing}
                               className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
                             />
-                            <span className="text-xs font-bold text-slate-700">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
                               Publicar automáticamente si la extracción es exitosa
                             </span>
                           </label>
                         ) : imageQueue.length > 1 ? (
-                          <span className="text-xs font-semibold text-slate-600">
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                             Se procesarán una por una y se omitirán duplicados automáticamente
                           </span>
                         ) : (
-                          <span className="text-xs font-medium text-slate-600">
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                             Se descontará 1 uso de IA por imagen procesada con éxito
                           </span>
                         )}
@@ -1477,7 +1477,7 @@ export default function EmpleosInformalesPage() {
                               type="button"
                               disabled={isStoppingBatch}
                               onClick={handleStopBatch}
-                              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors"
+                              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-rose-200 dark:border-rose-500/40 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/70 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors"
                             >
                               <PauseCircle className="w-4 h-4" />
                               <span>{isStoppingBatch ? 'Deteniendo...' : 'Pausar cola'}</span>
@@ -1493,7 +1493,7 @@ export default function EmpleosInformalesPage() {
                               )
                             }
                             onClick={() => handleProcessWithGemini()}
-                            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all"
+                            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all"
                           >
                             {isAnalyzing ? (
                               <>
@@ -1614,8 +1614,8 @@ export default function EmpleosInformalesPage() {
 
               {/* Selector si Gemini detectó múltiples avisos */}
               {extractedList.length > 1 && (
-                <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-2xl">
-                  <span className="text-xs font-bold text-amber-900 block mb-2">
+                <div className="p-3 bg-amber-100/70 dark:bg-slate-900 border border-amber-300 dark:border-amber-500/40 rounded-2xl">
+                  <span className="text-xs font-bold text-amber-900 dark:text-amber-300 block mb-2">
                     🎯 Gemini filtró y detectó {extractedList.length} ofertas reales de empleo:
                   </span>
                   <div className="flex flex-wrap gap-2">
@@ -1630,7 +1630,7 @@ export default function EmpleosInformalesPage() {
                         className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
                           activeExtractedIndex === idx
                             ? 'bg-amber-700 text-white shadow-sm'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-amber-50'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-amber-50 hover:border-amber-300 dark:hover:bg-slate-700 dark:hover:border-amber-500/40 dark:hover:text-amber-300'
                         }`}
                       >
                         <span>#{idx + 1}: {item.cargo || 'Aviso'}</span>
@@ -1647,14 +1647,14 @@ export default function EmpleosInformalesPage() {
 
               {/* Live Extracted Preview / Editable Form */}
               {parsedPreview && (
-                <div className="p-5 rounded-2xl border border-amber-200 bg-amber-50/50 space-y-4 animate-in fade-in">
-                  <div className="flex flex-wrap items-center justify-between border-b border-amber-200/60 pb-2 gap-2">
-                    <span className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <div className="p-5 rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/50 dark:bg-slate-900 space-y-4 animate-in fade-in">
+                  <div className="flex flex-wrap items-center justify-between border-b border-amber-200/60 dark:border-slate-800 pb-2 gap-2">
+                    <span className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                       Campos Detectados (Podés editarlos antes de guardar):
                     </span>
                     {parsedPreview.fecha_detectada && (
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-500/15 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         <span>Fecha detectada: {parsedPreview.fecha_detectada}</span>
                       </span>
@@ -1799,8 +1799,8 @@ export default function EmpleosInformalesPage() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 sm:p-5 border-t border-slate-100 flex items-center justify-between gap-3 bg-slate-50">
-              <span className="text-[11px] text-slate-500 hidden sm:inline">
+            <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:inline">
                 Potenciado por <strong>Gemini Flash Multimodal</strong>
               </span>
 
@@ -1808,7 +1808,7 @@ export default function EmpleosInformalesPage() {
                 <button
                   type="button"
                   onClick={() => setIsAiModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 transition-colors"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-200/70 dark:hover:text-white dark:hover:bg-slate-800 transition-colors"
                 >
                   Cerrar
                 </button>
@@ -1817,7 +1817,7 @@ export default function EmpleosInformalesPage() {
                     type="button"
                     disabled={!parsedPreview || isPublishing}
                     onClick={handlePublishFromAI}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-amber-200 transition-all"
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition-all"
                   >
                     {isPublishing ? (
                       <span>Guardando...</span>

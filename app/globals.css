@@ -84,12 +84,14 @@
   background-color: hsl(222.2 47.4% 9%) !important;
 }
 
-.dark .bg-slate-100 {
+.dark .bg-slate-100,
+.dark .bg-slate-100\/80 {
   background-color: hsl(var(--secondary)) !important;
 }
 
 .dark .bg-slate-200,
-.dark .bg-slate-200\/60 {
+.dark .bg-slate-200\/60,
+.dark .bg-slate-200\/80 {
   background-color: hsl(var(--muted)) !important;
 }
 
@@ -194,8 +196,10 @@
 }
 
 .dark .bg-emerald-50,
+.dark .bg-emerald-50\/50,
+.dark .bg-emerald-50\/70,
 .dark .bg-emerald-100 {
-  background-color: rgba(16, 185, 129, 0.15) !important;
+  background-color: rgba(16, 185, 129, 0.14) !important;
 }
 .dark .text-emerald-700,
 .dark .text-emerald-800 {
@@ -206,12 +210,16 @@
 }
 
 .dark .bg-amber-50,
+.dark .bg-amber-50\/40,
 .dark .bg-amber-50\/50,
+.dark .bg-amber-50\/60,
 .dark .bg-amber-50\/70,
+.dark .bg-amber-50\/90,
 .dark .bg-amber-100,
 .dark .bg-amber-100\/70,
-.dark .bg-amber-200 {
-  background-color: rgba(245, 158, 11, 0.16) !important;
+.dark .bg-amber-200,
+.dark .bg-amber-200\/70 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
 }
 .dark .text-amber-700,
 .dark .text-amber-800,
@@ -226,8 +234,10 @@
 }
 
 .dark .bg-rose-50,
+.dark .bg-rose-50\/50,
+.dark .bg-rose-50\/60,
 .dark .bg-rose-100 {
-  background-color: rgba(244, 63, 94, 0.16) !important;
+  background-color: rgba(244, 63, 94, 0.15) !important;
 }
 .dark .text-rose-700,
 .dark .text-rose-800 {
