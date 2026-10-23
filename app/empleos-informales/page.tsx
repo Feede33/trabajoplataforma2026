@@ -33,7 +33,7 @@ import {
   Trash2
 } from 'lucide-react'
 import { InformalJob } from '@/lib/supabase/database.types'
-import { fetchInformalJobs, createInformalJob, deleteInformalJob, parseInformalJobWithAI, formatWhatsAppUrl } from '@/lib/data'
+import { fetchInformalJobs, createInformalJob, deleteInformalJob, parseInformalJobWithAI, formatWhatsAppUrl, formatGmailUrl } from '@/lib/data'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/lib/context/AuthContext'
 
@@ -489,7 +489,8 @@ export default function EmpleosInformalesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredJobs.map((job) => {
               const waNumber = job.whatsapp || job.contacto_whatsapp
-              const waLink = waNumber ? formatWhatsAppUrl(waNumber, job.titulo) : null
+              const waLink = waNumber ? formatWhatsAppUrl(waNumber, job.cargo || job.titulo) : null
+              const gmailLink = job.email ? formatGmailUrl(job.email, job.cargo || job.titulo) : null
 
               return (
                 <div
@@ -619,11 +620,13 @@ export default function EmpleosInformalesPage() {
                           </a>
                         )}
 
-                        {/* Canal Email */}
-                        {showEmail && (
+                        {/* Canal Email (Redirección a Gmail con plantilla de CV) */}
+                        {showEmail && gmailLink && (
                           <a
-                            href={`mailto:${job.email}?subject=Postulaci%C3%B3n%20para%20${encodeURIComponent(job.titulo)}`}
-                            title={`Enviar CV a ${job.email}`}
+                            href={gmailLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Enviar CV vía Gmail a ${job.email}`}
                             className="w-full min-w-0 h-10 flex items-center justify-center gap-2 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm hover:shadow transition-all"
                           >
                             <Mail className="w-4 h-4 shrink-0" />

@@ -671,6 +671,19 @@ export function formatWhatsAppUrl(phone: string, jobTitle: string): string {
   } else if (cleaned.startsWith('9') && cleaned.length === 8) {
     cleaned = '598' + cleaned
   }
-  const msg = encodeURIComponent(`¡Hola! Vi el aviso de "${jobTitle}" en EmpleosYa y me gustaría comunicarme.`)
+  const msg = encodeURIComponent(`¡Hola! Vi el aviso de "${jobTitle}" en postulauy.com y me gustaría comunicarme.`)
   return `https://wa.me/${cleaned}?text=${msg}`
+}
+
+export function formatGmailUrl(email: string, jobTitle: string): string {
+  const subject = `Postulación: ${jobTitle} - postulauy.com`
+  const body = `Hola,
+
+Vi la postulación para el puesto de "${jobTitle}" en postulauy.com y me pongo en contacto para postularme.
+
+Procedo a adjuntar mi Currículum Vitae (CV) para su consideración.
+
+Muchas gracias, quedo a las órdenes.`
+
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
