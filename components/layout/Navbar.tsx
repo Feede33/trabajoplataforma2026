@@ -75,13 +75,13 @@ export function Navbar() {
               href="/empleos-informales"
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                 pathname === '/empleos-informales'
-                  ? 'text-amber-800 bg-amber-50 font-semibold border border-amber-200'
-                  : 'text-slate-600 hover:text-amber-800 hover:bg-amber-50/50'
+                  ? 'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 font-semibold border border-amber-200 dark:border-amber-500/30'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-500/15'
               }`}
             >
               <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               <span>Empleos Informales</span>
-              <span className="px-1.5 py-0.2 text-[10px] bg-amber-100 text-amber-800 rounded-full font-bold">
+              <span className="px-1.5 py-0.2 text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 rounded-full font-bold">
                 WhatsApp
               </span>
             </Link>
@@ -317,13 +317,13 @@ export function Navbar() {
             <Link
               href="/empleos-informales"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-amber-900 bg-amber-50 hover:bg-amber-100/70"
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-amber-900 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 hover:bg-amber-100/70 dark:hover:bg-amber-500/25"
             >
               <div className="flex items-center gap-3">
-                <Zap className="w-4 h-4 text-amber-600 fill-amber-500" />
+                <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 fill-amber-500" />
                 <span>Empleos Informales</span>
               </div>
-              <span className="px-2 py-0.5 text-[10px] bg-amber-200 text-amber-900 rounded-full font-bold">
+              <span className="px-2 py-0.5 text-[10px] bg-amber-200 dark:bg-amber-500/25 text-amber-900 dark:text-amber-300 rounded-full font-bold">
                 WhatsApp
               </span>
             </Link>

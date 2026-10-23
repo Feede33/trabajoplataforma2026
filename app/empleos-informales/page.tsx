@@ -352,9 +352,9 @@ export default function EmpleosInformalesPage() {
   })
 
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-20">
+    <div className="min-h-screen bg-slate-50/60 dark:bg-background pb-20">
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-200/50 py-12 px-4 sm:px-6 lg:px-8">
+      <section className="bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-200/50 dark:border-amber-500/20 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="max-w-2xl space-y-3">
