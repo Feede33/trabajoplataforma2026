@@ -3,9 +3,9 @@
 -- Requiere haber ejecutado antes las migraciones 005 y 006.
 -- ==============================================================================
 
--- ── 0. Corrección de seguridad: is_admin() ya NO mira emails fijos ─────────────
--- La versión de la migración 005 también daba permisos de admin al email fijo,
--- incluso con is_admin = false. La fuente de verdad pasa a ser SOLO la columna.
+-- ── 0. Asegurar columna is_admin y corregir función is_admin() ────────────────
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
+
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
