@@ -28,7 +28,7 @@ function saveStoredJobs(jobs: JobWithEmpresa[]) {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(LOCAL_STORAGE_JOBS_KEY, JSON.stringify(jobs))
-  } catch {}
+  } catch { }
 }
 
 function getStoredApplications(): ApplicationWithDetails[] {
@@ -45,7 +45,7 @@ function saveStoredApplications(apps: ApplicationWithDetails[]) {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(LOCAL_STORAGE_APPS_KEY, JSON.stringify(apps))
-  } catch {}
+  } catch { }
 }
 
 function getStoredInformalJobs(): InformalJob[] {
@@ -62,7 +62,7 @@ function saveStoredInformalJobs(jobs: InformalJob[]) {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(LOCAL_STORAGE_INFORMAL_KEY, JSON.stringify(jobs))
-  } catch {}
+  } catch { }
 }
 
 export async function fetchJobs(): Promise<JobWithEmpresa[]> {
@@ -175,12 +175,12 @@ export async function createJob(jobData: Omit<Job, 'id' | 'created_at' | 'update
       const message = error?.message || ''
       if (message.includes('QUOTA_EXCEEDED')) {
         const quotaError = new Error('Alcanzaste el límite de avisos de tu plan este mes.')
-        ;(quotaError as any).code = 'QUOTA_EXCEEDED'
+          ; (quotaError as any).code = 'QUOTA_EXCEEDED'
         throw quotaError
       }
       if (message.includes('ROLE_NOT_ALLOWED')) {
         const roleError = new Error('Solo las cuentas de Empresa pueden publicar empleos.')
-        ;(roleError as any).code = 'ROLE_NOT_ALLOWED'
+          ; (roleError as any).code = 'ROLE_NOT_ALLOWED'
         throw roleError
       }
     } catch (err: any) {
@@ -200,7 +200,7 @@ export async function toggleJobState(jobId: string, newState: JobEstado): Promis
       const supabase = createClient()
       const { error } = await supabase.from('jobs').update({ estado: newState }).eq('id', jobId)
       if (!error) return true
-    } catch {}
+    } catch { }
   }
 
   const existing = getStoredJobs()
@@ -222,7 +222,7 @@ export async function deleteJob(jobId: string, accessToken?: string | null): Pro
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       token = session?.access_token || null
-    } catch {}
+    } catch { }
   }
 
   if (token) {
@@ -473,7 +473,7 @@ export async function updateApplicationStatus(appId: string, nuevoEstado: Applic
       const supabase = createClient()
       const { error } = await supabase.from('applications').update({ estado: nuevoEstado }).eq('id', appId)
       if (!error) return true
-    } catch {}
+    } catch { }
   }
 
   const existing = getStoredApplications()
@@ -552,7 +552,7 @@ export async function deleteInformalJob(jobId: string, accessToken?: string | nu
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       token = session?.access_token || null
-    } catch {}
+    } catch { }
   }
 
   if (token) {
@@ -647,7 +647,7 @@ export function parseInformalJobWithAI(text: string): {
 
   if (phoneMatches && phoneMatches.length > 0) {
     const cleanedPhones = phoneMatches.map((p) => p.replace(/[\s.-]/g, ''))
-    
+
     // Si dice explícitamente WhatsApp o Whapp
     const hasExplicitWhatsApp = /whapp|whatsapp|wpp|wapp/i.test(clean)
 
@@ -847,7 +847,7 @@ function saveStoredCompanyContacts(contacts: CompanyContact[]) {
   if (typeof window === 'undefined') return
   try {
     localStorage.setItem(LOCAL_STORAGE_CONTACTS_KEY, JSON.stringify(contacts))
-  } catch {}
+  } catch { }
 }
 
 export async function fetchCompanyContacts(): Promise<CompanyContact[]> {
@@ -907,6 +907,57 @@ export async function createCompanyContact(
   saveStoredCompanyContacts(updated)
   return newContact
 }
+
+export function normalizePhoneNumberForComparison(phone: string): string {
+  let digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('598')) {
+    digits = digits.substring(3)
+  }
+  if (digits.startsWith('0')) {
+    digits = digits.substring(1)
+  }
+  return digits
+}
+
+export async function createCompanyContactsBulk(
+  contactsData: Omit<CompanyContact, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<CompanyContact[]> {
+  if (contactsData.length === 0) return []
+
+  const newContacts: CompanyContact[] = contactsData.map((cd, index) => ({
+    ...cd,
+    id: 'cnt-' + (Date.now() + index),
+    activo: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }))
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('company_contacts')
+        .insert(contactsData)
+        .select()
+
+      if (!error && data && data.length > 0) {
+        return data as CompanyContact[]
+      }
+      if (error) {
+        console.warn('Error al insertar contactos en lote en Supabase, guardando en local:', error)
+      }
+    } catch (err) {
+      console.warn('Error de red insertando contactos en lote en Supabase:', err)
+    }
+  }
+
+  const existing = getStoredCompanyContacts()
+  const list = existing.length > 0 ? existing : DEFAULT_COMPANY_CONTACTS
+  const updated = [...newContacts, ...list]
+  saveStoredCompanyContacts(updated)
+  return newContacts
+}
+
 
 export async function deleteCompanyContact(id: string): Promise<boolean> {
   if (isSupabaseConfigured()) {
