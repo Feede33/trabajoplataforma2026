@@ -42,8 +42,12 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
 
-    // Redirect logged-in users away from auth pages
-    if (request.nextUrl.pathname.startsWith('/auth') && user) {
+    // Redirect logged-in users away from auth pages (except the OAuth callback handler)
+    if (
+      request.nextUrl.pathname.startsWith('/auth') &&
+      !request.nextUrl.pathname.startsWith('/auth/callback') &&
+      user
+    ) {
       return NextResponse.redirect(new URL('/', request.url))
     }
   } catch (error) {

@@ -12,6 +12,7 @@ interface AuthContextType {
   isLoading: boolean
   isConfigured: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: UserRole; isAdmin?: boolean }>
+  loginWithGoogle: (options?: { role?: UserRole; redirect?: string | null }) => Promise<{ success: boolean; error?: string }>
   signup: (
     email: string,
     password: string,
@@ -62,12 +63,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(userProfile)
           } else {
             // El usuario existe en auth.users pero el trigger aún no completó la fila en profiles
+            const meta = session.user.user_metadata || {}
             setProfile({
               id: session.user.id,
-              role: (session.user.user_metadata?.role as UserRole) || 'candidato',
-              nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || '',
+              role: (meta.role as UserRole) || 'candidato',
+              nombre: meta.nombre || meta.full_name || meta.name || session.user.email?.split('@')[0] || '',
               email: session.user.email || '',
-              avatar_url: null,
+              avatar_url: meta.avatar_url || meta.picture || null,
               bio: null,
               ubicacion: null,
               cv_url: null,
@@ -92,12 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (userProfile) {
               setProfile(userProfile)
             } else {
+              const meta = session.user.user_metadata || {}
               setProfile({
                 id: session.user.id,
-                role: (session.user.user_metadata?.role as UserRole) || 'candidato',
-                nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || '',
+                role: (meta.role as UserRole) || 'candidato',
+                nombre: meta.nombre || meta.full_name || meta.name || session.user.email?.split('@')[0] || '',
                 email: session.user.email || '',
-                avatar_url: null,
+                avatar_url: meta.avatar_url || meta.picture || null,
                 bio: null,
                 ubicacion: null,
                 cv_url: null,
@@ -181,6 +184,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true, role: userRole, isAdmin: isCurrentlyAdmin }
     } catch (err: any) {
       return { success: false, error: err.message || 'Error al iniciar sesión' }
+    }
+  }
+
+  const loginWithGoogle = async (options?: {
+    role?: UserRole
+    redirect?: string | null
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!isConfigured) {
+      return { success: false, error: 'Supabase no está configurado en el archivo .env' }
+    }
+
+    try {
+      const supabase = createClient()
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const callbackUrl = new URL('/auth/callback', origin)
+
+      if (options?.role === 'empresa' || options?.role === 'candidato') {
+        callbackUrl.searchParams.set('role', options.role)
+      }
+
+      if (options?.redirect) {
+        callbackUrl.searchParams.set('next', options.redirect)
+      }
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callbackUrl.toString(),
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      })
+
+      if (error) {
+        return { success: false, error: error.message || 'Error al conectar con Google' }
+      }
+
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error al iniciar sesión con Google' }
     }
   }
 
@@ -303,6 +348,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isConfigured,
         login,
+        loginWithGoogle,
         signup,
         logout,
         updateProfile,
