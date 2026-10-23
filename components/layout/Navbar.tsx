@@ -47,10 +47,11 @@ export function Navbar() {
             <Link href="/" className="flex items-center gap-2.5 group shrink-0">
               <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-indigo-200/50 group-hover:scale-105 transition-transform border border-slate-200/60 dark:border-slate-800">
                 <Image
-                  src="/logo3.png"
+                  src="/logo-navbar.png"
                   alt="PostulaUY"
                   width={40}
                   height={40}
+                  unoptimized
                   className="w-full h-full object-cover"
                   priority
                 />

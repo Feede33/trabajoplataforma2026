@@ -13,10 +13,11 @@ export function Footer() {
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform border border-slate-800">
                 <Image
-                  src="/logo3.png"
+                  src="/logo-navbar.png"
                   alt="PostulaUY"
                   width={36}
                   height={36}
+                  unoptimized
                   className="w-full h-full object-cover"
                 />
               </div>
