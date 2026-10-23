@@ -104,9 +104,11 @@ export default function HomePage() {
   return (
     <div className="space-y-20 pb-20">
       {/* Hero Section */}
-      <section className="relative overflow-x-hidden bg-gradient-to-b from-indigo-900 via-slate-900 to-slate-950 text-white pt-20 pb-28 px-4 sm:px-6 lg:px-8">
+      <section className="relative bg-gradient-to-b from-indigo-900 via-slate-900 to-slate-950 text-white pt-20 pb-28 px-4 sm:px-6 lg:px-8">
         {/* Ambient background glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-tr from-indigo-500/20 via-purple-500/10 to-transparent blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-tr from-indigo-500/20 via-purple-500/10 to-transparent blur-3xl" />
+        </div>
 
         <div className="relative max-w-5xl mx-auto text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-medium backdrop-blur-md text-indigo-200">
@@ -129,7 +131,7 @@ export default function HomePage() {
           {/* Search Form */}
           <form
             onSubmit={handleSearch}
-            className="max-w-3xl mx-auto bg-white p-2.5 sm:p-3 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:flex-row items-center gap-2 border border-slate-200/50"
+            className="relative z-30 max-w-3xl mx-auto bg-white p-2.5 sm:p-3 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col sm:flex-row items-center gap-2 border border-slate-200/50"
           >
             {/* Keyword input with suggestions */}
             <div ref={keywordRef} className="relative flex-1 w-full">
@@ -146,7 +148,7 @@ export default function HomePage() {
                 />
               </div>
               {keywordFocused && filteredKeywords.length > 0 && (
-                <ul className="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 max-h-56 overflow-y-auto">
+                <ul className="absolute left-0 top-full mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 py-1.5 max-h-64 overflow-y-auto text-left">
                   {filteredKeywords.map((s) => (
                     <li
                       key={s}
@@ -181,7 +183,7 @@ export default function HomePage() {
                 />
               </div>
               {locationFocused && filteredLocations.length > 0 && (
-                <ul className="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 max-h-56 overflow-y-auto">
+                <ul className="absolute left-0 top-full mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 py-1.5 max-h-64 overflow-y-auto text-left">
                   {filteredLocations.map((s) => (
                     <li
                       key={s}
