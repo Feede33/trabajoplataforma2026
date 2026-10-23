@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Search, MapPin, Filter, RotateCcw } from 'lucide-react'
-import { RUBROS, MODALIDADES, TIPOS_CONTRATO } from '@/lib/utils'
+import { RUBROS, MODALIDADES, TIPOS_CONTRATO, DEPARTAMENTOS_UY } from '@/lib/utils'
 
 export interface FilterState {
   q: string
@@ -67,19 +67,32 @@ export function JobFilters({ filters, onChange, onReset, totalCount }: JobFilter
         </div>
       </div>
 
-      {/* Zona / Ubicación */}
-      <div>
-        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-          Ubicación
+      {/* Departamento / Región (Uruguay) */}
+      <div className="space-y-2.5">
+        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+          Departamento / Región (Uruguay)
         </label>
+        <select
+          value={DEPARTAMENTOS_UY.includes(filters.zona) ? filters.zona : ''}
+          onChange={(e) => handleChange('zona', e.target.value)}
+          className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 bg-white"
+        >
+          <option value="">Todo el país (Uruguay)</option>
+          {DEPARTAMENTOS_UY.map((dep) => (
+            <option key={dep} value={dep}>
+              {dep}
+            </option>
+          ))}
+        </select>
+
         <div className="relative">
           <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Ej: Montevideo, Canelones, Remoto..."
+            placeholder="O buscá barrio/ciudad (Pocitos, Punta del Este...)"
             value={filters.zona}
             onChange={(e) => handleChange('zona', e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400"
+            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400"
           />
         </div>
       </div>

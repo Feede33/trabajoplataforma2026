@@ -90,3 +90,26 @@ export const TIPOS_CONTRATO = [
   { value: 'freelance', label: 'Freelance' },
   { value: 'pasantia', label: 'Pasantía' },
 ]
+
+export const DEPARTAMENTOS_UY = [
+  'Montevideo',
+  'Canelones',
+  'Maldonado',
+  'Colonia',
+  'Salto',
+  'Paysandú',
+  'Rivera',
+  'Tacuarembó',
+  'Cerro Largo',
+  'Rocha',
+  'San José',
+  'Soriano',
+  'Florida',
+  'Lavalleja',
+  'Durazno',
+  'Río Negro',
+  'Treinta y Tres',
+  'Flores',
+  'Artigas',
+  'Remoto',
+]
