@@ -33,7 +33,7 @@ import {
   Trash2
 } from 'lucide-react'
 import { InformalJob } from '@/lib/supabase/database.types'
-import { fetchInformalJobs, createInformalJob, deleteInformalJob, parseInformalJobWithAI, formatWhatsAppUrl, formatGmailUrl } from '@/lib/data'
+import { fetchInformalJobs, deleteInformalJob, formatWhatsAppUrl, formatGmailUrl } from '@/lib/data'
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/lib/context/AuthContext'
 import { AI_ALLOWED_ROLES } from '@/lib/billing'
@@ -50,8 +50,6 @@ export default function EmpleosInformalesPage() {
   const [credits, setCredits] = useState<number | null>(null)
 
   // AI Modal states
-  const [aiTab, setAiTab] = useState<'image' | 'text'>('image')
-  const [rawText, setRawText] = useState('')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [imageMime, setImageMime] = useState('image/jpeg')
   const [imageName, setImageName] = useState('')
@@ -191,7 +189,6 @@ export default function EmpleosInformalesPage() {
       const file = e.clipboardData.files[0]
       if (file.type.startsWith('image/')) {
         e.preventDefault()
-        setAiTab('image')
         handleFileChosen(file)
       }
     }
@@ -204,19 +201,14 @@ export default function EmpleosInformalesPage() {
     setIsAnalyzing(true)
 
     try {
-      let payload: any = { autoPublish: shouldPublish }
+      if (!imagePreview) {
+        throw new Error('Primero debés seleccionar o arrastrar una imagen.')
+      }
 
-      if (aiTab === 'image') {
-        if (!imagePreview) {
-          throw new Error('Primero debés seleccionar o arrastrar una imagen.')
-        }
-        payload.image = imagePreview
-        payload.mimeType = imageMime
-      } else {
-        if (!rawText.trim()) {
-          throw new Error('Primero debés pegar o escribir el texto del aviso.')
-        }
-        payload.text = rawText
+      const payload = {
+        autoPublish: shouldPublish,
+        image: imagePreview,
+        mimeType: imageMime,
       }
 
       const token = await getAccessToken()
@@ -253,7 +245,6 @@ export default function EmpleosInformalesPage() {
           setPublishSuccess(false)
           setIsAiModalOpen(false)
           setImagePreview(null)
-          setRawText('')
           setExtractedList([])
           setParsedPreview(null)
         }, 2000)
@@ -305,7 +296,7 @@ export default function EmpleosInformalesPage() {
         headers,
         body: JSON.stringify({
           ...jobToSave,
-          raw_text: rawText || (imageName ? `Foto: ${imageName}` : null),
+          raw_text: imageName ? `Foto: ${imageName}` : null,
           autoPublish: true,
         }),
       })
@@ -325,7 +316,6 @@ export default function EmpleosInformalesPage() {
       setTimeout(() => {
         setPublishSuccess(false)
         setIsAiModalOpen(false)
-        setRawText('')
         setImagePreview(null)
         setExtractedList([])
         setParsedPreview(null)
@@ -335,21 +325,6 @@ export default function EmpleosInformalesPage() {
     } finally {
       setIsPublishing(false)
     }
-  }
-
-  // Ejemplos de prueba reales basados en clasificados
-  const loadExample = (type: 'taxi' | 'mecanico' | 'comida') => {
-    let ex = ''
-    if (type === 'taxi') {
-      ex = `CHOFERES para taxi diurno nocturno o trabajar solo, radio taxi 141 con o sin experiencia; enviar foto de libreta al WhatsApp cel 093609479 - 094920807 Cod.Web.298982761`
-    } else if (type === 'mecanico') {
-      ex = `MECÁNICO aprendiz o estudiante de mecánica entre 23 y 40 años para cambios de aceite en importante Lubricentro. Enviar CV a: lubricantes13@hotmail.com Cod.Web.299225191`
-    } else {
-      ex = `Estamos buscando personal para local de comidas, ubicado en la zona del Paso Molino, para el turno vespertino 17 a 01am. Para el cargo : CAJERA. WhatsApp ( no llamar porfavor) * 092327302 •.`
-    }
-    setRawText(ex)
-    const parsed = parseInformalJobWithAI(ex)
-    setParsedPreview(parsed)
   }
 
   const rubrosList = [
@@ -786,7 +761,7 @@ export default function EmpleosInformalesPage() {
                     )}
                   </div>
                   <p className="text-xs text-slate-500">
-                    Subí fotos de clasificados, vidrieras, capturas de WhatsApp o pegá texto.
+                    Subí fotos de clasificados, vidrieras o capturas de WhatsApp (también podés pegar con Ctrl+V).
                   </p>
                 </div>
               </div>
@@ -795,38 +770,6 @@ export default function EmpleosInformalesPage() {
                 className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Tabs Selector */}
-            <div className="flex border-b border-slate-100 bg-slate-50/70 p-1.5 gap-1.5 px-6">
-              <button
-                type="button"
-                onClick={() => setAiTab('image')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
-                  aiTab === 'image'
-                    ? 'bg-white text-amber-700 shadow-sm border border-slate-200/80'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                }`}
-              >
-                <Camera className="w-4 h-4 text-amber-600" />
-                <span>📸 Foto o Captura (Vision AI)</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold">
-                  NUEVO
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAiTab('text')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all ${
-                  aiTab === 'text'
-                    ? 'bg-white text-amber-700 shadow-sm border border-slate-200/80'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-                }`}
-              >
-                <FileText className="w-4 h-4 text-amber-600" />
-                <span>✍️ Pegar Texto Crudo</span>
               </button>
             </div>
 
@@ -864,188 +807,97 @@ export default function EmpleosInformalesPage() {
                 </div>
               )}
 
-              {/* TAB 1: SUBIR FOTO */}
-              {aiTab === 'image' && (
-                <div className="space-y-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleFileChosen(e.target.files[0])
-                      }
-                    }}
-                  />
+              {/* SUBIR FOTO / CAPTURA */}
+              <div className="space-y-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileChosen(e.target.files[0])
+                    }
+                  }}
+                />
 
-                  {!imagePreview ? (
-                    <div
-                      onDrop={handleDrop}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`cursor-pointer border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
-                        isDragging
-                          ? 'border-amber-500 bg-amber-50 scale-[1.01]'
-                          : 'border-slate-200 hover:border-amber-400 bg-slate-50/50 hover:bg-amber-50/20'
-                      }`}
-                    >
-                      <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
-                        <UploadCloud className="w-7 h-7" />
-                      </div>
-                      <h4 className="text-sm font-extrabold text-slate-800">
-                        Arrastrá tu foto aquí o hacé clic para seleccionarla
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        Recortes del diario (El Gallito), fotos de carteles en vidrieras o capturas de historias y WhatsApp.
-                      </p>
-                      <div className="mt-3 flex items-center justify-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
-                          Soporta JPG, PNG, WEBP
-                        </span>
-                        <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
-                          Podés pegar con Ctrl+V
-                        </span>
-                      </div>
+                {!imagePreview ? (
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`cursor-pointer border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
+                      isDragging
+                        ? 'border-amber-500 bg-amber-50 scale-[1.01]'
+                        : 'border-slate-200 hover:border-amber-400 bg-slate-50/50 hover:bg-amber-50/20'
+                    }`}
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                      <UploadCloud className="w-7 h-7" />
                     </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={imagePreview}
-                              alt="Vista previa"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">
-                              {imageName || 'Imagen cargada'}
-                            </p>
-                            <p className="text-[11px] text-slate-500">Lista para interpretar con IA</p>
-                          </div>
+                    <h4 className="text-sm font-extrabold text-slate-800">
+                      Arrastrá tu foto aquí o hacé clic para seleccionarla
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Recortes del diario (El Gallito), fotos de carteles en vidrieras o capturas de historias y WhatsApp.
+                    </p>
+                    <div className="mt-3 flex items-center justify-center gap-2">
+                      <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
+                        Soporta JPG, PNG, WEBP
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-semibold text-slate-600">
+                        Podés pegar con Ctrl+V
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-black/5 relative shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={imagePreview}
+                            alt="Vista previa"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-700"
-                          >
-                            Cambiar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setImagePreview(null)
-                              setImageName('')
-                              setExtractedList([])
-                              setParsedPreview(null)
-                            }}
-                            className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200"
-                            title="Eliminar imagen"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 truncate max-w-[200px] sm:max-w-xs">
+                            {imageName || 'Imagen cargada'}
+                          </p>
+                          <p className="text-[11px] text-slate-500">Lista para interpretar con IA</p>
                         </div>
                       </div>
 
-                      {/* Modo Toggle */}
-                      <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        {isAdmin ? (
-                          <label className="flex items-center gap-2 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={autoPublishDirectly}
-                              onChange={(e) => setAutoPublishDirectly(e.target.checked)}
-                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
-                            />
-                            <span className="text-xs font-bold text-slate-700">
-                              Publicar automáticamente si la extracción es exitosa
-                            </span>
-                          </label>
-                        ) : (
-                          <span className="text-xs font-medium text-slate-600">
-                            Se descontará 1 uso de IA al interpretar y publicar
-                          </span>
-                        )}
-
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          disabled={isAnalyzing}
-                          onClick={() => handleProcessWithGemini()}
-                          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-700"
                         >
-                          {isAnalyzing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Gemini Vision analizando foto...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-4 h-4" />
-                              <span>
-                                {!isAdmin || autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer Campos'}
-                              </span>
-                            </>
-                          )}
+                          Cambiar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImagePreview(null)
+                            setImageName('')
+                            setExtractedList([])
+                            setParsedPreview(null)
+                          }}
+                          className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 border border-transparent hover:border-rose-200"
+                          title="Eliminar imagen"
+                        >
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
 
-              {/* TAB 2: PEGAR TEXTO */}
-              {aiTab === 'text' && (
-                <div className="space-y-4">
-                  {/* Botones de prueba rápida */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Ejemplos de clasificados reales de Uruguay:
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => loadExample('taxi')}
-                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
-                      >
-                        🚕 Chofer Taxi (WhatsApp / Cel)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => loadExample('mecanico')}
-                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
-                      >
-                        🔧 Mecánico (Solo Email)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => loadExample('comida')}
-                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-amber-50 text-[11px] font-semibold text-slate-700 hover:text-amber-800"
-                      >
-                        🍔 Cajera Paso Molino
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                      Texto del Aviso / Clasificado
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={rawText}
-                      onChange={(e) => setRawText(e.target.value)}
-                      placeholder="Pegá aquí el texto del aviso copiado de WhatsApp o la web..."
-                      className="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-xs sm:text-sm text-slate-800 resize-none font-mono"
-                    />
-
-                    <div className="flex items-center justify-between pt-1">
+                    {/* Modo Toggle */}
+                    <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       {isAdmin ? (
                         <label className="flex items-center gap-2 cursor-pointer select-none">
                           <input
@@ -1055,7 +907,7 @@ export default function EmpleosInformalesPage() {
                             className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
                           />
                           <span className="text-xs font-bold text-slate-700">
-                            Publicar directo automáticamente
+                            Publicar automáticamente si la extracción es exitosa
                           </span>
                         </label>
                       ) : (
@@ -1066,28 +918,28 @@ export default function EmpleosInformalesPage() {
 
                       <button
                         type="button"
-                        disabled={!rawText.trim() || isAnalyzing}
+                        disabled={isAnalyzing}
                         onClick={() => handleProcessWithGemini()}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold text-xs transition-colors shadow-sm"
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all"
                       >
                         {isAnalyzing ? (
                           <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Gemini analizando...</span>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Gemini Vision analizando foto...</span>
                           </>
                         ) : (
                           <>
-                            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                            <Sparkles className="w-4 h-4" />
                             <span>
-                              {!isAdmin || autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer con Gemini'}
+                              {!isAdmin || autoPublishDirectly ? 'Interpretar y Publicar' : 'Extraer Campos'}
                             </span>
                           </>
                         )}
                       </button>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Selector si Gemini detectó múltiples avisos en una misma foto */}
               {extractedList.length > 1 && (

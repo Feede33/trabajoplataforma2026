@@ -307,7 +307,7 @@ function PlanesContent() {
           <div>
             <h2 className="text-xl font-extrabold text-slate-900">Publicá avisos informales con IA</h2>
             <p className="text-xs text-slate-500">
-              Subí una foto o pegá un texto y la IA arma el aviso por vos. Para cuentas de Candidato.
+              Subí una foto o captura de pantalla y la IA arma el aviso por vos. Para cuentas de Candidato.
             </p>
           </div>
         </div>

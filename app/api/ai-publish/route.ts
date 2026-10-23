@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseInformalJobWithAI } from '@/lib/data'
-import { extractJobsFromImage, extractJobsFromText, ExtractedInformalJob } from '@/lib/gemini'
+import { extractJobsFromImage, ExtractedInformalJob } from '@/lib/gemini'
 import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/server/auth'
 import { AI_ALLOWED_ROLES, MAX_AVISOS_POR_USO_IA } from '@/lib/billing'
 
@@ -69,13 +68,12 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
-    // Los usuarios no admin solo pueden usar la IA (imagen o texto) y siempre se publica directo.
-    // Así se evita publicar avisos estructurados a mano sin pagar el uso.
-    const sendsRawContent = (typeof body.image === 'string' && body.image) || (typeof body.text === 'string' && body.text)
-    if (backendReady && !isAdmin && !sendsRawContent) {
+    // Los usuarios no admin solo pueden usar la IA enviando una imagen y siempre se publica directo.
+    const sendsImage = typeof body.image === 'string' && body.image.length > 0
+    if (backendReady && !isAdmin && !sendsImage) {
       await refundCredit()
       return NextResponse.json(
-        { error: 'Solo se pueden publicar avisos enviando una imagen o un texto para interpretar con IA.' },
+        { error: 'Solo se pueden publicar avisos enviando una imagen o captura para interpretar con IA.' },
         { status: 400 }
       )
     }
@@ -97,22 +95,7 @@ export async function POST(request: Request) {
         )
       }
     }
-    // 2. Caso: Texto sin procesar (Avisos de clasificados o WhatsApp)
-    else if (body.text && typeof body.text === 'string') {
-      if (process.env.GEMINI_API_KEY) {
-        try {
-          extractedJobs = await extractJobsFromText(body.text)
-        } catch (geminiErr: any) {
-          console.warn('Gemini falló con el texto, usando analizador de respaldo local:', geminiErr)
-          const fallback = parseInformalJobWithAI(body.text)
-          extractedJobs = [fallback]
-        }
-      } else {
-        const fallback = parseInformalJobWithAI(body.text)
-        extractedJobs = [fallback]
-      }
-    }
-    // 3. Caso: El cliente ya envía los datos estructurados directamente (solo admin)
+    // 2. Caso: El cliente ya envía los datos estructurados directamente (solo admin tras revisar vista previa)
     else if (body.cargo) {
       extractedJobs = [
         {
@@ -136,7 +119,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            'Debes enviar una imagen en base64 ("image"), un texto clasificado ("text"), o los datos estructurados del empleo.',
+            'Debes enviar una imagen en base64 ("image") para interpretar con IA.',
         },
         { status: 400 }
       )
@@ -170,7 +153,7 @@ export async function POST(request: Request) {
       contacto_whatsapp: job.whatsapp || null,
       contacto_indicaciones: job.contacto_indicaciones || null,
       salario: job.salario || null,
-      raw_text: job.raw_text || (body.text ? body.text.slice(0, 500) : null),
+      raw_text: job.raw_text || null,
       activo: true,
     }))
 
