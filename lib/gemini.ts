@@ -13,6 +13,7 @@ export interface ExtractedInformalJob {
   direccion: string | null
   salario: string | null
   contacto_indicaciones: string | null
+  fecha_detectada?: string | null
   raw_text?: string | null
 }
 
@@ -25,11 +26,20 @@ const CANDIDATE_MODELS = [
 
 const SYSTEM_EXTRACTION_PROMPT = `
 Eres un asistente experto en digitalizar avisos clasificados y ofertas de trabajo para Uruguay (Montevideo e Interior).
-Tu tarea es analizar el texto o la imagen de avisos de empleo (pueden ser recortes de diarios clasificados como El Gallito Luis, avisos pegados en vidrieras, capturas de pantalla de historias de Instagram, Facebook o chats de WhatsApp).
+Tu tarea es analizar el texto, conversación de chat o imagen (pueden ser recortes de diarios clasificados como El Gallito Luis, avisos en vidrieras, capturas de pantalla o conversaciones enteras copiadas de grupos de WhatsApp/Telegram/Facebook).
 
-IMPORTANTE: Si en una misma imagen o texto hay MÁS DE UN aviso de empleo, debes extraer CADA UNO por separado en el array JSON.
+IMPORTANTE - FILTRADO INTELIGENTE DE CONVERSACIONES:
+1. Si el contenido es una conversación entre varias personas, FILTRA Y DESCARTA todos los mensajes que NO sean ofertas de empleo reales:
+   - DESCARTA personas que están pidiendo o buscando trabajo para sí mismas (ej: "Hola busco trabajo de limpieza", "Me ofrezco como cuidadora", "Alguien sabe de algún empleo").
+   - DESCARTA saludos, agradecimientos, preguntas ("info", "sigue disponible?", "cuánto pagan?", "pasame número"), charlas casuales o spam.
+   - DESCARTA ofertas que en la misma conversación se aclara que ya fueron cubiertas o cerradas (ej: "Ya se cubrió la vacante", "No llamen más").
+   - EXTRAE ÚNICAMENTE las publicaciones donde un empleador, comercio o intermediario ofrece una vacante o puesto de trabajo real.
+2. Si hay MÁS DE UNA oferta de empleo válida, extrae CADA UNA por separado en el array JSON. Si ninguna parte del texto es una oferta real, devuelve un array vacío [].
+3. INTERPRETACIÓN DE FECHAS Y REMITENTES EN CHATS:
+   - Si el mensaje tiene fecha/hora (ej: "[23/10/2026, 14:30]" o referencias como "hoy", "ayer"), evalúa qué tan reciente es respecto a la fecha actual indicada y resúmelo en el campo "fecha_detectada" (ej: "Hoy 14:30 (23/10)", "Ayer (22/10)", "Hace 3 días (20/10)").
+   - Si un mensaje de WhatsApp no menciona un teléfono en el cuerpo del texto pero en el encabezado del mensaje aparece el número del remitente que publicó la oferta (ej: "[23/10/2026 14:30] +598 99 123 456: Preciso peón..."), utiliza ese número de remitente como "whatsapp" limpio en formato uruguayo (ej: "099123456").
 
-Devuelve EXCLUSIVAMENTE un array JSON válido con la siguiente estructura para cada empleo:
+Devuelve EXCLUSIVAMENTE un array JSON válido con la siguiente estructura para cada empleo válido:
 [
   {
     "titulo": "Título atractivo y conciso (ej: 'Ayudante de Cocina - Pocitos')",
@@ -37,18 +47,19 @@ Devuelve EXCLUSIVAMENTE un array JSON válido con la siguiente estructura para c
     "rubro": "Debe ser uno de: 'Gastronomía', 'Limpieza', 'Construcción', 'Comercio', 'Logística', 'Administración', 'Atención al Cliente', 'Belleza y Cuidado', 'Seguridad', o 'General'",
     "zona": "Barrio de Montevideo o localidad/departamento del Interior si se menciona (ej: 'Paso Molino', 'Pocitos', 'Centro', 'Las Piedras', 'Ciudad de la Costa'). Si no se menciona o no es claro, usa null",
     "horario": "Días y horarios de trabajo si se mencionan (ej: 'Turno tarde 14:00 a 22:00', 'Lunes a viernes 8hs'). Si no, null",
-    "descripcion": "Descripción clara, prolija y completa de las tareas y requisitos del aviso.",
+    "descripcion": "Descripción clara, prolija y completa de las tareas, de qué trata el empleo y requisitos del aviso.",
     "whatsapp": "Número de WhatsApp limpio en formato uruguayo estándar (ej: '099123456', '094920807') o null si no hay",
     "telefono": "Teléfono fijo o celular para llamadas comunes o null si coincide con whatsapp o no hay",
     "email": "Correo electrónico de contacto o null si no hay",
     "direccion": "Dirección física para presentarse (si el aviso dice presentarse en tal calle o local) o null",
     "salario": "Sueldo o jornal estimado si se especifica (ej: '$28.000', 'Leyes sociales', 'A convenir'). Si no se menciona, null",
-    "contacto_indicaciones": "Indicaciones adicionales (ej: 'Enviar CV con foto al WhatsApp', 'Presentarse de 9 a 12 hs con libreta de conducir', 'Llamar solo en horario comercial') o null"
+    "contacto_indicaciones": "Indicaciones adicionales (ej: 'Enviar CV con foto al WhatsApp', 'Presentarse de 9 a 12 hs con libreta de conducir', 'Llamar solo en horario comercial') o null",
+    "fecha_detectada": "Fecha/hora y antigüedad detectada en el chat o aviso (ej: 'Hoy 14:30 (Reciente)', '22/10/2026 (Ayer)') o null si no figura fecha"
   }
 ]
 
-Reglas:
-1. Sé muy preciso extrayendo teléfonos y números de WhatsApp uruguayos (suelen empezar con 09 o tener 8 o 9 dígitos).
+Reglas adicionales:
+1. Sé muy preciso extrayendo teléfonos y números de WhatsApp uruguayos (suelen empezar con 09 o tener 8 o 9 dígitos; convierte '+598 9X XXX XXX' a '09XXXXXXX').
 2. Si un aviso busca varios puestos afines (ej: "Se precisa Bachero y Ayudante de Cocina"), puedes poner el cargo combinado o separar si son totalmente distintos.
 3. El campo rubro debe categorizarse lógicamente.
 4. Responde ÚNICAMENTE con la estructura JSON, sin markdown adicional ni comentarios.
@@ -179,10 +190,16 @@ export async function extractJobsFromImage(
   // Eliminar espacios en blanco o saltos de línea de la cadena base64
   cleanBase64 = cleanBase64.replace(/\s+/g, '')
 
+  const nowUy = new Date().toLocaleString('es-UY', { timeZone: 'America/Montevideo' })
+
   const contents = [
     {
       parts: [
-        { text: SYSTEM_EXTRACTION_PROMPT + '\nAnaliza la imagen adjunta y extrae todos los avisos de empleo:' },
+        {
+          text:
+            SYSTEM_EXTRACTION_PROMPT +
+            `\nFecha y hora actual de referencia en Uruguay: ${nowUy}.\nAnaliza la imagen adjunta y extrae únicamente las ofertas reales de empleo:`,
+        },
         {
           inline_data: {
             mime_type: detectedMime,
@@ -201,13 +218,15 @@ export async function extractJobsFromImage(
  * Interpreta texto crudo (copiado de WhatsApp o clasificados) y extrae las ofertas de empleo
  */
 export async function extractJobsFromText(text: string): Promise<ExtractedInformalJob[]> {
+  const nowUy = new Date().toLocaleString('es-UY', { timeZone: 'America/Montevideo' })
+
   const contents = [
     {
       parts: [
         {
           text:
             SYSTEM_EXTRACTION_PROMPT +
-            `\nAnaliza el siguiente texto y extrae todos los avisos de empleo:\n\n${text.trim()}`,
+            `\nFecha y hora actual de referencia en Uruguay: ${nowUy}.\nAnaliza el siguiente texto o conversación, descarta los mensajes que no sean ofertas de trabajo reales, evalúa qué tan recientes son y extrae todas las ofertas de empleo válidas:\n\n${text.trim()}`,
         },
       ],
     },
