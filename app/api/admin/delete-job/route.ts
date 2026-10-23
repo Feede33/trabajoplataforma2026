@@ -5,9 +5,10 @@ import { isUserAdmin, isProfileAdmin } from '@/lib/auth-utils'
 export async function POST(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    if (!url || !key || url.includes('your-supabase-project')) {
+    if (!url || !anonKey || url.includes('your-supabase-project')) {
       return NextResponse.json({ success: true, simulated: true })
     }
 
@@ -22,12 +23,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // 2. Validar sesión con Supabase Auth
-    const supabase = createClient(url, key)
+    // 2. Validar sesión con Supabase Auth (anon key, solo para verificar identidad)
+    const supabaseAuth = createClient(url, anonKey)
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser(token)
+    } = await supabaseAuth.auth.getUser(token)
 
     if (authError || !user) {
       return NextResponse.json(
@@ -44,8 +45,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Falta el parámetro jobId' }, { status: 400 })
     }
 
-    // Verificar si es admin dinámicamente en Supabase
-    const { data: userProfile } = await supabase
+    // 4. Verificar perfil y permisos usando anon client (respeta RLS de lectura)
+    const { data: userProfile } = await supabaseAuth
       .from('profiles')
       .select('is_admin, role, email')
       .eq('id', user.id)
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     const isAdmin = isProfileAdmin(userProfile || { email: user.email })
     const isFormalJob = type === 'formal'
 
-    // 4. Comprobación estricta de permisos:
+    // 5. Comprobación estricta de permisos:
     if (!isFormalJob) {
       // Para empleos informales: ÚNICAMENTE el administrador puede eliminar
       if (!isAdmin) {
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     } else {
       // Para empleos formales: Puede eliminar el administrador O la empresa dueña del aviso
       if (!isAdmin) {
-        const { data: job, error: jobError } = await supabase
+        const { data: job, error: jobError } = await supabaseAuth
           .from('jobs')
           .select('empresa_id')
           .eq('id', jobId)
@@ -85,14 +86,20 @@ export async function POST(request: Request) {
       }
     }
 
-    // 5. Ejecutar eliminación
+    // 6. Ejecutar eliminación con service role key (bypasea RLS tras verificar permisos)
+    // Si no hay service key disponible, usar anon key (puede fallar por RLS)
+    const supabaseAdmin = serviceKey
+      ? createClient(url, serviceKey)
+      : supabaseAuth
+
     const tableName = isFormalJob ? 'jobs' : 'informal_jobs'
-    const { error: deleteError } = await supabase.from(tableName).delete().eq('id', jobId)
+    const { error: deleteError } = await supabaseAdmin.from(tableName).delete().eq('id', jobId)
 
     if (deleteError) {
+      console.error('Error al eliminar:', deleteError)
       // Si hay restricciones de integridad referencial, realizar soft-delete
       const updateData = isFormalJob ? { estado: 'cerrado' } : { activo: false }
-      const { error: updateError } = await supabase.from(tableName).update(updateData).eq('id', jobId)
+      const { error: updateError } = await supabaseAdmin.from(tableName).update(updateData).eq('id', jobId)
 
       if (updateError) {
         return NextResponse.json(
