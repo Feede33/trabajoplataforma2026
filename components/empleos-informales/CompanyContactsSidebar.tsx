@@ -481,9 +481,16 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
         </div>
 
         {/* Category Pills */}
-        {categoriesList.length > 2 && (
-          <div className="flex items-center gap-2 overflow-x-auto py-1 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {categoriesList.slice(0, 6).map((cat) => (
+        {categoriesList.length > 1 && (
+          <div
+            onWheel={(e) => {
+              if (e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY
+              }
+            }}
+            className="flex items-center gap-2 overflow-x-auto pt-1 pb-2.5 text-xs scroll-smooth [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-800/60 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 hover:[&::-webkit-scrollbar-thumb]:bg-emerald-500 [&::-webkit-scrollbar-thumb]:rounded-full"
+          >
+            {categoriesList.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCat(cat)}
