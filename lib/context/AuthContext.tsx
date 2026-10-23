@@ -328,9 +328,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (isConfigured) {
       const supabase = createClient()
-      const { error } = await supabase.from('profiles').update(updates).eq('id', profile.id)
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', profile.id)
+        .select()
+        .maybeSingle()
       if (error) {
         throw new Error(error.message || 'Error al actualizar el perfil en la base de datos')
+      }
+      if (data) {
+        setProfile(data as Profile)
+        return
       }
     }
 

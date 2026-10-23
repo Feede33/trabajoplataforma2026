@@ -45,6 +45,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Falta el parámetro jobId' }, { status: 400 })
     }
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_REGEX.test(String(jobId).trim())) {
+      return NextResponse.json({
+        success: true,
+        simulated: true,
+        message: 'Aviso local eliminado exitosamente',
+        jobId,
+      })
+    }
+
     // 4. Verificar perfil y permisos usando anon client (respeta RLS de lectura)
     const { data: userProfile } = await supabaseAuth
       .from('profiles')

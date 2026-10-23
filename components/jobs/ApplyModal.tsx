@@ -36,20 +36,35 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
+    if (isOpen) {
+      setIsSuccess(false)
+      setErrorMessage('')
+      setCvFile(null)
+      setMensaje('')
+    }
+  }, [isOpen, job.id])
+
+  useEffect(() => {
     if (profile) {
       setNombre(profile.nombre || '')
       setEmail(profile.email || '')
-      if (profile.cv_url) {
-        setCvFileName('CV guardado en tu perfil')
+      if (!cvFile) {
+        setCvFileName(profile.cv_url ? 'CV guardado en tu perfil' : '')
       }
     }
-  }, [profile])
+  }, [profile, cvFile])
 
   if (!isOpen) return null
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage('')
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage('El archivo supera el tamaño máximo permitido de 5 MB.')
+        e.target.value = ''
+        return
+      }
       setCvFile(file)
       setCvFileName(file.name)
     }
@@ -87,11 +102,17 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
       // Si subió un nuevo archivo de CV, lo subimos a Supabase Storage
       if (cvFile) {
         currentCvUrl = await uploadCV(cvFile, profile.id)
-        // Guardamos también en su perfil para futuras postulaciones
+      }
+
+      // Guardamos el CV actualizado (y el nombre si cambió) en su perfil para futuras postulaciones
+      if (cvFile || (nombre.trim() && nombre.trim() !== profile.nombre)) {
         try {
-          await updateProfile({ cv_url: currentCvUrl })
-        } catch {
-          console.warn('No se pudo actualizar el cv_url en el perfil')
+          await updateProfile({
+            cv_url: currentCvUrl || profile.cv_url,
+            nombre: nombre.trim(),
+          })
+        } catch (profileErr) {
+          console.warn('No se pudo actualizar el perfil automáticamente:', profileErr)
         }
       }
 
@@ -100,9 +121,9 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
         job_titulo: job.titulo,
         job_slug: job.slug,
         candidato_id: profile.id,
-        candidato_nombre: nombre,
-        candidato_email: email,
-        mensaje,
+        candidato_nombre: nombre.trim(),
+        candidato_email: email.trim(),
+        mensaje: mensaje.trim(),
         cv_url: currentCvUrl,
       })
 
@@ -134,7 +155,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
             <h3 className="text-2xl font-bold text-slate-900">¡Postulación Enviada con Éxito!</h3>
             <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto">
               Tu postulación para <span className="font-semibold text-slate-800">{job.titulo}</span> en{' '}
-              <span className="font-semibold text-slate-800">{job.empresa.nombre}</span> fue registrada correctamente.
+              <span className="font-semibold text-slate-800">{job.empresa?.nombre || 'la empresa'}</span> fue registrada correctamente.
             </p>
             <div className="pt-4 flex flex-col gap-2">
               <Link
@@ -164,7 +185,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
               <h3 className="text-2xl font-extrabold text-slate-900 mt-1">Iniciá sesión para postularte</h3>
               <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto mt-2">
                 Para postularte a <span className="font-semibold text-slate-800">{job.titulo}</span> en{' '}
-                <span className="font-semibold text-slate-800">{job.empresa.nombre}</span>, necesitás ingresar con tu cuenta de candidato.
+                <span className="font-semibold text-slate-800">{job.empresa?.nombre || 'la empresa'}</span>, necesitás ingresar con tu cuenta de candidato.
               </p>
             </div>
 
@@ -213,7 +234,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
                 Postulación Laboral
               </span>
               <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-1 break-words">{job.titulo}</h2>
-              <p className="text-xs text-slate-500 mt-0.5">en {job.empresa.nombre}</p>
+              <p className="text-xs text-slate-500 mt-0.5">en {job.empresa?.nombre || 'Empresa'}</p>
             </div>
 
             {errorMessage && (

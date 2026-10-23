@@ -277,7 +277,7 @@ export default function CandidatoPerfilPage() {
                   <p className="text-xs font-semibold text-slate-800 truncate">
                     {cvName || 'Subir un nuevo CV en formato PDF'}
                   </p>
-                  <p className="text-[11px] text-slate-400">Máximo 10 MB (PDF, DOCX)</p>
+                  <p className="text-[11px] text-slate-400">Máximo 5 MB (PDF, DOC, DOCX)</p>
                 </div>
               </div>
               <span className="text-xs font-bold text-indigo-600 flex items-center gap-1 group-hover:underline shrink-0">

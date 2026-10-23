@@ -6,6 +6,12 @@ const LOCAL_STORAGE_JOBS_KEY = 'empleos_custom_jobs'
 const LOCAL_STORAGE_APPS_KEY = 'empleos_custom_apps'
 const LOCAL_STORAGE_INFORMAL_KEY = 'empleos_custom_informal_jobs'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isValidUUID(value?: string | null): boolean {
+  return !!value && UUID_REGEX.test(value.trim())
+}
+
 function getStoredJobs(): JobWithEmpresa[] {
   if (typeof window === 'undefined') return []
   try {
@@ -84,7 +90,9 @@ export async function fetchJobs(): Promise<JobWithEmpresa[]> {
 }
 
 export async function fetchJobsByEmpresa(empresaId: string): Promise<JobWithEmpresa[]> {
-  if (isSupabaseConfigured()) {
+  const custom = getStoredJobs().filter((j) => j.empresa_id === empresaId)
+
+  if (isSupabaseConfigured() && isValidUUID(empresaId)) {
     try {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -97,16 +105,16 @@ export async function fetchJobsByEmpresa(empresaId: string): Promise<JobWithEmpr
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        return data as unknown as JobWithEmpresa[]
+        const dbJobs = data as unknown as JobWithEmpresa[]
+        const merged = [...dbJobs, ...custom.filter((c) => !dbJobs.some((d) => d.id === c.id))]
+        return merged
       }
     } catch (err) {
       console.warn('Supabase fetch company jobs failed', err)
     }
   }
 
-  const custom = getStoredJobs()
-  const companyCustom = custom.filter((j) => j.empresa_id === empresaId)
-  if (companyCustom.length > 0) return companyCustom
+  if (custom.length > 0) return custom
   return MOCK_JOBS
 }
 
@@ -150,7 +158,7 @@ export async function createJob(jobData: Omit<Job, 'id' | 'created_at' | 'update
     }
   }
 
-  if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured() && isValidUUID(jobData.empresa_id)) {
     try {
       const supabase = createClient()
       const { data, error } = await supabase.from('jobs').insert([jobData]).select().single()
@@ -185,7 +193,7 @@ export async function createJob(jobData: Omit<Job, 'id' | 'created_at' | 'update
 }
 
 export async function toggleJobState(jobId: string, newState: JobEstado): Promise<boolean> {
-  if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured() && isValidUUID(jobId)) {
     try {
       const supabase = createClient()
       const { error } = await supabase.from('jobs').update({ estado: newState }).eq('id', jobId)
@@ -200,6 +208,12 @@ export async function toggleJobState(jobId: string, newState: JobEstado): Promis
 }
 
 export async function deleteJob(jobId: string, accessToken?: string | null): Promise<boolean> {
+  if (!isValidUUID(jobId)) {
+    const existing = getStoredJobs()
+    saveStoredJobs(existing.filter((j) => j.id !== jobId))
+    return true
+  }
+
   let token = accessToken
   if (!token && typeof window !== 'undefined' && isSupabaseConfigured()) {
     try {
@@ -235,6 +249,8 @@ export async function deleteJob(jobId: string, accessToken?: string | null): Pro
 }
 
 export async function fetchApplicationsForEmpresa(empresaId?: string): Promise<ApplicationWithDetails[]> {
+  const custom = getStoredApplications()
+
   if (isSupabaseConfigured()) {
     try {
       const supabase = createClient()
@@ -248,19 +264,22 @@ export async function fetchApplicationsForEmpresa(empresaId?: string): Promise<A
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        return data as unknown as ApplicationWithDetails[]
+        const dbApps = data as unknown as ApplicationWithDetails[]
+        const merged = [...dbApps, ...custom.filter((c) => !dbApps.some((d) => d.id === c.id))]
+        return merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       }
     } catch (err) {
       console.warn('Supabase fetch applications failed', err)
     }
   }
 
-  const custom = getStoredApplications()
   return [...custom, ...MOCK_APPLICATIONS]
 }
 
 export async function fetchApplicationsForCandidate(candidatoId: string): Promise<ApplicationWithDetails[]> {
-  if (isSupabaseConfigured()) {
+  const custom = getStoredApplications().filter((a) => a.candidato_id === candidatoId)
+
+  if (isSupabaseConfigured() && isValidUUID(candidatoId)) {
     try {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -274,26 +293,48 @@ export async function fetchApplicationsForCandidate(candidatoId: string): Promis
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        return data as unknown as ApplicationWithDetails[]
+        const dbApps = data as unknown as ApplicationWithDetails[]
+        const merged = [...dbApps, ...custom.filter((c) => !dbApps.some((d) => d.id === c.id))]
+        return merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       }
-    } catch (err) {}
+    } catch (err) {
+      console.warn('Supabase fetch candidate applications failed', err)
+    }
   }
 
-  const custom = getStoredApplications()
-  return [...custom, ...MOCK_APPLICATIONS]
+  if (custom.length > 0) return custom
+  return MOCK_APPLICATIONS.filter((a) => a.candidato_id === candidatoId)
 }
 
 export async function uploadCV(file: File, userId: string): Promise<string> {
+  const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB (coincide con bucket 'cvs' en Supabase)
+  if (file.size > MAX_SIZE_BYTES) {
+    throw new Error('El archivo de currículum supera el tamaño máximo permitido de 5 MB.')
+  }
+
+  const rawExt = (file.name.split('.').pop() || 'pdf').toLowerCase()
+  const allowedExts: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  }
+
+  if (!allowedExts[rawExt]) {
+    throw new Error('Formato de archivo no válido. Por favor subí tu CV en formato PDF o Word (.pdf, .doc, .docx).')
+  }
+
   if (isSupabaseConfigured()) {
     const supabase = createClient()
-    const fileExt = file.name.split('.').pop() || 'pdf'
-    const fileName = `${userId}/${Date.now()}.${fileExt}`
+    const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '') || 'candidato'
+    const fileName = `${safeUserId}/${Date.now()}.${rawExt}`
+    const contentType = allowedExts[rawExt]
 
     const { data, error } = await supabase.storage
       .from('cvs')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: true,
+        contentType,
       })
 
     if (error) {
@@ -321,6 +362,11 @@ export async function submitApplication(data: {
   mensaje: string
   cv_url?: string
 }): Promise<ApplicationWithDetails> {
+  const existing = getStoredApplications()
+  if (existing.some((a) => a.job_id === data.job_id && a.candidato_id === data.candidato_id)) {
+    throw new Error('Ya te has postulado a este empleo anteriormente.')
+  }
+
   const newApp: ApplicationWithDetails = {
     id: 'app-' + Date.now(),
     job_id: data.job_id,
@@ -341,7 +387,10 @@ export async function submitApplication(data: {
     }
   }
 
-  if (isSupabaseConfigured()) {
+  // Solo insertamos en la tabla 'applications' de Supabase cuando tanto job_id como candidato_id
+  // son UUIDs válidos de la base de datos (evita el error 'invalid input syntax for type uuid: "job-1"'
+  // cuando se postula a avisos de demostración o locales).
+  if (isSupabaseConfigured() && isValidUUID(data.job_id) && isValidUUID(data.candidato_id)) {
     const supabase = createClient()
     const { data: inserted, error } = await supabase
       .from('applications')
@@ -354,14 +403,15 @@ export async function submitApplication(data: {
       .single()
 
     if (error) {
-      console.error('Error insertando postulación en Supabase:', error)
       if (error.code === '23505' || error.message?.includes('unique_job_candidato')) {
         throw new Error('Ya te has postulado a este empleo anteriormente.')
       }
-      throw new Error(error.message || 'No se pudo registrar la postulación.')
-    }
-
-    if (inserted) {
+      // Si el aviso no existe en la tabla remota (23503) o error de formato UUID (22P02), respaldamos en local
+      if (error.code !== '23503' && error.code !== '22P02') {
+        console.error('Error insertando postulación en Supabase:', error)
+        throw new Error(error.message || 'No se pudo registrar la postulación.')
+      }
+    } else if (inserted) {
       return {
         ...inserted,
         job: newApp.job,
@@ -370,13 +420,12 @@ export async function submitApplication(data: {
     }
   }
 
-  const existing = getStoredApplications()
   saveStoredApplications([newApp, ...existing])
   return newApp
 }
 
 export async function updateApplicationStatus(appId: string, nuevoEstado: ApplicationEstado): Promise<boolean> {
-  if (isSupabaseConfigured()) {
+  if (isSupabaseConfigured() && isValidUUID(appId)) {
     try {
       const supabase = createClient()
       const { error } = await supabase.from('applications').update({ estado: nuevoEstado }).eq('id', appId)
@@ -448,6 +497,12 @@ export async function createInformalJob(
 }
 
 export async function deleteInformalJob(jobId: string, accessToken?: string | null): Promise<boolean> {
+  if (!isValidUUID(jobId)) {
+    const existing = getStoredInformalJobs()
+    saveStoredInformalJobs(existing.filter((j) => j.id !== jobId))
+    return true
+  }
+
   let token = accessToken
   if (!token && typeof window !== 'undefined' && isSupabaseConfigured()) {
     try {
