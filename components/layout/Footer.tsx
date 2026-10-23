@@ -11,7 +11,7 @@ export function Footer() {
           {/* Brand & mission */}
           <div className="lg:col-span-2 space-y-4">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform border border-slate-800">
+              <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-sky-500/10 group-hover:shadow-sky-500/25 group-hover:scale-105 transition-all border border-slate-800">
                 <Image
                   src="/logo-navbar.png"
                   alt="PostulaUY"
@@ -22,7 +22,7 @@ export function Footer() {
                 />
               </div>
               <span className="font-extrabold text-xl text-white tracking-tight flex items-center">
-                Postula<span className="text-indigo-400">UY</span><span className="text-xs text-indigo-300 font-bold ml-0.5">.com</span>
+                Postula<span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-400 bg-clip-text text-transparent font-black ml-0.5">UY<span className="text-xs font-bold ml-0.5">.com</span></span>
               </span>
             </Link>
             <p className="text-sm text-slate-400 max-w-sm leading-relaxed">

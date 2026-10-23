@@ -45,7 +45,7 @@ export function Navbar() {
           {/* Logo */}
           <div className="flex-1 flex items-center justify-start gap-6">
             <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-indigo-200/50 group-hover:scale-105 transition-transform border border-slate-200/60 dark:border-slate-800">
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-sky-500/20 group-hover:shadow-sky-500/35 group-hover:scale-105 transition-all border border-slate-200/60 dark:border-slate-800">
                 <Image
                   src="/logo-navbar.png"
                   alt="PostulaUY"
@@ -58,7 +58,7 @@ export function Navbar() {
               </div>
               <div className="flex flex-col">
                 <span className="font-extrabold text-xl text-slate-900 tracking-tight flex items-center">
-                  Postula<span className="text-indigo-600">UY</span><span className="text-xs text-indigo-500 font-bold ml-0.5">.com</span>
+                  Postula<span className="bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 bg-clip-text text-transparent font-black ml-0.5">UY<span className="text-xs font-bold ml-0.5">.com</span></span>
                 </span>
                 <span className="text-[10px] text-slate-500 font-medium -mt-1 uppercase tracking-wider">
                   Plataforma Laboral
