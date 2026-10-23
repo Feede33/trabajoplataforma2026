@@ -143,7 +143,7 @@ export default function HomePage() {
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onFocus={() => setKeywordFocused(true)}
-                  className="w-full text-slate-800 text-sm focus:outline-none placeholder-slate-400"
+                  className="w-full bg-transparent text-slate-800 text-sm focus:outline-none placeholder-slate-400"
                   autoComplete="off"
                 />
               </div>
@@ -178,7 +178,7 @@ export default function HomePage() {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   onFocus={() => setLocationFocused(true)}
-                  className="w-full text-slate-800 text-sm focus:outline-none placeholder-slate-400"
+                  className="w-full bg-transparent text-slate-800 text-sm focus:outline-none placeholder-slate-400"
                   autoComplete="off"
                 />
               </div>

@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/context/AuthContext'
+import { ModeToggle } from '@/components/mode-toggle'
 import {
   Briefcase,
   User,
@@ -149,6 +150,7 @@ export function Navbar() {
 
           {/* Action Buttons & User Menu */}
           <div className="hidden md:flex flex-1 items-center justify-end gap-3">
+            <ModeToggle />
             {profile ? (
               <div className="relative">
                 <button
@@ -287,6 +289,7 @@ export function Navbar() {
 
           {/* Mobile hamburger button */}
           <div className="flex md:hidden items-center gap-2">
+            <ModeToggle />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
