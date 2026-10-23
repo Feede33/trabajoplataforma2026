@@ -41,7 +41,7 @@ export function Navbar() {
       <div className="w-full px-3 sm:px-5 lg:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-6">
+          <div className="flex-1 flex items-center justify-start gap-6">
             <Link href="/" className="flex items-center gap-2.5 group shrink-0">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
                 <Briefcase className="w-5 h-5" />
@@ -58,7 +58,7 @@ export function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center justify-center gap-1 shrink-0">
             <Link
               href="/empleos"
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -148,7 +148,7 @@ export function Navbar() {
           </nav>
 
           {/* Action Buttons & User Menu */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex flex-1 items-center justify-end gap-3">
             {profile ? (
               <div className="relative">
                 <button
