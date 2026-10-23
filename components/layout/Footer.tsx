@@ -14,7 +14,7 @@ export function Footer() {
               <img
                 src="/logo.png"
                 alt="PostulaUY.com - Plataforma Laboral"
-                className="h-10 w-auto object-contain"
+                className="h-14 w-auto max-w-[224px] object-contain"
               />
             </Link>
             <p className="text-sm text-slate-400 max-w-sm leading-relaxed">

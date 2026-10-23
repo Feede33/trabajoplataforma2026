@@ -43,12 +43,12 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center group">
+            <Link href="/" className="flex items-center group shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logo.png"
                 alt="PostulaUY.com - Plataforma Laboral"
-                className="h-10 w-auto object-contain group-hover:scale-105 transition-transform"
+                className="h-14 w-auto max-w-[224px] object-contain group-hover:scale-[1.03] transition-transform"
               />
             </Link>
 
