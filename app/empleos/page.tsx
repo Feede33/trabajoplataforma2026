@@ -2,17 +2,21 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { fetchJobs } from '@/lib/data'
+import { fetchJobs, fetchApplicationsForCandidate } from '@/lib/data'
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { JobCard } from '@/components/jobs/JobCard'
 import { JobFilters, FilterState } from '@/components/jobs/JobFilters'
 import { Briefcase, SlidersHorizontal, ArrowUpDown } from 'lucide-react'
+import { useAuth } from '@/lib/context/AuthContext'
 
 function EmpleosContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { profile } = useAuth()
 
   const [allJobs, setAllJobs] = useState<JobWithEmpresa[]>([])
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set())
+  const [appliedSlugs, setAppliedSlugs] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [sortBy, setSortBy] = useState<'recientes' | 'antiguos'>('recientes')
@@ -33,6 +37,28 @@ function EmpleosContent() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    let active = true
+    async function loadApplied() {
+      if (!profile || profile.role === 'empresa') {
+        if (active) {
+          setAppliedJobIds(new Set())
+          setAppliedSlugs(new Set())
+        }
+        return
+      }
+      const apps = await fetchApplicationsForCandidate(profile.id)
+      if (active) {
+        setAppliedJobIds(new Set(apps.map((a) => a.job_id).filter(Boolean)))
+        setAppliedSlugs(new Set(apps.map((a) => a.job?.slug).filter(Boolean) as string[]))
+      }
+    }
+    loadApplied()
+    return () => {
+      active = false
+    }
+  }, [profile?.id, profile?.role])
 
   // Sync URL search params
   const handleFilterChange = (newFilters: FilterState) => {
@@ -187,7 +213,11 @@ function EmpleosContent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {sortedJobs.map((job) => (
-                <JobCard key={job.id} job={job} />
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  isApplied={appliedJobIds.has(job.id) || appliedSlugs.has(job.slug)}
+                />
               ))}
             </div>
           )}

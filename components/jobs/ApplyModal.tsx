@@ -13,19 +13,30 @@ import {
   Lock,
   ArrowRight,
   Building2,
-  Check
+  Check,
+  Clock
 } from 'lucide-react'
-import { JobWithEmpresa } from '@/lib/supabase/database.types'
+import { JobWithEmpresa, ApplicationWithDetails, ApplicationEstado } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
-import { submitApplication, uploadCV } from '@/lib/data'
+import { submitApplication, uploadCV, fetchCandidateApplicationForJob } from '@/lib/data'
+import { Badge } from '@/components/ui/Badge'
+import { formatRelativeTime } from '@/lib/utils'
 
 interface ApplyModalProps {
   job: JobWithEmpresa
   isOpen: boolean
   onClose: () => void
+  existingApplication?: ApplicationWithDetails | null
+  onApplied?: (application: ApplicationWithDetails) => void
 }
 
-export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
+export function ApplyModal({
+  job,
+  isOpen,
+  onClose,
+  existingApplication,
+  onApplied,
+}: ApplyModalProps) {
   const { profile, updateProfile } = useAuth()
   const [nombre, setNombre] = useState(profile?.nombre || '')
   const [email, setEmail] = useState(profile?.email || '')
@@ -35,6 +46,9 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [detectedApplication, setDetectedApplication] = useState<ApplicationWithDetails | null>(null)
+
+  const activeExistingApp = existingApplication !== undefined ? existingApplication : detectedApplication
 
   useEffect(() => {
     if (isOpen) {
@@ -44,6 +58,23 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
       setMensaje('')
     }
   }, [isOpen, job.id])
+
+  useEffect(() => {
+    let active = true
+    async function checkAlreadyApplied() {
+      if (!isOpen || !profile || profile.role === 'empresa' || existingApplication !== undefined) {
+        return
+      }
+      const found = await fetchCandidateApplicationForJob(job.id, profile.id, job.slug)
+      if (active) {
+        setDetectedApplication(found)
+      }
+    }
+    checkAlreadyApplied()
+    return () => {
+      active = false
+    }
+  }, [isOpen, job.id, job.slug, profile, existingApplication])
 
   useEffect(() => {
     if (profile) {
@@ -117,7 +148,7 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
         }
       }
 
-      await submitApplication({
+      const createdApp = await submitApplication({
         job_id: job.id,
         job_titulo: job.titulo,
         job_slug: job.slug,
@@ -128,12 +159,25 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
         cv_url: currentCvUrl,
       })
 
+      setDetectedApplication(createdApp)
+      onApplied?.(createdApp)
       setIsSuccess(true)
     } catch (err: any) {
       setErrorMessage(err.message || 'Ocurrió un error al enviar tu postulación.')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const getStatusBadge = (estado: ApplicationEstado) => {
+    const map = {
+      pendiente: { variant: 'warning', label: 'Pendiente de Revisión' },
+      visto: { variant: 'primary', label: 'CV Visto por la Empresa' },
+      entrevista: { variant: 'success', label: 'Convocado a Entrevista' },
+      rechazado: { variant: 'danger', label: 'Proceso Finalizado' },
+    }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }
+
+    return <Badge variant={map.variant} size="sm">{map.label}</Badge>
   }
 
   const modalContent = (
@@ -224,6 +268,60 @@ export function ApplyModal({ job, isOpen, onClose }: ApplyModalProps) {
                 className="w-full py-3 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition-colors"
               >
                 Entendido
+              </button>
+            </div>
+          </div>
+        ) : activeExistingApp ? (
+          /* Candidato YA postulado a esta oferta */
+          <div className="p-8 text-center space-y-5">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+                Postulación Registrada
+              </span>
+              <h3 className="text-2xl font-extrabold text-slate-900">
+                Ya te postulaste a esta oferta
+              </h3>
+              <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto">
+                Ya enviaste tu currículum para <span className="font-semibold text-slate-800">{job.titulo}</span> en{' '}
+                <span className="font-semibold text-slate-800">{job.empresa?.nombre || 'la empresa'}</span>.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-left space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-500">Estado actual:</span>
+                {getStatusBadge(activeExistingApp.estado)}
+              </div>
+              <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+                <span>Fecha de envío:</span>
+                <span className="font-medium text-slate-700 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  {formatRelativeTime(activeExistingApp.created_at)}
+                </span>
+              </div>
+              {activeExistingApp.mensaje && (
+                <div className="pt-2 border-t border-slate-200/70 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-700 block mb-0.5">Tu mensaje adjunto:</span>
+                  <p className="italic line-clamp-3">"{activeExistingApp.mensaje}"</p>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2.5">
+              <Link
+                href="/candidato/postulaciones"
+                className="w-full py-3 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors text-center shadow-md shadow-indigo-100"
+              >
+                Ver Mis Postulaciones
+              </Link>
+              <button
+                onClick={onClose}
+                className="w-full py-2.5 px-6 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-colors"
+              >
+                Cerrar
               </button>
             </div>
           </div>

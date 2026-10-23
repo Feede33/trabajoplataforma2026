@@ -21,9 +21,10 @@ import {
   HeartPulse,
   GraduationCap
 } from 'lucide-react'
-import { fetchJobs } from '@/lib/data'
+import { fetchJobs, fetchApplicationsForCandidate } from '@/lib/data'
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { JobCard } from '@/components/jobs/JobCard'
+import { useAuth } from '@/lib/context/AuthContext'
 
 const KEYWORD_SUGGESTIONS = [
   'Chofer', 'Repartidor', 'Fletes', 'Logística', 'Almacén',
@@ -43,7 +44,10 @@ const LOCATION_SUGGESTIONS = [
 
 export default function HomePage() {
   const router = useRouter()
+  const { profile } = useAuth()
   const [jobs, setJobs] = useState<JobWithEmpresa[]>([])
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set())
+  const [appliedSlugs, setAppliedSlugs] = useState<Set<string>>(new Set())
   const [keyword, setKeyword] = useState('')
   const [location, setLocation] = useState('')
   const [loading, setLoading] = useState(true)
@@ -83,6 +87,28 @@ export default function HomePage() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    let active = true
+    async function loadApplied() {
+      if (!profile || profile.role === 'empresa') {
+        if (active) {
+          setAppliedJobIds(new Set())
+          setAppliedSlugs(new Set())
+        }
+        return
+      }
+      const apps = await fetchApplicationsForCandidate(profile.id)
+      if (active) {
+        setAppliedJobIds(new Set(apps.map((a) => a.job_id).filter(Boolean)))
+        setAppliedSlugs(new Set(apps.map((a) => a.job?.slug).filter(Boolean) as string[]))
+      }
+    }
+    loadApplied()
+    return () => {
+      active = false
+    }
+  }, [profile?.id, profile?.role])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -296,7 +322,11 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.slice(0, 6).map((job) => (
-              <JobCard key={job.id} job={job} />
+              <JobCard
+                key={job.id}
+                job={job}
+                isApplied={appliedJobIds.has(job.id) || appliedSlugs.has(job.slug)}
+              />
             ))}
           </div>
         )}

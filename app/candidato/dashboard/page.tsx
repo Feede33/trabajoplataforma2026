@@ -248,7 +248,11 @@ export default function CandidatoDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {recommendedJobs.map((job) => (
-            <JobCard key={job.id} job={job} />
+            <JobCard
+              key={job.id}
+              job={job}
+              isApplied={applications.some((a) => a.job_id === job.id || a.job?.slug === job.slug)}
+            />
           ))}
         </div>
       </div>

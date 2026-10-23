@@ -294,7 +294,10 @@ export async function fetchApplicationsForCandidate(candidatoId: string): Promis
 
       if (!error && data) {
         const dbApps = data as unknown as ApplicationWithDetails[]
-        const merged = [...dbApps, ...custom.filter((c) => !dbApps.some((d) => d.id === c.id))]
+        const merged = [
+          ...dbApps,
+          ...custom.filter((c) => !dbApps.some((d) => d.id === c.id || d.job_id === c.job_id)),
+        ]
         return merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       }
     } catch (err) {
@@ -304,6 +307,44 @@ export async function fetchApplicationsForCandidate(candidatoId: string): Promis
 
   if (custom.length > 0) return custom
   return MOCK_APPLICATIONS.filter((a) => a.candidato_id === candidatoId)
+}
+
+export async function fetchCandidateApplicationForJob(
+  jobId: string,
+  candidatoId: string,
+  jobSlug?: string
+): Promise<ApplicationWithDetails | null> {
+  if (!jobId || !candidatoId) return null
+
+  const customMatch = getStoredApplications().find(
+    (a) =>
+      a.candidato_id === candidatoId &&
+      (a.job_id === jobId || (jobSlug && a.job?.slug === jobSlug))
+  )
+
+  if (isSupabaseConfigured() && isValidUUID(jobId) && isValidUUID(candidatoId)) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('applications')
+        .select(`
+          *,
+          job:jobs(titulo, slug),
+          candidato:profiles(nombre, email, cv_url, bio, ubicacion)
+        `)
+        .eq('job_id', jobId)
+        .eq('candidato_id', candidatoId)
+        .maybeSingle()
+
+      if (!error && data) {
+        return data as unknown as ApplicationWithDetails
+      }
+    } catch (err) {
+      console.warn('Supabase check existing application failed', err)
+    }
+  }
+
+  return customMatch || null
 }
 
 export async function uploadCV(file: File, userId: string): Promise<string> {

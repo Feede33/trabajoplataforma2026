@@ -1,6 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
-import { MapPin, Building2, Clock, Banknote, ArrowRight } from 'lucide-react'
+import { MapPin, Building2, Clock, Banknote, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
@@ -8,9 +8,10 @@ import { formatRelativeTime } from '@/lib/utils'
 interface JobCardProps {
   job: JobWithEmpresa
   featured?: boolean
+  isApplied?: boolean
 }
 
-export function JobCard({ job, featured = false }: JobCardProps) {
+export function JobCard({ job, featured = false, isApplied = false }: JobCardProps) {
   const modalidadVariant = {
     remoto: 'success',
     presencial: 'default',
@@ -74,6 +75,12 @@ export function JobCard({ job, featured = false }: JobCardProps) {
 
         {/* Badges: Rubro, Modalidad, Contrato */}
         <div className="flex flex-wrap items-center gap-2 mt-3">
+          {isApplied && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              Ya postulado
+            </span>
+          )}
           <Badge variant={modalidadVariant} size="sm">
             {modalidadLabel}
           </Badge>
@@ -123,9 +130,13 @@ export function JobCard({ job, featured = false }: JobCardProps) {
 
         <Link
           href={`/empleos/${job.slug}`}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700 group-hover:translate-x-0.5 transition-all shrink-0 whitespace-nowrap"
+          className={`inline-flex items-center gap-1 text-sm font-semibold group-hover:translate-x-0.5 transition-all shrink-0 whitespace-nowrap ${
+            isApplied
+              ? 'text-emerald-600 hover:text-emerald-700'
+              : 'text-indigo-600 hover:text-indigo-700'
+          }`}
         >
-          Ver puesto
+          {isApplied ? 'Ver mi postulación' : 'Ver puesto'}
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>

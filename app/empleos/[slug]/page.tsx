@@ -11,26 +11,30 @@ import {
   Globe,
   Share2,
   Check,
+  CheckCircle2,
   ChevronLeft,
   Briefcase,
   ShieldCheck,
   Sparkles
 } from 'lucide-react'
-import { fetchJobBySlug } from '@/lib/data'
-import { JobWithEmpresa } from '@/lib/supabase/database.types'
+import { fetchJobBySlug, fetchCandidateApplicationForJob } from '@/lib/data'
+import { JobWithEmpresa, ApplicationWithDetails } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
 import { ApplyModal } from '@/components/jobs/ApplyModal'
+import { useAuth } from '@/lib/context/AuthContext'
 
 export default function JobDetailPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
+  const { profile } = useAuth()
 
   const [job, setJob] = useState<JobWithEmpresa | null>(null)
   const [loading, setLoading] = useState(true)
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [existingApplication, setExistingApplication] = useState<ApplicationWithDetails | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -41,6 +45,24 @@ export default function JobDetailPage() {
     }
     load()
   }, [slug])
+
+  useEffect(() => {
+    let active = true
+    async function checkApplication() {
+      if (!job || !profile || profile.role === 'empresa') {
+        if (active) setExistingApplication(null)
+        return
+      }
+      const app = await fetchCandidateApplicationForJob(job.id, profile.id, job.slug)
+      if (active) {
+        setExistingApplication(app)
+      }
+    }
+    checkApplication()
+    return () => {
+      active = false
+    }
+  }, [job?.id, job?.slug, profile?.id, profile?.role])
 
   const handleShare = () => {
     if (typeof window !== 'undefined') {
@@ -176,13 +198,23 @@ export default function JobDetailPage() {
               )}
             </button>
 
-            <button
-              onClick={() => setIsApplyModalOpen(true)}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-indigo-200 hover:shadow-lg hover:scale-[1.02]"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Postularme Ahora</span>
-            </button>
+            {existingApplication ? (
+              <button
+                onClick={() => setIsApplyModalOpen(true)}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-sm transition-all shadow-sm"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Ya te postulaste • Ver estado</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsApplyModalOpen(true)}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-indigo-200 hover:shadow-lg hover:scale-[1.02]"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Postularme Ahora</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -258,12 +290,33 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            <button
-              onClick={() => setIsApplyModalOpen(true)}
-              className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-indigo-200"
-            >
-              Enviar Mi Postulación
-            </button>
+            {existingApplication ? (
+              <div className="space-y-2.5 pt-1">
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Ya estás postulado a esta vacante</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700 pl-5">
+                    Enviada {formatRelativeTime(existingApplication.created_at)} • Estado:{' '}
+                    <span className="font-semibold capitalize">{existingApplication.estado}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsApplyModalOpen(true)}
+                  className="w-full py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-all"
+                >
+                  Ver Detalle de Mi Postulación
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsApplyModalOpen(true)}
+                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-indigo-200"
+              >
+                Enviar Mi Postulación
+              </button>
+            )}
           </div>
 
           {/* Company Card */}
@@ -313,6 +366,8 @@ export default function JobDetailPage() {
         job={job}
         isOpen={isApplyModalOpen}
         onClose={() => setIsApplyModalOpen(false)}
+        existingApplication={existingApplication}
+        onApplied={(app) => setExistingApplication(app)}
       />
     </>
   )
