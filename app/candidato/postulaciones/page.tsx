@@ -135,12 +135,12 @@ export default function CandidatoPostulacionesPage() {
         </div>
 
         {/* Filter pills */}
-        <div className="flex items-center gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-200">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full scrollbar-none bg-white p-1.5 rounded-2xl border border-slate-200">
           {['todas', 'pendiente', 'visto', 'entrevista', 'rechazado'].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all shrink-0 ${
                 filter === status
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
