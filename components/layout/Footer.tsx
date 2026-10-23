@@ -1,5 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Briefcase, Heart, MapPin, Mail, ShieldCheck } from 'lucide-react'
 
 export function Footer() {
@@ -9,9 +10,15 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand & mission */}
           <div className="lg:col-span-2 space-y-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
-                <Briefcase className="w-5 h-5" />
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform border border-slate-800">
+                <Image
+                  src="/logo3.png"
+                  alt="PostulaUY"
+                  width={36}
+                  height={36}
+                  className="w-full h-full object-cover"
+                />
               </div>
               <span className="font-extrabold text-xl text-white tracking-tight flex items-center">
                 Postula<span className="text-indigo-400">UY</span><span className="text-xs text-indigo-300 font-bold ml-0.5">.com</span>

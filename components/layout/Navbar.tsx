@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/context/AuthContext'
 import { ModeToggle } from '@/components/mode-toggle'
@@ -44,8 +45,15 @@ export function Navbar() {
           {/* Logo */}
           <div className="flex-1 flex items-center justify-start gap-6">
             <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
-                <Briefcase className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-indigo-200/50 group-hover:scale-105 transition-transform border border-slate-200/60 dark:border-slate-800">
+                <Image
+                  src="/logo3.png"
+                  alt="PostulaUY"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-cover"
+                  priority
+                />
               </div>
               <div className="flex flex-col">
                 <span className="font-extrabold text-xl text-slate-900 tracking-tight flex items-center">
