@@ -18,6 +18,7 @@ import {
   Search,
   Sparkles,
   Wand2,
+  X,
   Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,22 @@ type ConversationRow = { id: string; title: string; updated_at: string }
 type Pending = { job_id: string; titulo: string; empresa: string | null; mensaje: string }
 
 type PendingEmail = { to: string; subject: string; body: string; attach_cv: boolean }
+type PendingProfile = { nombre?: string; bio?: string; ubicacion?: string }
+type AttachedFile = { name: string; mime: string; data: string }
+
+const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
+const MAX_FILES = 3
+const MAX_TOTAL_BYTES = 3 * 1024 * 1024
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result).split(',')[1] || '')
+    r.onerror = () => reject(new Error('No se pudo leer el archivo'))
+    r.readAsDataURL(file)
+  })
+}
+
 type GmailStatus = { configured: boolean; connected: boolean; email?: string | null }
 
 type Message = {
@@ -50,18 +67,34 @@ type Message = {
   email?: PendingEmail
   emailState?: 'idle' | 'sending' | 'done'
   needsGmail?: boolean
+  /** Nombres de archivos adjuntos por el usuario en este mensaje */
+  files?: string[]
+  /** Cambios de perfil/CV propuestos por la IA (editables) */
+  profile?: PendingProfile
+  profileState?: 'idle' | 'sending' | 'done'
 }
+
+type SendOptions = { autoApply: boolean; attachments: AttachedFile[]; includeCv: boolean; deepSearch: boolean }
 
 async function sendToAgent(
   history: Message[],
   token: string,
-  autoApply: boolean
-): Promise<{ reply: string; pending: Pending[]; email: PendingEmail | null; needsGmail: boolean }> {
+  opts: SendOptions
+): Promise<{
+  reply: string
+  pending: Pending[]
+  email: PendingEmail | null
+  needsGmail: boolean
+  profile: PendingProfile | null
+}> {
   const res = await fetch('/api/ai-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      autoApply,
+      autoApply: opts.autoApply,
+      attachments: opts.attachments,
+      includeCv: opts.includeCv,
+      deepSearch: opts.deepSearch,
       messages: history.map((m) => ({ role: m.role, content: m.content })),
     }),
   })
@@ -72,7 +105,18 @@ async function sendToAgent(
     pending: data.pending || [],
     email: data.pendingEmail || null,
     needsGmail: !!data.needsGmail,
+    profile: data.pendingProfile || null,
   }
+}
+
+async function saveProfile(profile: PendingProfile, token: string) {
+  const res = await fetch('/api/ai-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ confirmProfile: profile }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'No se pudo guardar el perfil')
 }
 
 async function gmailApi(token: string, method: 'POST' | 'DELETE', body?: object): Promise<GmailStatus & { url?: string }> {
@@ -113,14 +157,13 @@ const SUGGESTIONS = [
   { icon: Mail, label: 'Redactá un correo a una empresa' },
 ]
 
-// Opciones futuras del menú "+" (aún sin funcionalidad)
 const ATTACH_OPTIONS = [
-  { icon: Paperclip, label: 'Agregar fotos y archivos' },
-  { icon: FileText, label: 'Usar mi CV del perfil' },
-  { icon: Search, label: 'Búsqueda profunda de empleos' },
-  { icon: Wand2, label: 'Ajustar CV con IA' },
-  { icon: Mail, label: 'Postular por email (Gmail)' },
-]
+  { id: 'files', icon: Paperclip, label: 'Agregar fotos y archivos' },
+  { id: 'cv', icon: FileText, label: 'Usar mi CV del perfil' },
+  { id: 'deep', icon: Search, label: 'Búsqueda profunda de empleos' },
+  { id: 'cvfix', icon: Wand2, label: 'Ajustar CV con IA' },
+  { id: 'email', icon: Mail, label: 'Postular por email (Gmail)' },
+] as const
 
 export function AIChat() {
   const { profile, isLoading, getAccessToken } = useAuth()
@@ -133,6 +176,11 @@ export function AIChat() {
   const [convId, setConvId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<ConversationRow[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [attachments, setAttachments] = useState<AttachedFile[]>([])
+  const [includeCv, setIncludeCv] = useState(false)
+  const [deepSearch, setDeepSearch] = useState(false)
+  const [notice, setNotice] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [modelOpen, setModelOpen] = useState(false)
   const [modelId] = useState(MODELS[0].id)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -242,6 +290,81 @@ export function AIChat() {
     refreshConversations()
   }
 
+  async function onFilesPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    setNotice('')
+    const next = [...attachments]
+    let total = next.reduce((n, f) => n + Math.floor((f.data.length * 3) / 4), 0)
+    for (const f of picked) {
+      if (next.length >= MAX_FILES) {
+        setNotice(`Máximo ${MAX_FILES} archivos por mensaje.`)
+        break
+      }
+      if (!ALLOWED_FILE_TYPES.includes(f.type)) {
+        setNotice('Solo imágenes (PNG, JPG, WebP) o PDF.')
+        continue
+      }
+      if (total + f.size > MAX_TOTAL_BYTES) {
+        setNotice('Los archivos no pueden superar 3 MB en total.')
+        continue
+      }
+      try {
+        next.push({ name: f.name, mime: f.type, data: await fileToBase64(f) })
+        total += f.size
+      } catch {
+        setNotice('No se pudo leer un archivo.')
+      }
+    }
+    setAttachments(next)
+  }
+
+  function onMenuAction(id: (typeof ATTACH_OPTIONS)[number]['id']) {
+    setMenuOpen(false)
+    setNotice('')
+    if (id === 'files') fileInputRef.current?.click()
+    else if (id === 'cv') setIncludeCv((v) => !v)
+    else if (id === 'deep') setDeepSearch((v) => !v)
+    else if (id === 'cvfix') {
+      setIncludeCv(true)
+      if (!input.trim()) setInput('Revisá mi CV y proponeme una versión mejorada de mi perfil.')
+      textareaRef.current?.focus()
+    } else if (id === 'email') {
+      if (!gmail?.configured) {
+        setNotice('El envío por Gmail todavía no está habilitado en la plataforma.')
+      } else if (!gmail.connected) {
+        connectGmail()
+      } else {
+        setIncludeCv(true)
+        if (!input.trim()) setInput('Quiero postularme por email a: ')
+        textareaRef.current?.focus()
+      }
+    }
+  }
+
+  function editProfile(id: string, patch: Partial<PendingProfile>) {
+    setMessages((ms) => ms.map((m) => (m.id === id && m.profile ? { ...m, profile: { ...m.profile, ...patch } } : m)))
+  }
+
+  async function confirmProfileSave(msg: Message) {
+    if (!msg.profile) return
+    setMessages((ms) => ms.map((m) => (m.id === msg.id ? { ...m, profileState: 'sending' } : m)))
+    try {
+      const token = await getAccessToken()
+      if (!token) throw new Error('Tu sesión expiró.')
+      await saveProfile(msg.profile, token)
+      setMessages((ms) => [
+        ...ms.map((m) => (m.id === msg.id ? { ...m, profileState: 'done' as const } : m)),
+        { id: crypto.randomUUID(), role: 'assistant', content: 'Listo, actualicé tu perfil.' },
+      ])
+    } catch (e: any) {
+      setMessages((ms) => [
+        ...ms.map((m) => (m.id === msg.id ? { ...m, profileState: 'idle' as const } : m)),
+        { id: crypto.randomUUID(), role: 'assistant', content: e?.message || 'No se pudo guardar.' },
+      ])
+    }
+  }
+
   function toggleAuto() {
     setAutoApply((v) => {
       localStorage.setItem('ia-chat-auto', v ? '0' : '1')
@@ -285,16 +408,30 @@ export function AIChat() {
   }, [])
 
   async function send(text: string) {
-    const content = text.trim()
-    if (!content || loading) return
-    const next: Message[] = [...messages, { id: crypto.randomUUID(), role: 'user', content }]
+    const typed = text.trim()
+    if ((!typed && attachments.length === 0) || loading) return
+    const content = typed || 'Analizá el archivo adjunto.'
+    const sendOpts: SendOptions = { autoApply, attachments, includeCv, deepSearch }
+    const next: Message[] = [
+      ...messages,
+      {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content,
+        files: attachments.length ? attachments.map((a) => a.name) : undefined,
+      },
+    ]
     setMessages(next)
     setInput('')
+    setAttachments([])
+    setIncludeCv(false)
+    setDeepSearch(false)
+    setNotice('')
     setLoading(true)
     try {
       const token = await getAccessToken()
       if (!token) throw new Error('Tu sesión expiró. Volvé a iniciar sesión.')
-      const { reply, pending, email, needsGmail } = await sendToAgent(next, token, autoApply)
+      const { reply, pending, email, needsGmail, profile: proposed } = await sendToAgent(next, token, sendOpts)
       const withReply: Message[] = [
         ...next,
         {
@@ -306,6 +443,8 @@ export function AIChat() {
           email: email || undefined,
           emailState: 'idle',
           needsGmail,
+          profile: proposed || undefined,
+          profileState: 'idle',
         },
       ]
       setMessages(withReply)
@@ -388,6 +527,47 @@ export function AIChat() {
   const composer = (
     <div className="w-full max-w-3xl mx-auto">
       <div className="relative rounded-3xl border border-slate-200 bg-white shadow-sm focus-within:shadow-md focus-within:border-slate-300 transition-all">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/png,image/jpeg,image/webp,application/pdf"
+          className="hidden"
+          onChange={onFilesPicked}
+        />
+        {(attachments.length > 0 || includeCv || deepSearch) && (
+          <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+            {attachments.map((f, i) => (
+              <span key={f.name + i} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-slate-100 text-xs text-slate-700 max-w-[200px]">
+                <Paperclip className="w-3 h-3 shrink-0" />
+                <span className="truncate">{f.name}</span>
+                <button
+                  onClick={() => setAttachments((a) => a.filter((_, j) => j !== i))}
+                  aria-label="Quitar archivo"
+                  className="p-0.5 rounded-full hover:bg-slate-200"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            {includeCv && (
+              <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-sky-50 text-xs text-sky-700">
+                <FileText className="w-3 h-3" /> Mi CV
+                <button onClick={() => setIncludeCv(false)} aria-label="Quitar CV" className="p-0.5 rounded-full hover:bg-sky-100">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {deepSearch && (
+              <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-indigo-50 text-xs text-indigo-700">
+                <Search className="w-3 h-3" /> Búsqueda profunda
+                <button onClick={() => setDeepSearch(false)} aria-label="Quitar búsqueda profunda" className="p-0.5 rounded-full hover:bg-indigo-100">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           value={input}
@@ -414,23 +594,35 @@ export function AIChat() {
             </button>
             {menuOpen && (
               <div className="absolute bottom-11 left-0 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl py-1.5 z-20 animate-in fade-in slide-in-from-bottom-2">
-                {ATTACH_OPTIONS.map(({ icon: Icon, label }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      if (label.includes('Gmail') && gmail?.configured && !gmail.connected) connectGmail()
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left"
-                  >
-                    <Icon className="w-4 h-4 text-slate-400" />
-                    <span className="flex-1">{label}</span>
-                    <span className="text-[10px] text-slate-400">
-                      {label.includes('Gmail') ? (gmail?.connected ? 'Conectado' : gmail?.configured ? 'Conectar' : 'Pronto') : 'Pronto'}
-                    </span>
-                  </button>
-                ))}
+                {ATTACH_OPTIONS.map(({ id, icon: Icon, label }) => {
+                  const status =
+                    id === 'cv'
+                      ? includeCv
+                      : id === 'deep'
+                      ? deepSearch
+                      : false
+                  const tag =
+                    id === 'email'
+                      ? gmail?.connected
+                        ? 'Conectado'
+                        : gmail?.configured
+                        ? 'Conectar'
+                        : 'No disponible'
+                      : ''
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => onMenuAction(id)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left"
+                    >
+                      <Icon className="w-4 h-4 text-slate-400" />
+                      <span className="flex-1">{label}</span>
+                      {status && <Check className="w-4 h-4 text-emerald-500" />}
+                      {tag && <span className="text-[10px] text-slate-400">{tag}</span>}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -451,7 +643,7 @@ export function AIChat() {
           <button
             type="button"
             onClick={() => send(input)}
-            disabled={!input.trim() || loading}
+            disabled={(!input.trim() && attachments.length === 0) || loading}
             aria-label="Enviar"
             className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-900 text-white disabled:bg-slate-200 disabled:text-slate-400 hover:bg-slate-700 transition-colors"
           >
@@ -459,6 +651,7 @@ export function AIChat() {
           </button>
         </div>
       </div>
+      {notice && <p className="text-[11px] text-rose-500 text-center mt-2">{notice}</p>}
       {gmail?.configured && (
         <div className="flex justify-center mt-2">
           {gmail.connected ? (
@@ -617,6 +810,62 @@ export function AIChat() {
                     )}
                   >
                     {m.content}
+                    {m.files && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {m.files.map((n, i) => (
+                          <span key={n + i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 text-[11px]">
+                            <Paperclip className="w-3 h-3" /> {n}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {m.profile && (
+                      <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 space-y-2 whitespace-normal">
+                        <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                          <Wand2 className="w-3.5 h-3.5" /> Propuesta para tu perfil (podés editarla)
+                        </p>
+                        {m.profile.nombre !== undefined && (
+                          <input
+                            value={m.profile.nombre}
+                            onChange={(e) => editProfile(m.id, { nombre: e.target.value })}
+                            disabled={m.profileState !== 'idle'}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-slate-400"
+                            aria-label="Nombre"
+                          />
+                        )}
+                        {m.profile.ubicacion !== undefined && (
+                          <input
+                            value={m.profile.ubicacion}
+                            onChange={(e) => editProfile(m.id, { ubicacion: e.target.value })}
+                            disabled={m.profileState !== 'idle'}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-slate-400"
+                            aria-label="Ubicación"
+                          />
+                        )}
+                        {m.profile.bio !== undefined && (
+                          <textarea
+                            value={m.profile.bio}
+                            onChange={(e) => editProfile(m.id, { bio: e.target.value })}
+                            disabled={m.profileState !== 'idle'}
+                            rows={8}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-slate-400 resize-y"
+                            aria-label="Resumen profesional"
+                          />
+                        )}
+                        <button
+                          onClick={() => confirmProfileSave(m)}
+                          disabled={m.profileState !== 'idle'}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-60"
+                        >
+                          {m.profileState === 'sending' ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : m.profileState === 'done' ? (
+                            <Check className="w-3.5 h-3.5" />
+                          ) : null}
+                          {m.profileState === 'done' ? 'Guardado' : 'Guardar en mi perfil'}
+                        </button>
+                      </div>
+                    )}
                     {m.pending && (
                       <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 space-y-2 whitespace-normal">
                         <p className="text-xs font-semibold text-slate-500">Postulaciones listas para enviar</p>

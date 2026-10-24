@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server'
 import { isValidEmail } from '@/lib/server/google'
 import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/server/auth'
-import { applyToJobs, runAgent, sendConfirmedEmail, ChatTurn } from '@/lib/server/ai-agent'
+import {
+  ALLOWED_ATTACHMENT_MIMES,
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  Attachment,
+  applyToJobs,
+  runAgent,
+  sendConfirmedEmail,
+  ChatTurn,
+} from '@/lib/server/ai-agent'
 
 export const maxDuration = 60
 
@@ -40,6 +49,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ applied, skipped })
     }
 
+    // Confirmación explícita de cambios al perfil/CV propuestos por la IA
+    if (body.confirmProfile && typeof body.confirmProfile === 'object') {
+      const patch: Record<string, string> = {}
+      for (const k of ['nombre', 'bio', 'ubicacion']) {
+        const v = body.confirmProfile[k]
+        if (typeof v === 'string' && v.trim()) patch[k] = v.trim().slice(0, 4000)
+      }
+      if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'Sin cambios.' }, { status: 400 })
+      const { error } = await db.from('profiles').update(patch).eq('id', user.userId)
+      if (error) return NextResponse.json({ error: 'No se pudo guardar el perfil.' }, { status: 500 })
+      return NextResponse.json({ saved: Object.keys(patch) })
+    }
+
     // Confirmación explícita de UN correo: se envía exactamente lo que el usuario vio en pantalla.
     if (body.confirmEmail && typeof body.confirmEmail === 'object') {
       const e = body.confirmEmail
@@ -71,7 +93,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mensaje inválido.' }, { status: 400 })
     }
 
-    const result = await runAgent({ db, user, history, autoApply: body.autoApply === true })
+    // Adjuntos (imágenes/PDF) con validación estricta de tipo, cantidad y tamaño
+    const attachments: Attachment[] = []
+    if (Array.isArray(body.attachments)) {
+      let total = 0
+      for (const a of body.attachments.slice(0, MAX_ATTACHMENTS)) {
+        if (!a || typeof a.data !== 'string' || typeof a.mime !== 'string' || !ALLOWED_ATTACHMENT_MIMES.includes(a.mime)) {
+          return NextResponse.json({ error: 'Tipo de archivo no permitido. Usá imágenes (PNG, JPG, WebP) o PDF.' }, { status: 400 })
+        }
+        total += Math.floor((a.data.length * 3) / 4)
+        if (total > MAX_ATTACHMENT_BYTES) {
+          return NextResponse.json({ error: 'Los archivos superan el máximo de 3 MB en total.' }, { status: 413 })
+        }
+        attachments.push({
+          name: typeof a.name === 'string' ? a.name.slice(0, 120) : 'archivo',
+          mime: a.mime,
+          data: a.data,
+        })
+      }
+    }
+
+    const result = await runAgent({
+      db,
+      user,
+      history,
+      autoApply: body.autoApply === true,
+      attachments,
+      includeCv: body.includeCv === true,
+      deepSearch: body.deepSearch === true,
+    })
     return NextResponse.json(result)
   } catch (err: any) {
     console.error('Error en /api/ai-chat:', err)

@@ -27,6 +27,23 @@ export interface PendingEmail {
   attach_cv: boolean
 }
 
+export interface PendingProfile {
+  nombre?: string
+  bio?: string
+  ubicacion?: string
+}
+
+export interface Attachment {
+  name: string
+  mime: string
+  /** base64 sin prefijo data: */
+  data: string
+}
+
+export const ALLOWED_ATTACHMENT_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
+export const MAX_ATTACHMENTS = 3
+export const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024 // total
+
 export interface ChatTurn {
   role: 'user' | 'assistant'
   content: string
@@ -38,6 +55,8 @@ export interface AgentResult {
   applied: { job_id: string; titulo: string }[]
   /** Correo propuesto, a la espera de que el usuario lo confirme (nunca se envía solo) */
   pendingEmail: PendingEmail | null
+  /** Cambios al perfil/CV propuestos por la IA (se guardan solo si el usuario confirma) */
+  pendingProfile: PendingProfile | null
   /** La IA necesitó Gmail pero el usuario no lo tiene conectado */
   needsGmail: boolean
   /** Se actualizó el perfil (bio/ubicación/nombre) */
@@ -75,14 +94,14 @@ const TOOLS = [
     },
   },
   {
-    name: 'update_my_profile',
+    name: 'propose_profile_update',
     description:
-      'Actualiza el perfil/currículum del candidato. Usar solo si el usuario pidió explícitamente ajustar o mejorar su CV/perfil. Enviar solo los campos a cambiar.',
+      'Propone una versión mejorada del perfil/CV del candidato (resumen profesional, ubicación, nombre). NO guarda nada: el usuario ve una vista previa editable y decide si la guarda. Enviar solo los campos a cambiar; bio debe ser el texto final completo.',
     parameters: {
       type: 'OBJECT',
       properties: {
         nombre: { type: 'STRING' },
-        bio: { type: 'STRING', description: 'Resumen profesional / experiencia (reemplaza el actual).' },
+        bio: { type: 'STRING', description: 'Resumen profesional completo, listo para guardar (reemplaza el actual).' },
         ubicacion: { type: 'STRING' },
       },
     },
@@ -144,7 +163,15 @@ const TOOLS = [
   },
 ]
 
-function systemPrompt(): string {
+const DEEP_SEARCH_PROMPT = `
+
+MODO BÚSQUEDA PROFUNDA ACTIVADO:
+- Lee el perfil y el CV, y deduce los puestos objetivo y sinónimos (ej: "cajero" → "cajera", "atención al cliente", "ventas mostrador").
+- Haz VARIAS búsquedas (mínimo 3) con distintas palabras clave, zonas y rubros, tanto en empleos formales (search_jobs) como informales (search_informal_jobs); consulta también list_company_contacts si aplica. Usa limit alto (hasta 20).
+- Revisa list_my_applications para no repetir empleos a los que ya se postuló.
+- Entrega un ranking de los mejores 5-8 resultados, cada uno con una línea de por qué encaja con el CV, y ofrece postularse.`
+
+function systemPrompt(deep = false): string {
   const hoy = new Date().toLocaleDateString('es-UY', { timeZone: 'America/Montevideo', dateStyle: 'full' })
   return `Eres el asistente de IA de PostulaUY, una plataforma laboral de Uruguay. Hoy es ${hoy}.
 Ayudas al candidato a encontrar empleo y a postularse sin hacerlo una por una.
@@ -153,11 +180,12 @@ Reglas:
 - Responde siempre en español rioplatense, breve y claro. Usa listas cortas cuando enumeres empleos.
 - Usa las herramientas para obtener datos reales. NUNCA inventes empleos, empresas, ids ni contactos.
 - Para recomendar, primero lee el perfil (get_my_profile); si tiene CV adjunto, léelo también con read_my_cv. Luego busca empleos acordes. Explica en una línea por qué encaja cada uno.
-- Si el perfil/CV está vacío o es pobre, sugiere completarlo y ofrécete a redactarlo; solo llama a update_my_profile si el usuario lo pide o aprueba el texto.
+- Si el perfil/CV está vacío o es pobre, sugiere completarlo y ofrécete a redactarlo; si el usuario quiere ajustarlo o mejorarlo, redacta la versión y llama a propose_profile_update (el usuario la revisa y confirma; nunca digas que ya se guardó).
 - Para postular usa apply_to_jobs con los id exactos de search_jobs. Si el usuario dice "postulame a todos/5", usa los resultados más relevantes. No postules a empleos a los que ya se postuló (revisa list_my_applications si hay duda).
 - Los empleos informales no tienen postulación en la plataforma: da el contacto para que el usuario escriba.
 - Para postular por correo usa prepare_email (un solo correo por vez). Si el usuario no da un mensaje, usa uno por defecto del estilo: "Hola, estoy buscando una vacante en su empresa. Adjunto mi CV para que lo consideren. Quedo a disposición." Personalízalo con el puesto y el contexto de la conversación, y fírmalo con el nombre del perfil. Nunca digas que el correo fue enviado: queda pendiente de que el usuario lo confirme.
-- Después de apply_to_jobs, informa claramente si quedó pendiente de confirmación o si ya fue enviada.`
+- Después de apply_to_jobs, informa claramente si quedó pendiente de confirmación o si ya fue enviada.
+- Si el usuario adjunta archivos (imágenes o PDF), léelos y úsalos como contexto: puede ser un CV, un aviso de empleo o una captura.${deep ? DEEP_SEARCH_PROMPT : ''}`
 }
 
 type GeminiPart = Record<string, any>
@@ -206,7 +234,7 @@ async function extractCvText(pdf: Buffer): Promise<string> {
   throw lastError || new Error('No hay modelos de Gemini disponibles')
 }
 
-async function callGeminiChat(contents: GeminiContent[]): Promise<GeminiContent> {
+async function callGeminiChat(contents: GeminiContent[], deep = false): Promise<GeminiContent> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('Falta GEMINI_API_KEY en el servidor (.env.local)')
 
@@ -215,7 +243,7 @@ async function callGeminiChat(contents: GeminiContent[]): Promise<GeminiContent>
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
       const { statusCode, data } = await makeHttpsPost(url, {
-        systemInstruction: { parts: [{ text: systemPrompt() }] },
+        systemInstruction: { parts: [{ text: systemPrompt(deep) }] },
         tools: [{ functionDeclarations: TOOLS }],
         contents,
         generationConfig: { temperature: 0.4 },
@@ -343,13 +371,17 @@ export async function runAgent(opts: {
   user: AgentUser
   history: ChatTurn[]
   autoApply: boolean
+  attachments?: Attachment[]
+  includeCv?: boolean
+  deepSearch?: boolean
 }): Promise<AgentResult> {
-  const { db, user, history, autoApply } = opts
+  const { db, user, history, autoApply, attachments = [], includeCv = false, deepSearch = false } = opts
   const result: AgentResult = {
     reply: '',
     pending: [],
     applied: [],
     pendingEmail: null,
+    pendingProfile: null,
     needsGmail: false,
     profileUpdated: false,
   }
@@ -358,6 +390,22 @@ export async function runAgent(opts: {
     role: t.role === 'user' ? 'user' : 'model',
     parts: [{ text: t.content }],
   }))
+
+  // Archivos y CV del perfil se adjuntan solo al último mensaje del usuario
+  const last = contents[contents.length - 1]
+  for (const a of attachments) {
+    last.parts.push({ text: `[Archivo adjunto: ${a.name}]` }, { inlineData: { mimeType: a.mime, data: a.data } })
+  }
+  if (includeCv) {
+    const cv = await loadOwnCv(db, user.userId)
+    if ('error' in cv) {
+      last.parts.push({ text: `[Nota del sistema: no se pudo adjuntar el CV del perfil: ${cv.error}]` })
+    } else if (cv.ext !== 'pdf') {
+      last.parts.push({ text: '[Nota del sistema: el CV del perfil está en Word y no se puede leer; sugiere subir un PDF.]' })
+    } else {
+      last.parts.push({ text: '[CV del perfil del usuario, adjunto a continuación]' }, { inlineData: { mimeType: 'application/pdf', data: cv.buf.toString('base64') } })
+    }
+  }
 
   async function execTool(name: string, args: Record<string, any>): Promise<unknown> {
     switch (name) {
@@ -399,16 +447,17 @@ export async function runAgent(opts: {
           nota: 'Aún NO se envió. El usuario verá el correo y un botón para enviarlo. Pídele que lo revise y confirme.',
         }
       }
-      case 'update_my_profile': {
-        const patch: Record<string, string> = {}
-        for (const k of ['nombre', 'bio', 'ubicacion']) {
+      case 'propose_profile_update': {
+        const patch: PendingProfile = {}
+        for (const k of ['nombre', 'bio', 'ubicacion'] as const) {
           if (typeof args[k] === 'string' && args[k].trim()) patch[k] = args[k].trim().slice(0, 4000)
         }
-        if (Object.keys(patch).length === 0) return { error: 'No hay campos para actualizar' }
-        const { error } = await db.from('profiles').update(patch).eq('id', user.userId)
-        if (error) return { error: 'No se pudo actualizar el perfil' }
-        result.profileUpdated = true
-        return { ok: true, actualizado: Object.keys(patch) }
+        if (Object.keys(patch).length === 0) return { error: 'No hay cambios para proponer' }
+        result.pendingProfile = patch
+        return {
+          estado: 'PENDIENTE_DE_CONFIRMACION',
+          nota: 'Aún NO se guardó. El usuario verá la propuesta y un botón para guardarla en su perfil.',
+        }
       }
       case 'search_jobs': {
         const { data } = await db
@@ -514,8 +563,9 @@ export async function runAgent(opts: {
     }
   }
 
-  for (let step = 0; step < MAX_STEPS; step++) {
-    const modelContent = await callGeminiChat(contents)
+  const maxSteps = deepSearch ? 12 : MAX_STEPS
+  for (let step = 0; step < maxSteps; step++) {
+    const modelContent = await callGeminiChat(contents, deepSearch)
     contents.push(modelContent)
 
     const calls = modelContent.parts.filter((p) => p.functionCall)
