@@ -30,6 +30,7 @@ import { useAuth } from '@/lib/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { BillingStatus, fetchBillingStatus } from '@/lib/billing-client'
 import { Switch } from '@/components/ui/switch'
+import { GlassContainer } from '@/components/ui/glass-container'
 import { ChatMarkdown } from './ChatMarkdown'
 
 // Modelos disponibles. Solo el gratuito está activo; el resto se habilitará con los planes.
@@ -538,7 +539,7 @@ export function AIChat() {
   const [editingProfileIds, setEditingProfileIds] = useState<Record<string, boolean>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [modelOpen, setModelOpen] = useState(false)
-  const [modelId] = useState(MODELS[0].id)
+  const [modelId, setModelId] = useState(MODELS[0].id)
   const scrollRef = useRef<HTMLDivElement>(null)
   const modelMenuRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -1538,50 +1539,68 @@ export function AIChat() {
             )}
           </div>
 
-          {/* Selector de modelos con efecto Glassy (vidrio líquido con bisel especular y refracción) */}
+          {/* Selector de modelos con efecto Glassy (GlassContainer) */}
           <div className="relative" ref={modelMenuRef}>
-            <button
-              type="button"
+            <GlassContainer
+              blur={3}
+              variant="prominent"
+              tint="warm"
               onClick={() => setModelOpen((o) => !o)}
-              className="group relative flex items-center gap-2 px-4 py-1.5 rounded-full text-[14px] sm:text-[15px] font-medium text-slate-900 dark:text-white transition-all duration-300 overflow-hidden select-none bg-white/60 dark:bg-white/[0.08] backdrop-blur-xl backdrop-saturate-150 border border-white/80 dark:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),inset_0_-1px_1px_rgba(0,0,0,0.1),0_4px_16px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-1px_1px_rgba(0,0,0,0.4),0_6px_20px_rgba(0,0,0,0.35)] hover:bg-white/75 dark:hover:bg-white/[0.14] hover:border-white dark:hover:border-white/30 active:scale-[0.98]"
+              className="!rounded-full !px-4 !py-1.5 text-[14px] sm:text-[15px] font-medium transition-all duration-300 select-none flex items-center justify-center cursor-pointer shadow-md active:scale-[0.98]"
             >
-              {/* Reflejo de cristal curvado (lente de vidrio) */}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/40 via-white/10 to-transparent dark:from-white/25 dark:via-transparent dark:to-transparent opacity-80 group-hover:opacity-100 transition-opacity"
-              />
-              <span className="relative z-10 flex items-center gap-2">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-google-sans">
                 <Sparkles className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 shrink-0" />
                 <span className="tracking-tight">{MODELS.find((m) => m.id === modelId)?.name}</span>
-                <ChevronDown className={cn('w-3.5 h-3.5 text-slate-500 dark:text-white/80 transition-transform duration-200', modelOpen && 'rotate-180')} />
-              </span>
-            </button>
+                <ChevronDown
+                  className={cn(
+                    'w-3.5 h-3.5 text-slate-500 dark:text-white/80 transition-transform duration-200',
+                    modelOpen && 'rotate-180'
+                  )}
+                />
+              </div>
+            </GlassContainer>
+
             {modelOpen && (
-              <div className="absolute top-11 left-1/2 -translate-x-1/2 w-72 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl overflow-hidden z-30 animate-in fade-in slide-in-from-top-2">
-                {MODELS.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    disabled={!m.available}
-                    onClick={() => setModelOpen(false)}
-                    className={cn(
-                      'w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors',
-                      m.available ? 'hover:bg-slate-50 dark:hover:bg-slate-800' : 'opacity-60 cursor-not-allowed'
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{m.name}</p>
-                      <p className="text-xs text-slate-400">{m.description}</p>
-                    </div>
-                    {m.id === modelId ? (
-                      <Check className="w-4 h-4 text-slate-700 dark:text-slate-200 mt-0.5" />
-                    ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold mt-0.5">
-                        {m.badge}
-                      </span>
-                    )}
-                  </button>
-                ))}
+              <div className="absolute top-11 left-1/2 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-top-2">
+                <GlassContainer
+                  blur={16}
+                  variant="prominent"
+                  tint="warm"
+                  hover={false}
+                  className="!p-1.5 !rounded-2xl w-72 shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden font-google-sans bg-white/70 dark:bg-slate-900/80"
+                >
+                  {MODELS.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      disabled={!m.available}
+                      onClick={() => {
+                        if (m.available) {
+                          setModelId(m.id)
+                          setModelOpen(false)
+                        }
+                      }}
+                      className={cn(
+                        'w-full flex items-start gap-3 px-3.5 py-2.5 rounded-xl text-left transition-colors',
+                        m.available
+                          ? 'hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer'
+                          : 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{m.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{m.description}</p>
+                      </div>
+                      {m.id === modelId ? (
+                        <Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-white/10 text-slate-700 dark:text-slate-300 font-semibold mt-0.5 shrink-0">
+                          {m.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </GlassContainer>
               </div>
             )}
           </div>
@@ -1706,7 +1725,7 @@ export function AIChat() {
                           {m.content &&
                             m.content !== DEFAULT_ATTACHMENT_PROMPT &&
                             m.content !== 'Analizá el archivo adjunto.' && (
-                            <div className="bg-slate-900 dark:bg-indigo-600 text-white rounded-3xl rounded-br-lg px-4 py-2.5 shadow-xs whitespace-pre-wrap text-sm leading-relaxed">
+                            <div className="bg-slate-900 dark:bg-[#282a2c] text-white rounded-3xl rounded-br-lg px-4 py-2.5 shadow-xs whitespace-pre-wrap text-sm leading-relaxed border border-transparent dark:border-white/5">
                               {m.content}
                             </div>
                           )}
