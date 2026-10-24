@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Copy,
   Download,
   ExternalLink,
   Eye,
@@ -328,7 +329,7 @@ function generateCvPdfBlobUrl(data: {
   return URL.createObjectURL(blob)
 }
 
-type GmailStatus = { configured: boolean; connected: boolean; email?: string | null }
+type GmailStatus = { configured: boolean; connected: boolean; email?: string | null; comingSoon?: boolean; message?: string }
 
 type Message = {
   id: string
@@ -465,7 +466,7 @@ const SUGGESTIONS = [
   { icon: Search, label: '¿Qué empleos hay hoy para mi perfil?' },
   { icon: FileText, label: 'Ajustá mi CV para una vacante' },
   { icon: Briefcase, label: 'Postulate a 5 empleos por mí' },
-  { icon: MailIcon, label: 'Redactá una postulación por Gmail' },
+  { icon: MailIcon, label: 'Redactá una postulación por email' },
 ]
 
 const ATTACH_OPTIONS = [
@@ -754,10 +755,17 @@ export function AIChat() {
   }, [profile?.id])
 
   async function connectGmail() {
+    if (!isAdmin) {
+      setNotice('La función de postular por Gmail estará disponible muy pronto (en proceso de verificación con Google).')
+      return
+    }
     const token = await getAccessToken()
     if (!token) return
     const st = await gmailApi(token, 'POST', { reconnect: true })
     if (st.url) window.location.href = st.url
+    else if (st.comingSoon) {
+      setNotice(st.message || 'La función de Gmail estará disponible muy pronto.')
+    }
   }
 
   async function disconnectGmail() {
@@ -923,6 +931,10 @@ export function AIChat() {
       if (!input.trim()) setInput('Revisá mi CV y proponeme una versión mejorada de mi perfil.')
       textareaRef.current?.focus()
     } else if (id === 'email') {
+      if (!isAdmin) {
+        setNotice('La función de postular por Gmail estará disponible muy pronto (en proceso de verificación con Google).')
+        return
+      }
       if (!gmail?.configured) {
         setNotice('El envío por Gmail todavía no está habilitado en la plataforma.')
       } else if (!gmail.connected) {
@@ -1337,7 +1349,11 @@ export function AIChat() {
                       </span>
                       <span className="flex-1 truncate leading-none pt-0.5">{label}</span>
                       {id === 'email' ? (
-                        gmail?.connected ? (
+                        !isAdmin ? (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0 leading-none">
+                            Próximamente
+                          </span>
+                        ) : gmail?.connected ? (
                           <span className="w-5 h-5 shrink-0 flex items-center justify-center">
                             <Check className="w-4 h-4 text-emerald-500 shrink-0" />
                           </span>
@@ -2237,32 +2253,58 @@ export function AIChat() {
                               </label>
                             )}
 
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => sendEmail(m)}
-                                disabled={m.emailState !== 'idle'}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-60 transition-colors"
-                              >
-                                {m.emailState === 'sending' ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : m.emailState === 'done' ? (
-                                  <Check className="w-3.5 h-3.5" />
-                                ) : null}
-                                {m.emailState === 'done' ? 'Correo enviado' : 'Confirmar y enviar correo'}
-                              </button>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              {isAdmin ? (
+                                <button
+                                  type="button"
+                                  onClick={() => sendEmail(m)}
+                                  disabled={m.emailState !== 'idle'}
+                                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-60 transition-colors cursor-pointer"
+                                >
+                                  {m.emailState === 'sending' ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : m.emailState === 'done' ? (
+                                    <Check className="w-3.5 h-3.5" />
+                                  ) : null}
+                                  {m.emailState === 'done' ? 'Correo enviado' : 'Confirmar y enviar correo'}
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const text = `Para: ${m.email?.to}\nAsunto: ${m.email?.subject}\n\n${m.email?.body}`
+                                      navigator.clipboard?.writeText(text)
+                                      setNotice('¡Texto del correo copiado al portapapeles!')
+                                    }}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" /> Copiar correo
+                                  </button>
+                                  <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                                    Envío en 1 clic: Próximamente
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         )}
 
-                        {m.needsGmail && gmail?.configured && !gmail.connected && (
-                          <button
-                            type="button"
-                            onClick={connectGmail}
-                            className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                          >
-                            <MailIcon className="w-3.5 h-3.5" /> Conectar Gmail
-                          </button>
+                        {m.needsGmail && (
+                          isAdmin && gmail?.configured && !gmail.connected ? (
+                            <button
+                              type="button"
+                              onClick={connectGmail}
+                              className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                            >
+                              <MailIcon className="w-3.5 h-3.5" /> Conectar Gmail
+                            </button>
+                          ) : !isAdmin ? (
+                            <div className="mt-3 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
+                              <MailIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <span>La postulación directa con Gmail estará disponible muy pronto (verificación en curso con Google).</span>
+                            </div>
+                          ) : null
                         )}
                       </div>
                     )}

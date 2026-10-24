@@ -21,6 +21,7 @@ import { cleanChatText } from '@/lib/chat-format'
 export interface AgentUser {
   userId: string
   email: string | null
+  isAdmin?: boolean
 }
 
 export interface PendingApplication {
@@ -221,8 +222,19 @@ MODO BÚSQUEDA PROFUNDA ACTIVADO:
 - Revisa list_my_applications para no repetir empleos a los que ya se postuló.
 - Entrega un ranking de los mejores 5-8 resultados, cada uno con una línea de por qué encaja con el CV, y ofrece postularse.`
 
-function systemPrompt(deep = false): string {
+function systemPrompt(deep = false, isAdmin = true): string {
   const hoy = new Date().toLocaleDateString('es-UY', { timeZone: 'America/Montevideo', dateStyle: 'full' })
+  const gmailInstructions = isAdmin
+    ? `- POSTULACIONES Y BORRADORES POR GMAIL:
+  * Para enviar una postulación por correo usa prepare_email (el usuario lo revisa en pantalla y pulsa "Enviar correo"). Personaliza el mensaje con el puesto y contexto, y fírmalo con el nombre del candidato.
+  * Si el usuario quiere redactar un correo y dejarlo guardado en su cuenta de Gmail para revisarlo o enviarlo más tarde, usa create_gmail_draft.
+  * Para ver qué borradores tiene pendientes usa list_gmail_drafts.
+  * Por privacidad y seguridad del usuario, la IA solo redacta borradores y envía postulaciones autorizadas por él; NO lee su bandeja de entrada ni correos personales recibidos (si el usuario te pide revisar si le respondieron o leer su correo recibido, explícale amablemente que por privacidad de Google solo gestionas envíos y borradores).
+  * Si el usuario aún no tiene Gmail conectado, indícale amablemente que use el botón "Conectar Gmail".`
+    : `- POSTULACIONES Y CORREOS:
+  * La integración directa de envío en 1 clic y borradores con Gmail está actualmente en proceso de verificación oficial con Google (24h aprox.) y estará disponible muy pronto para todos los usuarios.
+  * Si el usuario te pide postularse por correo o redactar un email a una empresa, redacta amablemente el correo completo en tu respuesta (destinatario, asunto y cuerpo) para que el candidato pueda copiarlo y enviarlo directamente desde su casilla personal. NO uses herramientas de Gmail (prepare_email o create_gmail_draft), e infórmale con amabilidad que la función de postular directo por Gmail estará disponible en breve.`
+
   return `Eres el asistente de IA de PostulaUY, una plataforma laboral de Uruguay. Hoy es ${hoy}.
 Ayudas al candidato a encontrar empleo y a postularse sin hacerlo una por una.
 
@@ -245,12 +257,7 @@ Reglas:
 - Si el perfil/CV está vacío o es pobre, sugiere completarlo y ofrécete a redactarlo; si el usuario quiere ajustarlo o mejorarlo, redacta la versión y llama a propose_profile_update (el usuario la revisa y confirma; nunca digas que ya se guardó).
 - Para postular usa apply_to_jobs con los id exactos de search_jobs. Si el usuario dice "postulame a todos/5", usa los resultados más relevantes. No postules a empleos a los que ya se postuló (revisa list_my_applications si hay duda).
 - Los empleos informales no tienen postulación en la plataforma: da el contacto para que el usuario escriba.
-- POSTULACIONES Y BORRADORES POR GMAIL:
-  * Para enviar una postulación por correo usa prepare_email (el usuario lo revisa en pantalla y pulsa "Enviar correo"). Personaliza el mensaje con el puesto y contexto, y fírmalo con el nombre del candidato.
-  * Si el usuario quiere redactar un correo y dejarlo guardado en su cuenta de Gmail para revisarlo o enviarlo más tarde, usa create_gmail_draft.
-  * Para ver qué borradores tiene pendientes usa list_gmail_drafts.
-  * Por privacidad y seguridad del usuario, la IA solo redacta borradores y envía postulaciones autorizadas por él; NO lee su bandeja de entrada ni correos personales recibidos (si el usuario te pide revisar si le respondieron o leer su correo recibido, explícale amablemente que por privacidad de Google solo gestionas envíos y borradores).
-  * Si el usuario aún no tiene Gmail conectado, indícale amablemente que use el botón "Conectar Gmail".
+${gmailInstructions}
 - Después de apply_to_jobs, informa claramente si quedó pendiente de confirmación o si ya fue enviada.
 - Si el usuario adjunta archivos (imágenes o PDF):
   * Examina inmediatamente la imagen o documento.
@@ -305,7 +312,7 @@ async function extractCvText(pdf: Buffer): Promise<string> {
   throw lastError || new Error('No hay modelos de Gemini disponibles')
 }
 
-async function callGeminiChat(contents: GeminiContent[], deep = false): Promise<GeminiContent> {
+async function callGeminiChat(contents: GeminiContent[], deep = false, isAdmin = true): Promise<GeminiContent> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('Falta GEMINI_API_KEY en el servidor (.env.local)')
 
@@ -314,7 +321,7 @@ async function callGeminiChat(contents: GeminiContent[], deep = false): Promise<
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
       const { statusCode, data } = await makeHttpsPost(url, {
-        systemInstruction: { parts: [{ text: systemPrompt(deep) }] },
+        systemInstruction: { parts: [{ text: systemPrompt(deep, isAdmin) }] },
         tools: [{ functionDeclarations: TOOLS }],
         contents,
         generationConfig: { temperature: 0.4 },
@@ -500,6 +507,11 @@ export async function runAgent(opts: {
         return { contenido_cv: await extractCvText(cv.buf) }
       }
       case 'prepare_email': {
+        if (!user.isAdmin) {
+          return {
+            error: 'La función de postular por Gmail estará disponible muy pronto para todos los usuarios (en proceso de verificación con Google). Por favor redacta el correo completo directamente en tu respuesta para que el candidato pueda copiarlo y enviarlo desde su correo.',
+          }
+        }
         if (!isGoogleConfigured()) return { error: 'El envío por Gmail no está configurado en la plataforma.' }
         if (!isValidEmail(args.to)) return { error: 'La dirección de correo no es válida.' }
         if (typeof args.subject !== 'string' || typeof args.body !== 'string' || !args.subject.trim() || !args.body.trim()) {
@@ -524,6 +536,11 @@ export async function runAgent(opts: {
         }
       }
       case 'create_gmail_draft': {
+        if (!user.isAdmin) {
+          return {
+            error: 'La función de crear borradores en Gmail estará disponible muy pronto para todos los usuarios (en proceso de verificación con Google). Redacta el correo completo en tu respuesta para que el usuario pueda copiarlo.',
+          }
+        }
         if (!isGoogleConfigured()) return { error: 'El servicio de Gmail no está configurado.' }
         if (!isValidEmail(args.to)) return { error: 'Dirección de correo destino inválida.' }
         if (!args.subject || !args.body) return { error: 'Faltan asunto o cuerpo del correo.' }
@@ -562,6 +579,11 @@ export async function runAgent(opts: {
         }
       }
       case 'list_gmail_drafts': {
+        if (!user.isAdmin) {
+          return {
+            error: 'La función de listar borradores de Gmail estará disponible muy pronto (en proceso de verificación con Google).',
+          }
+        }
         if (!isGoogleConfigured()) return { error: 'El servicio de Gmail no está configurado.' }
         const conn = await getGmailConnection(db, user.userId)
         if (!conn) {
@@ -734,7 +756,7 @@ export async function runAgent(opts: {
       const maxSteps = deepSearch ? 10 : MAX_STEPS
       for (let step = 0; step < maxSteps; step++) {
         const res = await callClaudeChat({
-          system: systemPrompt(deepSearch),
+          system: systemPrompt(deepSearch, user.isAdmin ?? false),
           messages: claudeMessages,
           tools: claudeTools,
           model: specificModel,
@@ -789,7 +811,7 @@ export async function runAgent(opts: {
 
       const openAiTools = formatToolsForOpenAi(TOOLS)
       const openAiMessages: any[] = [
-        { role: 'system', content: systemPrompt(deepSearch) },
+        { role: 'system', content: systemPrompt(deepSearch, user.isAdmin ?? false) },
         ...history.map((t, idx) => {
           if (idx === history.length - 1 && t.role === 'user' && attachments.length > 0) {
             const parts: any[] = [{ type: 'text', text: t.content }]
@@ -859,7 +881,7 @@ export async function runAgent(opts: {
   // 3. Motor Base Google Gemini (Gratuito por defecto)
   const maxSteps = deepSearch ? 12 : MAX_STEPS
   for (let step = 0; step < maxSteps; step++) {
-    const modelContent = await callGeminiChat(contents, deepSearch)
+    const modelContent = await callGeminiChat(contents, deepSearch, user.isAdmin ?? false)
     contents.push(modelContent)
 
     const calls = modelContent.parts.filter((p) => p.functionCall)

@@ -13,6 +13,18 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}))
+
+  // Mientras la aplicación de Google OAuth está en proceso de verificación (24h aprox.),
+  // solo los administradores pueden autorizar y usar la integración con Gmail.
+  if (!ctx.isAdmin) {
+    return NextResponse.json({
+      configured: false,
+      connected: false,
+      comingSoon: true,
+      message: 'La función de postular por Gmail estará disponible muy pronto (en proceso de verificación oficial con Google).',
+    })
+  }
+
   const conn = await getGmailConnection(db, ctx.userId)
 
   if (conn && !body.reconnect) {

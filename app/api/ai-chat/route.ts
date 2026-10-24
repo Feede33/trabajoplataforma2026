@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const user = { userId: ctx.userId, email: ctx.email }
+    const user = { userId: ctx.userId, email: ctx.email, isAdmin: ctx.isAdmin }
 
     // Confirmación explícita del usuario: se aplican las postulaciones propuestas sin pasar por el modelo.
     if (Array.isArray(body.confirm) && body.confirm.length > 0) {
@@ -68,6 +68,13 @@ export async function POST(request: Request) {
 
     // Confirmación explícita de UN correo: se envía exactamente lo que el usuario vio en pantalla.
     if (body.confirmEmail && typeof body.confirmEmail === 'object') {
+      if (!ctx.isAdmin) {
+        return NextResponse.json({
+          error: 'La función de postular por Gmail estará disponible muy pronto (en proceso de verificación oficial con Google).',
+          code: 'GMAIL_COMING_SOON',
+          comingSoon: true,
+        }, { status: 403 })
+      }
       const e = body.confirmEmail
       if (!isValidEmail(e.to) || typeof e.subject !== 'string' || typeof e.body !== 'string' || !e.subject.trim() || !e.body.trim()) {
         return NextResponse.json({ error: 'Correo inválido.' }, { status: 400 })

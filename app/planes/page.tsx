@@ -255,7 +255,7 @@ function PlanesContent() {
                 'Búsqueda inteligente de empleos formales e informales',
                 'Lectura y análisis de tu CV en formato PDF',
                 'Sugerencias para optimizar tu perfil profesional',
-                'Postulación en 1 clic y borrador de emails con Gmail',
+                'Postulación en 1 clic y borrador de emails con Gmail (Próximamente)',
               ])}
             </div>
 
