@@ -1196,30 +1196,17 @@ export function AIChat() {
       </div>
 
       {notice && <p className="text-xs text-rose-500 text-center mt-2">{notice}</p>}
-      {gmail?.configured && (
-        <div className="flex justify-center mt-2.5">
-          {gmail.connected ? (
-            <span className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <MailIcon className="w-3.5 h-3.5 text-emerald-500" />
-              Gmail conectado{gmail.email ? `: ${gmail.email}` : ''}
-              <button onClick={disconnectGmail} className="underline text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 ml-1">
-                Desconectar
-              </button>
-            </span>
-          ) : (
-            <button
-              onClick={connectGmail}
-              className="text-xs sm:text-[13px] flex items-center gap-1.5 text-sky-600 dark:text-sky-400 hover:text-sky-700 font-medium"
-            >
-              <MailIcon className="w-3.5 h-3.5" />
-              Conectar Gmail para enviar postulaciones por correo
+      {gmail?.configured && gmail.connected && (
+        <div className="flex justify-center mt-2">
+          <span className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <MailIcon className="w-3.5 h-3.5 text-emerald-500" />
+            Gmail conectado{gmail.email ? `: ${gmail.email}` : ''}
+            <button onClick={disconnectGmail} className="underline text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 ml-1">
+              Desconectar
             </button>
-          )}
+          </span>
         </div>
       )}
-      <p className="text-xs sm:text-[13px] text-slate-400 dark:text-slate-500 text-center mt-1.5">
-        La IA puede cometer errores. Revisá las postulaciones antes de enviarlas.
-      </p>
     </div>
   )
 
@@ -1551,16 +1538,23 @@ export function AIChat() {
             )}
           </div>
 
-          {/* Selector de modelos con background con blur y texto visible */}
+          {/* Selector de modelos con efecto Glassy (vidrio líquido con bisel especular y refracción) */}
           <div className="relative" ref={modelMenuRef}>
             <button
               type="button"
               onClick={() => setModelOpen((o) => !o)}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[15px] sm:text-base font-semibold text-slate-800 dark:text-white bg-white/40 dark:bg-white/5 backdrop-blur-md border border-slate-200/50 dark:border-white/10 shadow-xs hover:bg-slate-100/70 dark:hover:bg-white/15 transition-all"
+              className="group relative flex items-center gap-2 px-4 py-1.5 rounded-full text-[14px] sm:text-[15px] font-medium text-slate-900 dark:text-white transition-all duration-300 overflow-hidden select-none bg-white/60 dark:bg-white/[0.08] backdrop-blur-xl backdrop-saturate-150 border border-white/80 dark:border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),inset_0_-1px_1px_rgba(0,0,0,0.1),0_4px_16px_rgba(0,0,0,0.08)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-1px_1px_rgba(0,0,0,0.4),0_6px_20px_rgba(0,0,0,0.35)] hover:bg-white/75 dark:hover:bg-white/[0.14] hover:border-white dark:hover:border-white/30 active:scale-[0.98]"
             >
-              <Sparkles className="w-4 h-4 text-sky-500 shrink-0" />
-              <span>{MODELS.find((m) => m.id === modelId)?.name}</span>
-              <ChevronDown className={cn('w-4 h-4 text-slate-500 dark:text-slate-300 transition-transform', modelOpen && 'rotate-180')} />
+              {/* Reflejo de cristal curvado (lente de vidrio) */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/40 via-white/10 to-transparent dark:from-white/25 dark:via-transparent dark:to-transparent opacity-80 group-hover:opacity-100 transition-opacity"
+              />
+              <span className="relative z-10 flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 shrink-0" />
+                <span className="tracking-tight">{MODELS.find((m) => m.id === modelId)?.name}</span>
+                <ChevronDown className={cn('w-3.5 h-3.5 text-slate-500 dark:text-white/80 transition-transform duration-200', modelOpen && 'rotate-180')} />
+              </span>
             </button>
             {modelOpen && (
               <div className="absolute top-11 left-1/2 -translate-x-1/2 w-72 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl overflow-hidden z-30 animate-in fade-in slide-in-from-top-2">
