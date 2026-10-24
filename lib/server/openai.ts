@@ -10,7 +10,7 @@ export const OPENAI_MODELS = [
 
 export interface OpenAiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string | null
+  content: string | Array<Record<string, any>> | null
   tool_calls?: Array<{
     id: string
     type: 'function'

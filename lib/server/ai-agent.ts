@@ -53,8 +53,12 @@ export interface Attachment {
 }
 
 export const ALLOWED_ATTACHMENT_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
-export const MAX_ATTACHMENTS = 3
-export const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024 // total
+export const MAX_ATTACHMENTS = 4
+export const MAX_PHOTO_ATTACHMENTS = 3
+export const MAX_PDF_ATTACHMENTS = 2
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB por foto
+export const MAX_PDF_BYTES = 15 * 1024 * 1024 // 15 MB por PDF (la IA lo procesa adecuadamente)
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024 // 20 MB total
 
 export interface ChatTurn {
   role: 'user' | 'assistant'
@@ -709,9 +713,22 @@ export async function runAgent(opts: {
         content: t.content,
       }))
       const lastMsg = claudeMessages[claudeMessages.length - 1]
-      if (attachments.length > 0) {
-        const textAtts = attachments.map((a) => `[Archivo adjunto: ${a.name}]`).join('\n')
-        lastMsg.content = `${lastMsg.content}\n${textAtts}`
+      if (attachments.length > 0 && lastMsg) {
+        const blocks: any[] = [{ type: 'text', text: lastMsg.content }]
+        for (const a of attachments) {
+          if (a.mime.startsWith('image/')) {
+            blocks.push({
+              type: 'image',
+              source: { type: 'base64', media_type: a.mime, data: a.data },
+            })
+          } else if (a.mime === 'application/pdf') {
+            blocks.push({
+              type: 'document',
+              source: { type: 'base64', media_type: 'application/pdf', data: a.data },
+            })
+          }
+        }
+        lastMsg.content = blocks
       }
 
       const maxSteps = deepSearch ? 10 : MAX_STEPS
@@ -773,7 +790,26 @@ export async function runAgent(opts: {
       const openAiTools = formatToolsForOpenAi(TOOLS)
       const openAiMessages: any[] = [
         { role: 'system', content: systemPrompt(deepSearch) },
-        ...history.map((t) => ({ role: t.role as any, content: t.content })),
+        ...history.map((t, idx) => {
+          if (idx === history.length - 1 && t.role === 'user' && attachments.length > 0) {
+            const parts: any[] = [{ type: 'text', text: t.content }]
+            for (const a of attachments) {
+              if (a.mime.startsWith('image/')) {
+                parts.push({
+                  type: 'image_url',
+                  image_url: { url: `data:${a.mime};base64,${a.data}` },
+                })
+              } else {
+                parts.push({
+                  type: 'text',
+                  text: `[Archivo adjunto: ${a.name}]`,
+                })
+              }
+            }
+            return { role: 'user', content: parts }
+          }
+          return { role: t.role as any, content: t.content }
+        }),
       ]
 
       const maxSteps = deepSearch ? 10 : MAX_STEPS

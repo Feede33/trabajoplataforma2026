@@ -4,6 +4,10 @@ import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/s
 import {
   ALLOWED_ATTACHMENT_MIMES,
   MAX_ATTACHMENTS,
+  MAX_PHOTO_ATTACHMENTS,
+  MAX_PDF_ATTACHMENTS,
+  MAX_IMAGE_BYTES,
+  MAX_PDF_BYTES,
   MAX_ATTACHMENT_BYTES,
   Attachment,
   applyToJobs,
@@ -95,18 +99,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mensaje inválido.' }, { status: 400 })
     }
 
-    // Adjuntos (imágenes/PDF) con validación estricta de tipo, cantidad y tamaño
+    // Adjuntos (fotos/PDF) con validación estricta de tipo, cantidad y tamaño
     const attachments: Attachment[] = []
     if (Array.isArray(body.attachments)) {
+      if (body.attachments.length > MAX_ATTACHMENTS) {
+        return NextResponse.json({ error: `Podés adjuntar hasta ${MAX_ATTACHMENTS} archivos por mensaje.` }, { status: 400 })
+      }
       let total = 0
-      for (const a of body.attachments.slice(0, MAX_ATTACHMENTS)) {
+      let photoCount = 0
+      let pdfCount = 0
+
+      for (const a of body.attachments) {
         if (!a || typeof a.data !== 'string' || typeof a.mime !== 'string' || !ALLOWED_ATTACHMENT_MIMES.includes(a.mime)) {
-          return NextResponse.json({ error: 'Tipo de archivo no permitido. Usá imágenes (PNG, JPG, WebP) o PDF.' }, { status: 400 })
+          return NextResponse.json({ error: 'Tipo de archivo no permitido. Usá fotos (PNG, JPG, WebP) o documentos PDF.' }, { status: 400 })
         }
-        total += Math.floor((a.data.length * 3) / 4)
+
+        const isImage = a.mime.startsWith('image/')
+        const isPdf = a.mime === 'application/pdf'
+
+        if (isImage) {
+          photoCount++
+          if (photoCount > MAX_PHOTO_ATTACHMENTS) {
+            return NextResponse.json({ error: `Podés adjuntar un máximo de ${MAX_PHOTO_ATTACHMENTS} fotos por mensaje.` }, { status: 400 })
+          }
+        }
+        if (isPdf) {
+          pdfCount++
+          if (pdfCount > MAX_PDF_ATTACHMENTS) {
+            return NextResponse.json({ error: `Podés adjuntar un máximo de ${MAX_PDF_ATTACHMENTS} documentos PDF por mensaje.` }, { status: 400 })
+          }
+        }
+
+        const fileBytes = Math.floor((a.data.length * 3) / 4)
+        if (isImage && fileBytes > MAX_IMAGE_BYTES) {
+          return NextResponse.json({ error: `La foto "${a.name || 'archivo'}" supera el límite de 10 MB.` }, { status: 413 })
+        }
+        if (isPdf && fileBytes > MAX_PDF_BYTES) {
+          return NextResponse.json({ error: `El documento PDF "${a.name || 'archivo'}" supera el límite de 15 MB.` }, { status: 413 })
+        }
+
+        total += fileBytes
         if (total > MAX_ATTACHMENT_BYTES) {
-          return NextResponse.json({ error: 'Los archivos superan el máximo de 3 MB en total.' }, { status: 413 })
+          return NextResponse.json({ error: 'Los archivos adjuntos superan el máximo de 20 MB en total.' }, { status: 413 })
         }
+
         attachments.push({
           name: typeof a.name === 'string' ? a.name.slice(0, 120) : 'archivo',
           mime: a.mime,

@@ -100,8 +100,12 @@ type PendingProfile = { nombre?: string; bio?: string; ubicacion?: string }
 type AttachedFile = { name: string; mime: string; data: string }
 
 const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
-const MAX_FILES = 3
-const MAX_TOTAL_BYTES = 3 * 1024 * 1024
+const MAX_FILES = 4
+const MAX_PHOTOS = 3
+const MAX_PDFS = 2
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB por foto
+const MAX_PDF_BYTES = 15 * 1024 * 1024 // 15 MB por PDF (la IA lo maneja fluidamente)
+const MAX_TOTAL_BYTES = 20 * 1024 * 1024 // 20 MB total
 const DEFAULT_ATTACHMENT_PROMPT = 'Analizá la imagen o archivo que te adjunto y decime qué es o qué contiene.'
 
 function openAttachment(file: AttachedFile) {
@@ -130,6 +134,68 @@ function fileToBase64(file: File): Promise<string> {
     r.onerror = () => reject(new Error('No se pudo leer el archivo'))
     r.readAsDataURL(file)
   })
+}
+
+/**
+ * Optimiza fotos/imágenes grandes en el navegador para que suban al instante,
+ * manteniendo resolución óptima (hasta 2048px) y lectura nítida para la IA (OCR y visión multimodal).
+ */
+async function processImageAttachment(file: File): Promise<{ data: string; mime: string }> {
+  // Si no es imagen o pesa menos de 1 MB, se envía en su calidad original directamente
+  if (!file.type.startsWith('image/') || file.size <= 1024 * 1024) {
+    const data = await fileToBase64(file)
+    return { data, mime: file.type }
+  }
+
+  try {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => resolve(image)
+      image.onerror = reject
+      image.src = dataUrl
+    })
+
+    const MAX_DIM = 2048 // Máxima dimensión para detalle nítido sin sobrecargar tokens ni payload
+    let { width, height } = img
+
+    if (width > MAX_DIM || height > MAX_DIM) {
+      if (width > height) {
+        height = Math.round((height * MAX_DIM) / width)
+        width = MAX_DIM
+      } else {
+        width = Math.round((width * MAX_DIM) / height)
+        height = MAX_DIM
+      }
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas context not available')
+
+    ctx.drawImage(img, 0, 0, width, height)
+
+    const outMime = file.type === 'image/png' && file.size < 2.5 * 1024 * 1024 ? 'image/png' : 'image/jpeg'
+    const outDataUrl = canvas.toDataURL(outMime, 0.88)
+    const base64 = outDataUrl.split(',')[1] || ''
+
+    if (base64.length > 0 && Math.floor((base64.length * 3) / 4) < file.size) {
+      return { data: base64, mime: outMime }
+    }
+  } catch {
+    // Si no se puede procesar en canvas, fallback seguro al archivo original
+  }
+
+  const fallbackData = await fileToBase64(file)
+  return { data: fallbackData, mime: file.type }
 }
 
 /**
@@ -769,26 +835,78 @@ export function AIChat() {
     const picked = Array.from(e.target.files || [])
     e.target.value = ''
     setNotice('')
+    if (picked.length === 0) return
+
     const next = [...attachments]
+    let currentPhotos = next.filter((f) => f.mime.startsWith('image/')).length
+    let currentPdfs = next.filter((f) => f.mime === 'application/pdf').length
     let total = next.reduce((n, f) => n + Math.floor((f.data.length * 3) / 4), 0)
+
     for (const f of picked) {
+      if (!ALLOWED_FILE_TYPES.includes(f.type)) {
+        setNotice('Solo podés subir fotos (PNG, JPG, WebP) o documentos PDF.')
+        continue
+      }
+
+      const isImage = f.type.startsWith('image/')
+      const isPdf = f.type === 'application/pdf'
+
+      if (isImage) {
+        if (currentPhotos >= MAX_PHOTOS) {
+          setNotice(`Podés adjuntar hasta un máximo de ${MAX_PHOTOS} fotos por mensaje.`)
+          continue
+        }
+        if (f.size > MAX_IMAGE_BYTES) {
+          setNotice(`La foto "${f.name}" supera el límite de 10 MB.`)
+          continue
+        }
+      }
+
+      if (isPdf) {
+        if (currentPdfs >= MAX_PDFS) {
+          setNotice(`Podés adjuntar hasta un máximo de ${MAX_PDFS} documentos PDF por mensaje.`)
+          continue
+        }
+        if (f.size > MAX_PDF_BYTES) {
+          setNotice(`El documento PDF "${f.name}" supera el límite de 15 MB.`)
+          continue
+        }
+      }
+
       if (next.length >= MAX_FILES) {
-        setNotice(`Máximo ${MAX_FILES} archivos por mensaje.`)
+        setNotice(`Podés adjuntar hasta ${MAX_FILES} archivos en total por mensaje.`)
         break
       }
-      if (!ALLOWED_FILE_TYPES.includes(f.type)) {
-        setNotice('Solo imágenes (PNG, JPG, WebP) o PDF.')
-        continue
-      }
+
       if (total + f.size > MAX_TOTAL_BYTES) {
-        setNotice('Los archivos no pueden superar 3 MB en total.')
+        setNotice('Los archivos no pueden superar los 20 MB en total.')
         continue
       }
+
       try {
-        next.push({ name: f.name, mime: f.type, data: await fileToBase64(f) })
-        total += f.size
+        let fileData = ''
+        let fileMime = f.type
+
+        if (isImage) {
+          const processed = await processImageAttachment(f)
+          fileData = processed.data
+          fileMime = processed.mime
+        } else {
+          fileData = await fileToBase64(f)
+        }
+
+        const effectiveSize = Math.floor((fileData.length * 3) / 4)
+        if (total + effectiveSize > MAX_TOTAL_BYTES) {
+          setNotice('Los archivos no pueden superar los 20 MB en total.')
+          continue
+        }
+
+        next.push({ name: f.name, mime: fileMime, data: fileData })
+        total += effectiveSize
+        if (isImage) currentPhotos++
+        if (isPdf) currentPdfs++
       } catch {
-        setNotice('No se pudo leer un archivo.')
+        setNotice(`No se pudo leer el archivo "${f.name}".`)
       }
     }
     setAttachments(next)
