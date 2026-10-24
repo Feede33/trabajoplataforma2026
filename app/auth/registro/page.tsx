@@ -234,7 +234,11 @@ function RegistroContent() {
           </button>
 
           <p className="text-[11px] text-center text-slate-500 leading-relaxed">
-            Al continuar o registrarte, aceptás nuestra{' '}
+            Al continuar o registrarte, aceptás nuestros{' '}
+            <Link href="/terms-of-service" className="text-indigo-600 hover:underline font-medium">
+              Términos del Servicio
+            </Link>{' '}
+            y la{' '}
             <Link href="/privacy-policy" className="text-indigo-600 hover:underline font-medium">
               Política de Privacidad
             </Link>.

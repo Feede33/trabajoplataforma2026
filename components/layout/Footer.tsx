@@ -129,12 +129,16 @@ export function Footer() {
         {/* Bottom copyright */}
         <div className="border-t border-slate-800 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
           <p>© {new Date().getFullYear()} Postulauy.com. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/terms-of-service" className="hover:text-white transition-colors underline-offset-4 hover:underline">
+              Términos del Servicio
+            </Link>
+            <span className="text-slate-700">•</span>
             <Link href="/privacy-policy" className="hover:text-white transition-colors underline-offset-4 hover:underline">
               Política de Privacidad
             </Link>
             <span className="text-slate-700">•</span>
-            <span>Construido con Next.js 14 y Supabase</span>
+            <span>Uruguay</span>
           </div>
         </div>
       </div>
