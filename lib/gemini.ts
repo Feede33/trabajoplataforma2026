@@ -17,7 +17,7 @@ export interface ExtractedInformalJob {
   raw_text?: string | null
 }
 
-const CANDIDATE_MODELS = [
+export const CANDIDATE_MODELS = [
   'gemini-3.5-flash-lite',
   'gemini-3.8-flash',
   'gemini-3.5-flash',
@@ -65,7 +65,7 @@ Reglas adicionales:
 4. Responde ÚNICAMENTE con la estructura JSON, sin markdown adicional ni comentarios.
 `
 
-function makeHttpsPost(urlStr: string, payload: any): Promise<{ statusCode: number; data: any }> {
+export function makeHttpsPost(urlStr: string, payload: any): Promise<{ statusCode: number; data: any }> {
   return new Promise((resolve, reject) => {
     const url = new URL(urlStr)
     const postData = JSON.stringify(payload)
