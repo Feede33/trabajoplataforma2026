@@ -96,6 +96,18 @@ export function Navbar() {
             </Link>
 
             <Link
+              href="/ia-chat"
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                pathname === '/ia-chat'
+                  ? 'text-indigo-600 bg-indigo-50 font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-sky-500" />
+              IA Chat
+            </Link>
+
+            <Link
               href="/planes"
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 pathname === '/planes'
@@ -335,6 +347,15 @@ export function Navbar() {
               <span className="px-2 py-0.5 text-[10px] bg-amber-200 dark:bg-amber-500/25 text-amber-900 dark:text-amber-300 rounded-full font-bold">
                 WhatsApp
               </span>
+            </Link>
+
+            <Link
+              href="/ia-chat"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Sparkles className="w-4 h-4 text-sky-500" />
+              IA Chat
             </Link>
 
             <Link
