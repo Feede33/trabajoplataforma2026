@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Eye,
   FileText,
+  Inbox,
   Loader2,
   MoreHorizontal,
   PanelLeft,
@@ -398,7 +399,7 @@ const SUGGESTIONS = [
   { icon: Search, label: '¿Qué empleos hay hoy para mi perfil?' },
   { icon: FileText, label: 'Ajustá mi CV para una vacante' },
   { icon: Briefcase, label: 'Postulate a 5 empleos por mí' },
-  { icon: MailIcon, label: 'Redactá un correo a una empresa' },
+  { icon: MailIcon, label: 'Redactá una postulación por Gmail' },
 ]
 
 const ATTACH_OPTIONS = [
@@ -406,7 +407,7 @@ const ATTACH_OPTIONS = [
   { id: 'cv', icon: FileText, label: 'Usar mi CV del perfil' },
   { id: 'deep', icon: Search, label: 'Búsqueda profunda de empleos' },
   { id: 'cvfix', icon: Wand2, label: 'Ajustar CV con IA' },
-  { id: 'email', icon: MailIcon, label: 'Postular por Gmail solamente' },
+  { id: 'email', icon: MailIcon, label: 'Postular por Gmail' },
 ] as const
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect
@@ -668,7 +669,7 @@ export function AIChat() {
         if (flag === 'connected') {
           setGmailBanner({
             type: 'success',
-            text: 'Gmail conectado. Ya puedo prepararte correos de postulación; vos los revisás y confirmás antes de enviar.',
+            text: 'Gmail conectado. Ya puedo preparar postulaciones, redactar borradores y enviar correos por vos.',
           })
         } else if (flag === 'denied') {
           setGmailBanner({

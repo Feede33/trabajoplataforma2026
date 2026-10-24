@@ -270,9 +270,9 @@ export function Navbar() {
 
                     <div className="border-t border-slate-100 my-1 pt-1">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setDropdownOpen(false)
-                          logout()
+                          await logout()
                         }}
                         className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors text-left font-medium"
                       >
@@ -287,12 +287,14 @@ export function Navbar() {
               <div className="flex items-center gap-2.5">
                 <Link
                   href="/auth/login"
+                  prefetch={false}
                   className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
                 >
                   Iniciar Sesión
                 </Link>
                 <Link
                   href="/auth/registro"
+                  prefetch={false}
                   className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
                 >
                   Registrarse
@@ -419,9 +421,9 @@ export function Navbar() {
                   <p className="text-xs text-indigo-600 capitalize">{userRoleLabel}</p>
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setMobileMenuOpen(false)
-                    logout()
+                    await logout()
                   }}
                   className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors"
                 >
@@ -433,6 +435,7 @@ export function Navbar() {
               <>
                 <Link
                   href="/auth/login"
+                  prefetch={false}
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full text-center py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
                 >

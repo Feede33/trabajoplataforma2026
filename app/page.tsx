@@ -395,6 +395,7 @@ export default function HomePage() {
             <div className="pt-6">
               <Link
                 href="/auth/registro?tipo=candidato"
+                prefetch={false}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-md shadow-indigo-200"
               >
                 <span>Crear Perfil de Candidato</span>
@@ -456,6 +457,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/auth/registro"
+                prefetch={false}
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-700 text-white font-semibold text-sm hover:bg-indigo-800 transition-colors border border-indigo-500 text-center"
               >
                 Crear una Cuenta

@@ -2,11 +2,18 @@ import crypto from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Integración con Google (Gmail) para enviar postulaciones por correo.
- * Alcance mínimo: gmail.send (solo enviar; no puede leer correos).
+ * Integración con Google (Gmail) para enviar y redactar postulaciones con la IA.
+ * Scopes seguros y sensibles aprobados para producción pública sin auditorías externas:
+ * - gmail.send (enviar postulaciones confirmadas por el candidato)
+ * - gmail.compose (crear y listar borradores en su cuenta de Gmail)
  */
 
-export const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send', 'openid', 'email']
+export const GMAIL_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.compose',
+  'openid',
+  'email',
+]
 
 export function isGoogleConfigured(): boolean {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
@@ -131,7 +138,33 @@ export async function getGmailConnection(db: SupabaseClient, userId: string): Pr
   return data ? { email: data.email ?? null } : null
 }
 
-// ---------- Envío ----------
+/** Obtiene credenciales de acceso válidas a Gmail renovando el token si es necesario. */
+export async function getGmailAuth(
+  db: SupabaseClient,
+  userId: string
+): Promise<{ accessToken: string; email: string | null }> {
+  const { data } = await db
+    .from('google_connections')
+    .select('email, refresh_token_enc')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (!data) throw new Error('GMAIL_NOT_CONNECTED')
+
+  let accessToken: string
+  try {
+    accessToken = await refreshAccessToken(decryptToken(data.refresh_token_enc))
+  } catch (e: any) {
+    if (e.message === 'GMAIL_REVOKED') {
+      await db.from('google_connections').delete().eq('user_id', userId)
+      throw new Error('GMAIL_NOT_CONNECTED')
+    }
+    throw e
+  }
+
+  return { accessToken, email: data.email ?? null }
+}
+
+// ---------- Envío y MIME ----------
 const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/
 
 export function isValidEmail(v: unknown): v is string {
@@ -151,6 +184,8 @@ export interface OutgoingEmail {
   subject: string
   body: string
   attachment?: { filename: string; mime: string; data: Buffer }
+  threadId?: string
+  inReplyTo?: string
 }
 
 function buildMime(from: string | null, mail: OutgoingEmail): string {
@@ -160,6 +195,7 @@ function buildMime(from: string | null, mail: OutgoingEmail): string {
     ...(from ? [`From: ${stripCRLF(from)}`] : []),
     `To: ${stripCRLF(mail.to)}`,
     `Subject: ${subject}`,
+    ...(mail.inReplyTo ? [`In-Reply-To: <${stripCRLF(mail.inReplyTo)}>`, `References: <${stripCRLF(mail.inReplyTo)}>`] : []),
     'MIME-Version: 1.0',
   ]
   const textPart = [
@@ -192,34 +228,162 @@ function buildMime(from: string | null, mail: OutgoingEmail): string {
 /** Envía un correo desde la cuenta de Gmail conectada del usuario. */
 export async function sendGmail(db: SupabaseClient, userId: string, mail: OutgoingEmail): Promise<void> {
   if (!isValidEmail(mail.to)) throw new Error('Dirección de correo inválida')
+  const { accessToken, email } = await getGmailAuth(db, userId)
 
-  const { data } = await db
-    .from('google_connections')
-    .select('email, refresh_token_enc')
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (!data) throw new Error('GMAIL_NOT_CONNECTED')
+  const raw = Buffer.from(buildMime(email, mail)).toString('base64url')
+  const payload: any = { raw }
+  if (mail.threadId) payload.threadId = mail.threadId
 
-  let accessToken: string
-  try {
-    accessToken = await refreshAccessToken(decryptToken(data.refresh_token_enc))
-  } catch (e: any) {
-    if (e.message === 'GMAIL_REVOKED') {
-      await db.from('google_connections').delete().eq('user_id', userId)
-      throw new Error('GMAIL_NOT_CONNECTED')
-    }
-    throw e
-  }
-
-  const raw = Buffer.from(buildMime(data.email, mail)).toString('base64url')
   const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw }),
+    body: JSON.stringify(payload),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     console.error('Gmail send error:', err)
     throw new Error(err?.error?.message || 'Gmail rechazó el envío')
   }
+}
+
+// ---------- Extracción y Decodificación de Correos ----------
+function decodeBase64Url(str?: string): string {
+  if (!str) return ''
+  try {
+    return Buffer.from(str, 'base64url').toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function extractTextFromPayload(payload: any): string {
+  if (!payload) return ''
+
+  if (payload.mimeType === 'text/plain' && payload.body?.data) {
+    return decodeBase64Url(payload.body.data)
+  }
+
+  if (Array.isArray(payload.parts) && payload.parts.length > 0) {
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        return decodeBase64Url(part.body.data)
+      }
+    }
+    for (const part of payload.parts) {
+      const nested = extractTextFromPayload(part)
+      if (nested) return nested
+    }
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/html' && part.body?.data) {
+        return stripHtml(decodeBase64Url(part.body.data))
+      }
+    }
+  }
+
+  if (payload.mimeType === 'text/html' && payload.body?.data) {
+    return stripHtml(decodeBase64Url(payload.body.data))
+  }
+
+  if (payload.body?.data) {
+    return decodeBase64Url(payload.body.data)
+  }
+
+  return ''
+}
+
+// ---------- Búsqueda, Lectura y Borradores ----------
+export async function createGmailDraft(
+  db: SupabaseClient,
+  userId: string,
+  mail: OutgoingEmail
+): Promise<{ draftId: string; messageId: string }> {
+  if (!isValidEmail(mail.to)) throw new Error('Dirección de correo inválida')
+  const { accessToken, email } = await getGmailAuth(db, userId)
+
+  const raw = Buffer.from(buildMime(email, mail)).toString('base64url')
+  const payload: any = {
+    message: {
+      raw,
+      ...(mail.threadId ? { threadId: mail.threadId } : {}),
+    },
+  }
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || 'No se pudo crear el borrador en Gmail')
+  }
+  const data = await res.json()
+  return { draftId: data.id, messageId: data.message?.id || '' }
+}
+
+export interface GmailDraftSummary {
+  id: string
+  messageId: string
+  to: string
+  subject: string
+  snippet: string
+}
+
+export async function listGmailDrafts(
+  db: SupabaseClient,
+  userId: string,
+  limit = 5
+): Promise<GmailDraftSummary[]> {
+  const { accessToken } = await getGmailAuth(db, userId)
+  const max = Math.min(10, Math.max(1, limit))
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=${max}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || 'Error al listar borradores en Gmail')
+  }
+  const data = await res.json()
+  const drafts: { id: string; message?: { id: string } }[] = data.drafts || []
+  if (drafts.length === 0) return []
+
+  const details = await Promise.all(
+    drafts.slice(0, max).map(async (d) => {
+      try {
+        const draftRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${d.id}?format=metadata&metadataHeaders=To&metadataHeaders=Subject`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+        if (!draftRes.ok) return null
+        const draftData = await draftRes.json()
+        const headers: { name: string; value: string }[] = draftData.message?.payload?.headers || []
+        const getHeader = (name: string) =>
+          headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
+        return {
+          id: d.id,
+          messageId: draftData.message?.id || '',
+          to: getHeader('to'),
+          subject: getHeader('subject') || '(Sin asunto)',
+          snippet: draftData.message?.snippet || '',
+        }
+      } catch {
+        return null
+      }
+    })
+  )
+
+  return details.filter((d): d is GmailDraftSummary => d !== null)
 }

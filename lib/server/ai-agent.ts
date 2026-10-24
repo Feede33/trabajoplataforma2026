@@ -2,7 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { CANDIDATE_MODELS, makeHttpsPost } from '@/lib/gemini'
 import { callClaudeChat, formatToolsForClaude } from '@/lib/server/claude'
 import { callOpenAiChat, formatToolsForOpenAi } from '@/lib/server/openai'
-import { getGmailConnection, isGoogleConfigured, isValidEmail, sendGmail } from '@/lib/server/google'
+import {
+  createGmailDraft,
+  getGmailConnection,
+  isGoogleConfigured,
+  isValidEmail,
+  listGmailDrafts,
+  sendGmail,
+} from '@/lib/server/google'
 import { cleanChatText } from '@/lib/chat-format'
 
 /**
@@ -28,6 +35,8 @@ export interface PendingEmail {
   subject: string
   body: string
   attach_cv: boolean
+  thread_id?: string
+  in_reply_to?: string
 }
 
 export interface PendingProfile {
@@ -84,7 +93,7 @@ const TOOLS = [
   {
     name: 'prepare_email',
     description:
-      'Prepara UN correo de postulación espontánea o de contacto a una empresa, desde el Gmail del usuario. NO lo envía: el usuario lo revisa y confirma con un botón. Usar solo con direcciones de correo reales (de un aviso informal o dadas por el usuario).',
+      'Prepara UN correo de postulación o respuesta a una empresa desde el Gmail del usuario. NO lo envía: el usuario lo revisa y confirma con un botón en pantalla. Usar con correos reales.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -92,8 +101,42 @@ const TOOLS = [
         subject: { type: 'STRING' },
         body: { type: 'STRING', description: 'Cuerpo del mensaje en español, breve, con saludo y firma con el nombre del candidato.' },
         attach_cv: { type: 'BOOLEAN', description: 'Adjuntar el CV del perfil (por defecto true).' },
+        thread_id: { type: 'STRING', description: 'ID del hilo de Gmail si se responde a un correo previo.' },
+        in_reply_to: { type: 'STRING', description: 'ID del mensaje previo si se responde a un correo específico.' },
       },
       required: ['to', 'subject', 'body'],
+    },
+  },
+  {
+    name: 'create_gmail_draft',
+    description:
+      'Crea un borrador de correo de postulación o contacto directamente en la cuenta de Gmail del usuario para que pueda revisarlo desde su app de Gmail sin enviarlo de inmediato.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        to: { type: 'STRING', description: 'Dirección de correo destino.' },
+        subject: { type: 'STRING', description: 'Asunto del borrador.' },
+        body: { type: 'STRING', description: 'Cuerpo del mensaje en texto claro.' },
+        attach_cv: {
+          type: 'BOOLEAN',
+          description: 'Si debe adjuntar el CV del candidato guardado en su perfil (por defecto true).',
+        },
+      },
+      required: ['to', 'subject', 'body'],
+    },
+  },
+  {
+    name: 'list_gmail_drafts',
+    description:
+      'Lista los borradores pendientes guardados en la cuenta de Gmail del usuario (destinatario, asunto y resumen).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        limit: {
+          type: 'INTEGER',
+          description: 'Cantidad máxima de borradores a devolver (por defecto 5).',
+        },
+      },
     },
   },
   {
@@ -198,7 +241,12 @@ Reglas:
 - Si el perfil/CV está vacío o es pobre, sugiere completarlo y ofrécete a redactarlo; si el usuario quiere ajustarlo o mejorarlo, redacta la versión y llama a propose_profile_update (el usuario la revisa y confirma; nunca digas que ya se guardó).
 - Para postular usa apply_to_jobs con los id exactos de search_jobs. Si el usuario dice "postulame a todos/5", usa los resultados más relevantes. No postules a empleos a los que ya se postuló (revisa list_my_applications si hay duda).
 - Los empleos informales no tienen postulación en la plataforma: da el contacto para que el usuario escriba.
-- Para postular por correo usa prepare_email (un solo correo por vez). Si el usuario no da un mensaje, usa uno por defecto del estilo: "Hola, estoy buscando una vacante en su empresa. Adjunto mi CV para que lo consideren. Quedo a disposición." Personalízalo con el puesto y el contexto de la conversación, y fírmalo con el nombre del perfil. Nunca digas que el correo fue enviado: queda pendiente de que el usuario lo confirme.
+- POSTULACIONES Y BORRADORES POR GMAIL:
+  * Para enviar una postulación por correo usa prepare_email (el usuario lo revisa en pantalla y pulsa "Enviar correo"). Personaliza el mensaje con el puesto y contexto, y fírmalo con el nombre del candidato.
+  * Si el usuario quiere redactar un correo y dejarlo guardado en su cuenta de Gmail para revisarlo o enviarlo más tarde, usa create_gmail_draft.
+  * Para ver qué borradores tiene pendientes usa list_gmail_drafts.
+  * Por privacidad y seguridad del usuario, la IA solo redacta borradores y envía postulaciones autorizadas por él; NO lee su bandeja de entrada ni correos personales recibidos (si el usuario te pide revisar si le respondieron o leer su correo recibido, explícale amablemente que por privacidad de Google solo gestionas envíos y borradores).
+  * Si el usuario aún no tiene Gmail conectado, indícale amablemente que use el botón "Conectar Gmail".
 - Después de apply_to_jobs, informa claramente si quedó pendiente de confirmación o si ya fue enviada.
 - Si el usuario adjunta archivos (imágenes o PDF):
   * Examina inmediatamente la imagen o documento.
@@ -347,6 +395,8 @@ export async function sendConfirmedEmail(
     subject: mail.subject.slice(0, 200),
     body: mail.body.slice(0, 5000),
     attachment,
+    threadId: mail.thread_id,
+    inReplyTo: mail.in_reply_to,
   })
 }
 
@@ -461,10 +511,68 @@ export async function runAgent(opts: {
           subject: args.subject.trim().slice(0, 200),
           body: args.body.trim().slice(0, 5000),
           attach_cv: args.attach_cv !== false,
+          thread_id: typeof args.thread_id === 'string' ? args.thread_id : undefined,
+          in_reply_to: typeof args.in_reply_to === 'string' ? args.in_reply_to : undefined,
         }
         return {
           estado: 'PENDIENTE_DE_CONFIRMACION',
           nota: 'Aún NO se envió. El usuario verá el correo y un botón para enviarlo. Pídele que lo revise y confirme.',
+        }
+      }
+      case 'create_gmail_draft': {
+        if (!isGoogleConfigured()) return { error: 'El servicio de Gmail no está configurado.' }
+        if (!isValidEmail(args.to)) return { error: 'Dirección de correo destino inválida.' }
+        if (!args.subject || !args.body) return { error: 'Faltan asunto o cuerpo del correo.' }
+        const conn = await getGmailConnection(db, user.userId)
+        if (!conn) {
+          result.needsGmail = true
+          return { error: 'El usuario no tiene Gmail conectado.' }
+        }
+        try {
+          let attachment
+          if (args.attach_cv !== false) {
+            const cv = await loadOwnCv(db, user.userId)
+            if (!('error' in cv)) {
+              attachment = { filename: cv.filename, mime: cv.mime, data: cv.buf }
+            }
+          }
+          const draft = await createGmailDraft(db, user.userId, {
+            to: args.to.trim(),
+            subject: args.subject.trim(),
+            body: args.body.trim(),
+            attachment,
+          })
+          return {
+            exito: true,
+            mensaje: 'Borrador creado con éxito en tu Gmail.',
+            draftId: draft.draftId,
+            destinatario: args.to,
+            asunto: args.subject,
+          }
+        } catch (err: any) {
+          if (err.message === 'GMAIL_NOT_CONNECTED') {
+            result.needsGmail = true
+            return { error: 'La sesión de Gmail expiró. El usuario debe reconectar Gmail.' }
+          }
+          return { error: err.message || 'No se pudo crear el borrador' }
+        }
+      }
+      case 'list_gmail_drafts': {
+        if (!isGoogleConfigured()) return { error: 'El servicio de Gmail no está configurado.' }
+        const conn = await getGmailConnection(db, user.userId)
+        if (!conn) {
+          result.needsGmail = true
+          return { error: 'Gmail no está conectado.' }
+        }
+        try {
+          const drafts = await listGmailDrafts(db, user.userId, clampLimit(args.limit, 5))
+          return { total: drafts.length, borradores: drafts }
+        } catch (err: any) {
+          if (err.message === 'GMAIL_NOT_CONNECTED') {
+            result.needsGmail = true
+            return { error: 'La sesión de Gmail expiró. El usuario debe reconectar Gmail.' }
+          }
+          return { error: err.message || 'Error al listar borradores' }
         }
       }
       case 'propose_profile_update': {

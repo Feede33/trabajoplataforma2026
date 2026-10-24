@@ -32,14 +32,23 @@ export async function middleware(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Helper to create a redirect response preserving cookies set by Supabase
+    const createRedirect = (path: string) => {
+      const redirectResponse = NextResponse.redirect(new URL(path, request.url))
+      supabaseResponse.cookies.getAll().forEach(({ name, value, ...options }) => {
+        redirectResponse.cookies.set(name, value, options)
+      })
+      return redirectResponse
+    }
+
     // Protect empresa routes
     if (request.nextUrl.pathname.startsWith('/empresa') && !user) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+      return createRedirect('/auth/login')
     }
 
     // Protect candidato routes
     if (request.nextUrl.pathname.startsWith('/candidato') && !user) {
-      return NextResponse.redirect(new URL('/auth/login', request.url))
+      return createRedirect('/auth/login')
     }
 
     // Redirect logged-in users away from auth pages (except the OAuth callback handler)
@@ -48,7 +57,7 @@ export async function middleware(request: NextRequest) {
       !request.nextUrl.pathname.startsWith('/auth/callback') &&
       user
     ) {
-      return NextResponse.redirect(new URL('/', request.url))
+      return createRedirect('/')
     }
   } catch (error) {
     // If auth call fails, proceed gracefully

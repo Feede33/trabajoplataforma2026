@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { Profile, UserRole } from '../supabase/database.types'
-import { isSupabaseConfigured, createClient } from '../supabase/client'
+import { isSupabaseConfigured, createClient, resetClient } from '../supabase/client'
 import { isProfileAdmin } from '../auth-utils'
 
 interface AuthContextType {
@@ -302,12 +302,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.warn('Error durante el cierre de sesión en Supabase:', err)
       }
+      resetClient()
     }
     setProfile(null)
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('empleos_current_user')
+        // Eliminar cookies de Supabase explícitamente en el navegador
+        document.cookie.split(';').forEach((cookie) => {
+          const eqPos = cookie.indexOf('=')
+          const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim()
+          if (name.startsWith('sb-')) {
+            document.cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0`
+          }
+        })
       } catch {}
+      // Redirigir al inicio con navegación completa para limpiar el Router Cache de Next.js
+      window.location.href = '/'
     }
   }
 

@@ -232,6 +232,13 @@ function RegistroContent() {
           >
             {isLoading ? <span>Registrando en el sistema...</span> : <span>Crear mi Cuenta</span>}
           </button>
+
+          <p className="text-[11px] text-center text-slate-500 leading-relaxed">
+            Al continuar o registrarte, aceptás nuestra{' '}
+            <Link href="/privacy-policy" className="text-indigo-600 hover:underline font-medium">
+              Política de Privacidad
+            </Link>.
+          </p>
         </form>
 
         <div className="pt-2 text-center text-xs text-slate-500">

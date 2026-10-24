@@ -89,7 +89,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/auth/registro?tipo=empresa" className="hover:text-white transition-colors">
+                <Link href="/auth/registro?tipo=empresa" prefetch={false} className="hover:text-white transition-colors">
                   Crear Cuenta Empresa
                 </Link>
               </li>
@@ -129,7 +129,11 @@ export function Footer() {
         {/* Bottom copyright */}
         <div className="border-t border-slate-800 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
           <p>© {new Date().getFullYear()} Postulauy.com. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <Link href="/privacy-policy" className="hover:text-white transition-colors underline-offset-4 hover:underline">
+              Política de Privacidad
+            </Link>
+            <span className="text-slate-700">•</span>
             <span>Construido con Next.js 14 y Supabase</span>
           </div>
         </div>

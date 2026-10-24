@@ -74,6 +74,8 @@ export async function POST(request: Request) {
           subject: e.subject.trim(),
           body: e.body.trim(),
           attach_cv: e.attach_cv !== false,
+          thread_id: typeof e.thread_id === 'string' ? e.thread_id : undefined,
+          in_reply_to: typeof e.in_reply_to === 'string' ? e.in_reply_to : undefined,
         })
         return NextResponse.json({ sent: true, to: e.to.trim() })
       } catch (err: any) {
