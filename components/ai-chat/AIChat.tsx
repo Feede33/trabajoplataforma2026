@@ -7,16 +7,20 @@ import {
   Briefcase,
   Check,
   ChevronDown,
+  Download,
+  ExternalLink,
+  Eye,
   FileText,
-  History,
-  SquarePen,
-  Trash2,
   Loader2,
-  Mail,
-  Paperclip,
+  MoreHorizontal,
+  PanelLeft,
+  Pencil,
+  Pin,
   Plus,
   Search,
   Sparkles,
+  SquarePen,
+  Trash2,
   Wand2,
   X,
   Zap,
@@ -24,6 +28,9 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
+import { BillingStatus, fetchBillingStatus } from '@/lib/billing-client'
+import { Switch } from '@/components/ui/switch'
+import { ChatMarkdown } from './ChatMarkdown'
 
 // Modelos disponibles. Solo el gratuito está activo; el resto se habilitará con los planes.
 const MODELS = [
@@ -44,6 +51,26 @@ type AttachedFile = { name: string; mime: string; data: string }
 const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
 const MAX_FILES = 3
 const MAX_TOTAL_BYTES = 3 * 1024 * 1024
+const DEFAULT_ATTACHMENT_PROMPT = 'Analizá la imagen o archivo que te adjunto y decime qué es o qué contiene.'
+
+function openAttachment(file: AttachedFile) {
+  try {
+    const byteCharacters = atob(file.data)
+    const byteNumbers = new Array(byteCharacters.length)
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
+    }
+    const byteArray = new Uint8Array(byteNumbers)
+    const blob = new Blob([byteArray], { type: file.mime })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  } catch {
+    const win = window.open()
+    if (win && file.mime.startsWith('image/')) {
+      win.document.write(`<img src="data:${file.mime};base64,${file.data}" style="max-width:100%;height:auto;margin:auto;display:block;" />`)
+    }
+  }
+}
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -52,6 +79,136 @@ function fileToBase64(file: File): Promise<string> {
     r.onerror = () => reject(new Error('No se pudo leer el archivo'))
     r.readAsDataURL(file)
   })
+}
+
+/**
+ * Genera un PDF válido en memoria (Blob URL) a partir de los datos del perfil/CV
+ * para mostrar la vista previa del PDF en un contenedor con bordes redondeados.
+ */
+function generateCvPdfBlobUrl(data: {
+  nombre?: string | null
+  email?: string | null
+  ubicacion?: string | null
+  bio?: string | null
+}): string {
+  const toPdfString = (str: string) => {
+    const clean = str
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      .replace(/[•·]/g, '-')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/—|–/g, '-')
+    let out = ''
+    for (let i = 0; i < clean.length; i++) {
+      const code = clean.charCodeAt(i)
+      if (code >= 32 && code <= 126) {
+        out += clean[i]
+      } else if (code >= 160 && code <= 255) {
+        out += '\\' + code.toString(8).padStart(3, '0')
+      } else {
+        out += ' '
+      }
+    }
+    return out
+  }
+
+  const wrapLines = (text: string, maxChars: number): string[] => {
+    const result: string[] = []
+    for (const rawParagraph of text.split(/\r?\n/)) {
+      const p = rawParagraph.trim()
+      if (!p) {
+        result.push('')
+        continue
+      }
+      const words = p.split(/\s+/)
+      let current = ''
+      for (const word of words) {
+        if (!current) {
+          current = word
+        } else if (current.length + 1 + word.length <= maxChars) {
+          current += ' ' + word
+        } else {
+          result.push(current)
+          current = word
+        }
+      }
+      if (current) result.push(current)
+    }
+    return result
+  }
+
+  const nombre = (data.nombre || 'Candidato').trim()
+  const subline = [data.ubicacion?.trim(), data.email?.trim()].filter(Boolean).join('  |  ')
+  const bioLines = wrapLines(data.bio || 'Sin resumen cargado.', 82)
+
+  const ops: string[] = []
+  // Encabezado decorativo
+  ops.push('0.95 0.96 0.98 rg 40 740 515 65 re f')
+  ops.push('0.31 0.27 0.90 rg 40 740 4 65 re f')
+
+  // Nombre
+  ops.push('BT /F2 18 Tf 0.08 0.10 0.16 rg 56 778 Td (' + toPdfString(nombre) + ') Tj ET')
+  // Subtítulo (ubicación y correo)
+  if (subline) {
+    ops.push('BT /F1 10 Tf 0.35 0.40 0.48 rg 56 756 Td (' + toPdfString(subline) + ') Tj ET')
+  }
+
+  // Sección Perfil Profesional
+  ops.push('BT /F2 11 Tf 0.31 0.27 0.90 rg 45 712 Td (' + toPdfString('PERFIL Y RESUMEN PROFESIONAL') + ') Tj ET')
+  ops.push('0.85 0.87 0.92 RG 0.8 w 45 704 m 555 704 l S')
+
+  let y = 684
+  for (const line of bioLines) {
+    if (y < 55) break
+    if (!line) {
+      y -= 8
+      continue
+    }
+    const isHeading =
+      line.length < 48 &&
+      (line === line.toUpperCase() || line.endsWith(':')) &&
+      !/^[-*]/.test(line)
+    if (isHeading) {
+      y -= 4
+      ops.push('BT /F2 10.5 Tf 0.12 0.15 0.22 rg 45 ' + y + ' Td (' + toPdfString(line) + ') Tj ET')
+      y -= 15
+    } else {
+      ops.push('BT /F1 10 Tf 0.20 0.24 0.32 rg 45 ' + y + ' Td (' + toPdfString(line) + ') Tj ET')
+      y -= 14
+    }
+  }
+
+  const streamContent = ops.join('\n')
+  const objects: string[] = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n',
+    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n',
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n',
+    `6 0 obj\n<< /Length ${streamContent.length} >>\nstream\n${streamContent}\nendstream\nendobj\n`,
+  ]
+
+  let pdf = '%PDF-1.4\n'
+  const offsets: number[] = [0]
+  for (const obj of objects) {
+    offsets.push(pdf.length)
+    pdf += obj
+  }
+  const xrefPos = pdf.length
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (let i = 1; i <= objects.length; i++) {
+    pdf += offsets[i].toString().padStart(10, '0') + ' 00000 n \n'
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`
+
+  const bytes = new Uint8Array(pdf.length)
+  for (let i = 0; i < pdf.length; i++) {
+    bytes[i] = pdf.charCodeAt(i) & 0xff
+  }
+  const blob = new Blob([bytes], { type: 'application/pdf' })
+  return URL.createObjectURL(blob)
 }
 
 type GmailStatus = { configured: boolean; connected: boolean; email?: string | null }
@@ -69,6 +226,8 @@ type Message = {
   needsGmail?: boolean
   /** Nombres de archivos adjuntos por el usuario en este mensaje */
   files?: string[]
+  /** Archivos adjuntos completos (con base64 y mime) para vista previa */
+  attachments?: AttachedFile[]
   /** Cambios de perfil/CV propuestos por la IA (editables) */
   profile?: PendingProfile
   profileState?: 'idle' | 'sending' | 'done'
@@ -150,36 +309,233 @@ async function confirmApplications(pending: Pending[], token: string) {
   return data as { applied: { titulo: string }[]; skipped: { reason: string }[] }
 }
 
+function MailIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 -960 960 960"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm320-280L160-640v400h640v-400L480-440Zm0-80 320-200H160l320 200ZM160-640v-80 480-400Z" />
+    </svg>
+  )
+}
+
+function AttachFileIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 -960 960 960"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z" />
+    </svg>
+  )
+}
+
 const SUGGESTIONS = [
   { icon: Search, label: '¿Qué empleos hay hoy para mi perfil?' },
   { icon: FileText, label: 'Ajustá mi CV para una vacante' },
   { icon: Briefcase, label: 'Postulate a 5 empleos por mí' },
-  { icon: Mail, label: 'Redactá un correo a una empresa' },
+  { icon: MailIcon, label: 'Redactá un correo a una empresa' },
 ]
 
 const ATTACH_OPTIONS = [
-  { id: 'files', icon: Paperclip, label: 'Agregar fotos y archivos' },
+  { id: 'files', icon: AttachFileIcon, label: 'Agregar fotos y archivos' },
   { id: 'cv', icon: FileText, label: 'Usar mi CV del perfil' },
   { id: 'deep', icon: Search, label: 'Búsqueda profunda de empleos' },
   { id: 'cvfix', icon: Wand2, label: 'Ajustar CV con IA' },
-  { id: 'email', icon: Mail, label: 'Postular por email (Gmail)' },
+  { id: 'email', icon: MailIcon, label: 'Postular por Gmail solamente' },
 ] as const
 
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect
+
+interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  value?: string | number | readonly string[]
+}
+
+const AutoResizeTextarea = React.forwardRef<HTMLTextAreaElement, AutoResizeTextareaProps>(
+  ({ value, onChange, className, ...props }, ref) => {
+    const internalRef = useRef<HTMLTextAreaElement | null>(null)
+
+    const setRefs = (element: HTMLTextAreaElement | null) => {
+      internalRef.current = element
+      if (typeof ref === 'function') {
+        ref(element)
+      } else if (ref) {
+        ;(ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = element
+      }
+    }
+
+    const adjustHeight = () => {
+      const el = internalRef.current
+      if (!el) return
+      el.style.height = 'auto'
+      if (el.scrollHeight > 0) {
+        const borderOffset = el.offsetHeight - el.clientHeight
+        el.style.height = `${el.scrollHeight + borderOffset}px`
+      }
+    }
+
+    useIsomorphicLayoutEffect(() => {
+      adjustHeight()
+      const rafId = requestAnimationFrame(adjustHeight)
+      return () => cancelAnimationFrame(rafId)
+    }, [value])
+
+    useEffect(() => {
+      const handleResize = () => adjustHeight()
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    return (
+      <textarea
+        ref={setRefs}
+        value={value}
+        onChange={(e) => {
+          onChange?.(e)
+          adjustHeight()
+        }}
+        className={cn('resize-none overflow-hidden', className)}
+        {...props}
+      />
+    )
+  }
+)
+AutoResizeTextarea.displayName = 'AutoResizeTextarea'
+
+/**
+ * Componente de vista previa del PDF con bordes redondeados (rounded-2xl).
+ * Se muestra cuando la IA entrega un CV/perfil o un correo/postulación con CV adjunto para revisar y confirmar.
+ */
+function RoundedPdfPreview({
+  pdfUrl,
+  title,
+  subtitle,
+  nombre,
+  email,
+  ubicacion,
+  bio,
+  defaultExpanded = true,
+  rightSlot,
+}: {
+  pdfUrl?: string | null
+  title: string
+  subtitle?: string
+  nombre?: string | null
+  email?: string | null
+  ubicacion?: string | null
+  bio?: string | null
+  defaultExpanded?: boolean
+  rightSlot?: React.ReactNode
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (pdfUrl) {
+      setGeneratedUrl(null)
+      return
+    }
+    const url = generateCvPdfBlobUrl({ nombre, email, ubicacion, bio })
+    setGeneratedUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [pdfUrl, nombre, email, ubicacion, bio])
+
+  const effectivePdfUrl = pdfUrl || generatedUrl
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-900/70 overflow-hidden shadow-sm transition-all">
+      {/* Cabecera de la tarjeta PDF */}
+      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-white/90 dark:bg-slate-800/80 border-b border-slate-200/70 dark:border-slate-700/60">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 font-bold text-[10px] border border-rose-500/20">
+            PDF
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{title}</p>
+            {subtitle && <p className="text-[11px] text-slate-400 dark:text-slate-400 truncate">{subtitle}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {rightSlot}
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70 transition-colors"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            {expanded ? 'Ocultar vista previa' : 'Ver PDF'}
+          </button>
+          {effectivePdfUrl && (
+            <a
+              href={effectivePdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              download={!pdfUrl ? `${(nombre || 'CV').replace(/\s+/g, '_')}_PostulaUY.pdf` : undefined}
+              title={pdfUrl ? 'Abrir PDF en pestaña nueva' : 'Descargar PDF'}
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/70 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+            >
+              {pdfUrl ? <ExternalLink className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Cuerpo de la vista previa con bordes redondeados */}
+      {expanded && (
+        <div className="p-3 bg-slate-100/70 dark:bg-slate-950/50">
+          <div className="rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-white shadow-inner">
+            {effectivePdfUrl ? (
+              <iframe
+                src={`${effectivePdfUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                title={title}
+                className="w-full h-64 sm:h-72 border-0 bg-white block"
+              />
+            ) : (
+              <div className="p-5 space-y-2 text-xs text-slate-700 bg-white">
+                <p className="text-sm font-bold text-slate-900">{nombre || 'Mi Currículum'}</p>
+                {ubicacion && <p className="text-slate-500">{ubicacion}</p>}
+                <hr className="border-slate-200 my-2" />
+                <p className="whitespace-pre-wrap leading-relaxed">{bio}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AIChat() {
-  const { profile, isLoading, getAccessToken } = useAuth()
+  const { profile, isAdmin, isLoading, getAccessToken } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [autoApply, setAutoApply] = useState(false)
   const [gmail, setGmail] = useState<GmailStatus | null>(null)
+  const [gmailBanner, setGmailBanner] = useState<{ type: 'success' | 'warning'; text: string } | null>(null)
   const [convId, setConvId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<ConversationRow[]>([])
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [recentsExpanded, setRecentsExpanded] = useState(true)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [pinnedIds, setPinnedIds] = useState<string[]>([])
+  const [chatMenuId, setChatMenuId] = useState<string | null>(null)
+  const [billing, setBilling] = useState<BillingStatus | null>(null)
   const [attachments, setAttachments] = useState<AttachedFile[]>([])
   const [includeCv, setIncludeCv] = useState(false)
   const [deepSearch, setDeepSearch] = useState(false)
   const [notice, setNotice] = useState('')
+  const [editingProfileIds, setEditingProfileIds] = useState<Record<string, boolean>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [modelOpen, setModelOpen] = useState(false)
   const [modelId] = useState(MODELS[0].id)
@@ -187,10 +543,42 @@ export function AIChat() {
   const modelMenuRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const composerBoxRef = useRef<HTMLDivElement>(null)
+  const [isMultiLine, setIsMultiLine] = useState(false)
 
   useEffect(() => {
     setAutoApply(localStorage.getItem('ia-chat-auto') === '1')
+    const savedSidebar = localStorage.getItem('ia-chat-sidebar')
+    if (savedSidebar === '0') setSidebarOpen(false)
+    try {
+      const savedPins = JSON.parse(localStorage.getItem('ia-chat-pinned') || '[]')
+      if (Array.isArray(savedPins)) setPinnedIds(savedPins)
+    } catch {}
   }, [])
+
+  function togglePin(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setPinnedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev]
+      localStorage.setItem('ia-chat-pinned', JSON.stringify(next))
+      return next
+    })
+  }
+
+  function toggleSidebar() {
+    setSidebarOpen((prev) => {
+      const next = !prev
+      localStorage.setItem('ia-chat-sidebar', next ? '1' : '0')
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (!profile) return
+    fetchBillingStatus(profile.id)
+      .then(setBilling)
+      .catch(() => setBilling(null))
+  }, [profile?.id])
 
   useEffect(() => {
     if (!profile) return
@@ -201,13 +589,22 @@ export function AIChat() {
       const flag = new URLSearchParams(window.location.search).get('gmail')
       if (flag) {
         window.history.replaceState({}, '', '/ia-chat')
-        const note =
-          flag === 'connected'
-            ? 'Gmail conectado. Ya puedo prepararte correos de postulación; vos los revisás y confirmás antes de enviar.'
-            : flag === 'denied'
-            ? 'No diste permiso para enviar correos con Gmail.'
-            : 'No se pudo conectar Gmail. Intentá de nuevo.'
-        setMessages((ms) => [...ms, { id: crypto.randomUUID(), role: 'assistant', content: note }])
+        if (flag === 'connected') {
+          setGmailBanner({
+            type: 'success',
+            text: 'Gmail conectado. Ya puedo prepararte correos de postulación; vos los revisás y confirmás antes de enviar.',
+          })
+        } else if (flag === 'denied') {
+          setGmailBanner({
+            type: 'warning',
+            text: 'No diste permiso para enviar correos con Gmail.',
+          })
+        } else {
+          setGmailBanner({
+            type: 'warning',
+            text: 'No se pudo conectar Gmail. Intentá de nuevo.',
+          })
+        }
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,6 +622,7 @@ export function AIChat() {
     if (!token) return
     await gmailApi(token, 'DELETE')
     setGmail({ configured: true, connected: false })
+    setGmailBanner(null)
   }
 
   async function refreshConversations() {
@@ -246,7 +644,7 @@ export function AIChat() {
   async function saveConversation(msgs: Message[], id: string | null): Promise<string | null> {
     if (!profile) return id
     const supabase = createClient()
-    const slim = msgs.map((m) => ({ id: m.id, role: m.role, content: m.content }))
+    const slim = msgs.map((m) => ({ id: m.id, role: m.role, content: m.content, files: m.files, attachments: m.attachments }))
     const firstUser = msgs.find((m) => m.role === 'user')?.content || 'Nueva conversación'
     const title = firstUser.length > 60 ? firstUser.slice(0, 57) + '…' : firstUser
     try {
@@ -273,7 +671,7 @@ export function AIChat() {
   function newChat() {
     setMessages([])
     setConvId(null)
-    setHistoryOpen(false)
+    setMobileSidebarOpen(false)
   }
 
   async function openConversation(id: string) {
@@ -281,7 +679,7 @@ export function AIChat() {
     const msgs = ((data as { messages: Message[] } | null)?.messages || []) as Message[]
     setMessages(msgs)
     setConvId(id)
-    setHistoryOpen(false)
+    setMobileSidebarOpen(false)
   }
 
   async function deleteConversation(id: string) {
@@ -372,13 +770,13 @@ export function AIChat() {
     })
   }
 
-  // Scroll solo dentro del panel de mensajes (scrollIntoView movía toda la página)
+  // Scroll solo dentro del panel de mensajes
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
-  // El chat ocupa toda la pantalla: se bloquea el scroll de la página (y del footer) mientras está abierto
+  // El chat ocupa toda la pantalla: se bloquea el scroll de la página mientras está abierto
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -387,12 +785,75 @@ export function AIChat() {
     }
   }, [])
 
+  const hasAttachments = attachments.length > 0 || includeCv || deepSearch
+  const hasNewLine = input.includes('\n')
+  const isExpanded = hasAttachments || hasNewLine || isMultiLine
+
+  // Detección para expandir a dos filas cuando el texto se acerca a los botones de la derecha
+  useEffect(() => {
+    if (hasAttachments || hasNewLine) {
+      if (!isMultiLine) setIsMultiLine(true)
+      return
+    }
+    if (!input.trim()) {
+      if (isMultiLine) setIsMultiLine(false)
+      return
+    }
+
+    const boxWidth = composerBoxRef.current?.offsetWidth || 700
+    const occupiedWidth = boxWidth < 500 ? 175 : 210
+    const availableTextWidth = Math.max(100, boxWidth - occupiedWidth)
+
+    let textWidth = 0
+    if (typeof document !== 'undefined') {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.font = '15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        textWidth = ctx.measureText(input).width
+      }
+    }
+
+    if (!isMultiLine && textWidth >= availableTextWidth - 15) {
+      setIsMultiLine(true)
+    } else if (isMultiLine && textWidth < availableTextWidth - 35) {
+      setIsMultiLine(false)
+    }
+  }, [input, hasAttachments, hasNewLine, isMultiLine])
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (!composerBoxRef.current || !input.trim() || hasAttachments || hasNewLine) return
+      const boxWidth = composerBoxRef.current.offsetWidth
+      const occupiedWidth = boxWidth < 500 ? 175 : 210
+      const availableTextWidth = Math.max(100, boxWidth - occupiedWidth)
+      let textWidth = 0
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.font = '15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        textWidth = ctx.measureText(input).width
+      }
+      setIsMultiLine(textWidth >= availableTextWidth - 15)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [input, hasAttachments, hasNewLine])
+
+  // Ajuste de altura del textarea para expandirse hacia arriba sin generar scrollbar
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 200) + 'px'
-  }, [input])
+    if (!isExpanded) {
+      el.style.height = '42px'
+      el.style.overflowY = 'hidden'
+    } else {
+      el.style.height = 'auto'
+      const newHeight = Math.min(el.scrollHeight, 260)
+      el.style.height = `${newHeight}px`
+      el.style.overflowY = el.scrollHeight > 260 ? 'auto' : 'hidden'
+    }
+  }, [input, isExpanded])
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -410,7 +871,7 @@ export function AIChat() {
   async function send(text: string) {
     const typed = text.trim()
     if ((!typed && attachments.length === 0) || loading) return
-    const content = typed || 'Analizá el archivo adjunto.'
+    const content = typed || DEFAULT_ATTACHMENT_PROMPT
     const sendOpts: SendOptions = { autoApply, attachments, includeCv, deepSearch }
     const next: Message[] = [
       ...messages,
@@ -419,6 +880,7 @@ export function AIChat() {
         role: 'user',
         content,
         files: attachments.length ? attachments.map((a) => a.name) : undefined,
+        attachments: attachments.length ? [...attachments] : undefined,
       },
     ]
     setMessages(next)
@@ -507,14 +969,14 @@ export function AIChat() {
 
   if (!isLoading && !profile) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] gap-5 px-4 text-center">
-        <h1 className="text-2xl font-extrabold text-slate-900">Iniciá sesión para usar el chat de IA</h1>
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] gap-5 px-4 text-center font-google-sans">
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Iniciá sesión para usar el chat de IA</h1>
         <p className="text-sm text-slate-500 max-w-sm">
           La IA necesita tu perfil y CV para recomendarte empleos y postularte por vos.
         </p>
         <Link
           href="/auth/login"
-          className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold"
+          className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors"
         >
           Iniciar sesión
         </Link>
@@ -524,9 +986,20 @@ export function AIChat() {
 
   const empty = messages.length === 0
 
+  // Cuadro de escritura (composer):
+  // 1 línea unificada: [ + ] [ Preguntale a la IA sobre empleos... ] [ Auto ] [ Enviar ]
+  // Multilínea/expandido: Textarea arriba a todo el ancho, y controles abajo ([ + ] a la izquierda, [ Auto ] [ Enviar ] a la derecha)
   const composer = (
-    <div className="w-full max-w-3xl mx-auto">
-      <div className="relative rounded-3xl border border-slate-200 bg-white shadow-sm focus-within:shadow-md focus-within:border-slate-300 transition-all">
+    <div className="w-full max-w-[700px] mx-auto">
+      <div
+        ref={composerBoxRef}
+        className={cn(
+          'relative border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900 shadow-sm focus-within:shadow-md focus-within:border-slate-300 dark:focus-within:border-slate-600 transition-all duration-200',
+          isExpanded
+            ? 'rounded-3xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-y-2.5'
+            : 'rounded-full px-3 sm:px-3.5 py-2 sm:py-2.5 min-h-[56px] flex flex-nowrap items-center gap-2 sm:gap-2.5'
+        )}
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -535,438 +1008,987 @@ export function AIChat() {
           className="hidden"
           onChange={onFilesPicked}
         />
+
+        {/* Zona de archivos adjuntos / badges (CV, Búsqueda profunda) */}
         {(attachments.length > 0 || includeCv || deepSearch) && (
-          <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+          <div className="w-full order-1 flex flex-wrap items-center gap-2.5 px-2 pt-1 pb-2">
             {attachments.map((f, i) => (
-              <span key={f.name + i} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-slate-100 text-xs text-slate-700 max-w-[200px]">
-                <Paperclip className="w-3 h-3 shrink-0" />
-                <span className="truncate">{f.name}</span>
+              <div
+                key={f.name + i}
+                className="relative group w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border border-transparent bg-slate-100 dark:bg-slate-800 shadow-xs shrink-0 transition-transform hover:scale-[1.02]"
+              >
+                {f.mime.startsWith('image/') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`data:${f.mime};base64,${f.data}`}
+                    alt={f.name}
+                    className="w-full h-full object-cover select-none"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center select-none bg-slate-50 dark:bg-slate-800/90">
+                    <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold text-[10px] mb-1">
+                      PDF
+                    </span>
+                    <span className="text-[10px] text-slate-600 dark:text-slate-300 line-clamp-2 max-w-full break-all font-medium leading-tight">
+                      {f.name}
+                    </span>
+                  </div>
+                )}
                 <button
+                  type="button"
                   onClick={() => setAttachments((a) => a.filter((_, j) => j !== i))}
                   aria-label="Quitar archivo"
-                  className="p-0.5 rounded-full hover:bg-slate-200"
+                  className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/65 hover:bg-black/85 text-white flex items-center justify-center transition-colors shadow-xs cursor-pointer z-10"
                 >
                   <X className="w-3 h-3" />
                 </button>
-              </span>
+              </div>
             ))}
             {includeCv && (
-              <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-sky-50 text-xs text-sky-700">
-                <FileText className="w-3 h-3" /> Mi CV
-                <button onClick={() => setIncludeCv(false)} aria-label="Quitar CV" className="p-0.5 rounded-full hover:bg-sky-100">
+              <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-sky-50 dark:bg-sky-500/15 text-xs text-sky-700 dark:text-white border border-sky-200/60 dark:border-sky-500/30">
+                <FileText className="w-3 h-3 text-sky-600 dark:text-white" /> Mi CV
+                <button
+                  type="button"
+                  onClick={() => setIncludeCv(false)}
+                  aria-label="Quitar CV"
+                  className="p-0.5 rounded-full hover:bg-sky-100 dark:hover:bg-sky-500/30 text-sky-700 dark:text-white"
+                >
                   <X className="w-3 h-3" />
                 </button>
               </span>
             )}
             {deepSearch && (
-              <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-indigo-50 text-xs text-indigo-700">
-                <Search className="w-3 h-3" /> Búsqueda profunda
-                <button onClick={() => setDeepSearch(false)} aria-label="Quitar búsqueda profunda" className="p-0.5 rounded-full hover:bg-indigo-100">
+              <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-xs text-indigo-700 dark:text-white border border-indigo-200/60 dark:border-indigo-500/30">
+                <Search className="w-3 h-3 text-indigo-600 dark:text-white" /> Búsqueda profunda
+                <button
+                  type="button"
+                  onClick={() => setDeepSearch(false)}
+                  aria-label="Quitar búsqueda profunda"
+                  className="p-0.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-500/30 text-indigo-700 dark:text-white"
+                >
                   <X className="w-3 h-3" />
                 </button>
               </span>
             )}
           </div>
         )}
-        <textarea
-          ref={textareaRef}
-          value={input}
-          rows={1}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              send(input)
-            }
-          }}
-          placeholder="Preguntale a la IA sobre empleos, tu CV o postulaciones…"
-          className="w-full resize-none bg-transparent px-5 pt-4 pb-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none"
-        />
-        <div className="flex items-center px-3 pb-3">
-          <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((o) => !o)}
-              aria-label="Más opciones"
-              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-            >
-              <Plus className={cn('w-5 h-5 transition-transform', menuOpen && 'rotate-45')} />
-            </button>
-            {menuOpen && (
-              <div className="absolute bottom-11 left-0 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl py-1.5 z-20 animate-in fade-in slide-in-from-bottom-2">
-                {ATTACH_OPTIONS.map(({ id, icon: Icon, label }) => {
-                  const status =
-                    id === 'cv'
-                      ? includeCv
-                      : id === 'deep'
-                      ? deepSearch
-                      : false
-                  const tag =
-                    id === 'email'
-                      ? gmail?.connected
-                        ? 'Conectado'
-                        : gmail?.configured
-                        ? 'Conectar'
-                        : 'No disponible'
-                      : ''
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => onMenuAction(id)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left"
-                    >
-                      <Icon className="w-4 h-4 text-slate-400" />
-                      <span className="flex-1">{label}</span>
-                      {status && <Check className="w-4 h-4 text-emerald-500" />}
-                      {tag && <span className="text-[10px] text-slate-400">{tag}</span>}
-                    </button>
-                  )
-                })}
-              </div>
+
+        {/* Caja de texto (textarea). Permanece en el DOM para preservar foco y cursor */}
+        <div
+          className={cn(
+            'min-w-0 transition-all',
+            isExpanded ? 'w-full order-2 px-2 pt-1 pb-1' : 'flex-1 order-2'
+          )}
+        >
+          <textarea
+            ref={textareaRef}
+            value={input}
+            rows={1}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send(input)
+              }
+            }}
+            placeholder="Preguntale a la IA sobre empleos…"
+            className={cn(
+              'w-full block resize-none !bg-transparent border-0 text-sm sm:text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-0 leading-relaxed font-google-sans',
+              isExpanded ? 'px-1 py-1 max-h-[260px]' : 'px-2 py-2 h-[42px] max-h-[42px] overflow-hidden'
             )}
-          </div>
+          />
+        </div>
+
+        {/* Botón + con su menú desplegable (a la izquierda en modo inline, o abajo a la izquierda en modo expandido) */}
+        <div
+          className={cn('relative shrink-0', isExpanded ? 'order-3' : 'order-1')}
+          ref={menuRef}
+        >
           <button
             type="button"
-            onClick={toggleAuto}
-            title="Si está activo, la IA se postula sin pedirte confirmación"
-            className={cn(
-              'ml-auto mr-2 flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-medium border transition-colors',
-              autoApply
-                ? 'bg-amber-50 border-amber-300 text-amber-800'
-                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-            )}
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Más opciones"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-600 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <Zap className={cn('w-3.5 h-3.5', autoApply && 'fill-amber-500 text-amber-500')} />
-            {autoApply ? 'Postulación automática' : 'Pedir confirmación'}
+            <Plus className={cn('w-5 h-5 transition-transform text-slate-600 dark:text-white', menuOpen && 'rotate-45')} />
           </button>
+          {menuOpen && (
+            <div className="absolute bottom-full mb-2.5 left-0 w-72 sm:w-80 rounded-2xl border border-slate-200/90 dark:border-[#333538] bg-white dark:bg-[#1e1f20] shadow-2xl shadow-black/40 p-1.5 z-40 animate-in fade-in slide-in-from-bottom-2 font-google-sans">
+              {ATTACH_OPTIONS.map(({ id, icon: Icon, label }) => {
+                const status = id === 'cv' ? includeCv : id === 'deep' ? deepSearch : false
+                const showDivider = id === 'deep'
+                return (
+                  <React.Fragment key={id}>
+                    {showDivider && (
+                      <div className="my-1 border-t border-slate-200 dark:border-[#2d2e30]" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onMenuAction(id)}
+                      className="w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-[15px] sm:text-base font-normal text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-[#2d2e30] text-left transition-colors"
+                    >
+                      <span className="w-5 h-5 shrink-0 flex items-center justify-center text-slate-600 dark:text-white">
+                        <Icon className="w-[18px] h-[18px] shrink-0 text-slate-600 dark:text-white" />
+                      </span>
+                      <span className="flex-1 truncate leading-none pt-0.5">{label}</span>
+                      {id === 'email' ? (
+                        gmail?.connected ? (
+                          <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-rose-500 dark:text-rose-400 shrink-0 leading-none">
+                            No conectado
+                          </span>
+                        )
+                      ) : (
+                        status && (
+                          <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                          </span>
+                        )
+                      )}
+                    </button>
+                  </React.Fragment>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Acciones de la derecha: Switch Auto + Botón Enviar */}
+        <div
+          className={cn(
+            'flex items-center gap-2 sm:gap-2.5 shrink-0 select-none',
+            isExpanded ? 'order-4 ml-auto' : 'order-3'
+          )}
+        >
+          <div
+            className="flex items-center gap-1.5 sm:gap-2"
+            title="Auto: la IA se postula automáticamente sin pedir confirmación previa"
+          >
+            <label
+              htmlFor="auto-apply-switch"
+              className="text-xs sm:text-sm font-medium text-slate-700 dark:text-white cursor-pointer"
+            >
+              Auto
+            </label>
+            <Switch
+              id="auto-apply-switch"
+              checked={autoApply}
+              onCheckedChange={(checked) => {
+                setAutoApply(checked)
+                localStorage.setItem('ia-chat-auto', checked ? '1' : '0')
+              }}
+              aria-label="Modo automático"
+            />
+          </div>
           <button
             type="button"
             onClick={() => send(input)}
             disabled={(!input.trim() && attachments.length === 0) || loading}
             aria-label="Enviar"
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-900 text-white disabled:bg-slate-200 disabled:text-slate-400 hover:bg-slate-700 transition-colors"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-900 dark:bg-blue-600 text-white disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors shrink-0"
           >
-            <ArrowUp className="w-4 h-4" />
+            <ArrowUp className="w-4.5 h-4.5 text-white" />
           </button>
         </div>
       </div>
-      {notice && <p className="text-[11px] text-rose-500 text-center mt-2">{notice}</p>}
+
+      {notice && <p className="text-xs text-rose-500 text-center mt-2">{notice}</p>}
       {gmail?.configured && (
-        <div className="flex justify-center mt-2">
+        <div className="flex justify-center mt-2.5">
           {gmail.connected ? (
-            <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
-              <Mail className="w-3 h-3 text-emerald-500" />
+            <span className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <MailIcon className="w-3.5 h-3.5 text-emerald-500" />
               Gmail conectado{gmail.email ? `: ${gmail.email}` : ''}
-              <button onClick={disconnectGmail} className="underline text-slate-400 hover:text-slate-600">
+              <button onClick={disconnectGmail} className="underline text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 ml-1">
                 Desconectar
               </button>
             </span>
           ) : (
             <button
               onClick={connectGmail}
-              className="text-[11px] flex items-center gap-1.5 text-sky-600 hover:text-sky-700 font-medium"
+              className="text-xs sm:text-[13px] flex items-center gap-1.5 text-sky-600 dark:text-sky-400 hover:text-sky-700 font-medium"
             >
-              <Mail className="w-3 h-3" />
+              <MailIcon className="w-3.5 h-3.5" />
               Conectar Gmail para enviar postulaciones por correo
             </button>
           )}
         </div>
       )}
-      <p className="text-[11px] text-slate-400 text-center mt-2">
+      <p className="text-xs sm:text-[13px] text-slate-400 dark:text-slate-500 text-center mt-1.5">
         La IA puede cometer errores. Revisá las postulaciones antes de enviarlas.
       </p>
     </div>
   )
 
-  return (
-    <div className="fixed inset-x-0 top-16 bottom-0 z-10 flex flex-col bg-background">
-      <div className="absolute top-3 left-3 z-30 flex items-center gap-1">
+  // Iniciales del usuario y etiqueta de su plan actual
+  const displayName = profile?.nombre?.trim() || profile?.email?.split('@')[0] || 'Usuario'
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('') || 'U'
+
+  const planLabel = isAdmin
+    ? 'Admin'
+    : billing?.plan === 'anual'
+    ? 'Plan Anual'
+    : billing?.plan === 'mensual'
+    ? 'Plan Mensual'
+    : billing?.creditos && billing.creditos > 0
+    ? `Pro · ${billing.creditos} créditos`
+    : 'Free'
+
+  const hasActiveSubscription = !!billing && (billing.plan === 'mensual' || billing.plan === 'anual')
+  const showUpgradeButton = !isAdmin && !hasActiveSubscription
+
+  const filteredConversations = [...conversations]
+    .filter((c) => !searchQuery.trim() || c.title.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    .sort((a, b) => {
+      const aPinned = pinnedIds.includes(a.id) ? 1 : 0
+      const bPinned = pinnedIds.includes(b.id) ? 1 : 0
+      return bPinned - aPinned
+    })
+
+  // Contenido del panel lateral de historial fiel al diseño de ChatGPT pero con el fondo azul oscuro de la página
+  const sidebarContent = (
+    <div className="flex flex-col h-full w-[260px] bg-slate-50/95 dark:bg-[#020617] border-r border-slate-200/80 dark:border-slate-800/80 text-slate-900 dark:text-slate-100 select-none">
+      {/* Fila superior: Título + Buscar + Plegar sidebar */}
+      <div className="flex items-center justify-between px-3.5 pt-3.5 pb-2">
+        <span className="text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white">
+          PostulaIA
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setSearchOpen((v) => {
+                if (v) setSearchQuery('')
+                return !v
+              })
+            }}
+            aria-label="Buscar en chats"
+            title="Buscar en chats"
+            className={cn(
+              'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+              searchOpen
+                ? 'bg-slate-200/80 dark:bg-[#0f172a] text-slate-900 dark:text-white'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#0f172a] hover:text-slate-900 dark:hover:text-white'
+            )}
+          >
+            <Search className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              toggleSidebar()
+              setMobileSidebarOpen(false)
+            }}
+            aria-label="Ocultar barra lateral"
+            title="Ocultar barra lateral"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-[#0f172a] hover:text-slate-900 dark:hover:text-white transition-colors"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Buscador desplegable opcional */}
+      {searchOpen && (
+        <div className="px-2.5 pb-2">
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute left-3 pointer-events-none" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar conversación…"
+              autoFocus
+              className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs !bg-slate-200/70 dark:!bg-[#0f172a] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Botón "New chat" / "Nuevo chat" en cápsula redondeada */}
+      <div className="px-2.5 pb-3">
         <button
-          onClick={() => setHistoryOpen((o) => !o)}
-          aria-label="Historial"
-          title="Historial"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100"
-        >
-          <History className="w-4 h-4" />
-        </button>
-        <button
+          type="button"
           onClick={newChat}
-          aria-label="Nuevo chat"
-          title="Nuevo chat"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100"
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-200/75 dark:bg-[#0f172a] hover:bg-slate-200 dark:hover:bg-[#16203a] border border-transparent dark:border-slate-800/70 text-[13px] font-medium text-slate-900 dark:text-white transition-colors"
         >
-          <SquarePen className="w-4 h-4" />
+          <SquarePen className="w-4 h-4 shrink-0" />
+          <span>Nuevo chat</span>
         </button>
       </div>
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30" ref={modelMenuRef}>
+
+      {/* Sección Recientes (Recents) con su respectivo hover estilo ChatGPT */}
+      <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
         <button
-          onClick={() => setModelOpen((o) => !o)}
-          className="flex items-center gap-2 px-3.5 h-9 rounded-full text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+          type="button"
+          onClick={() => setRecentsExpanded((v) => !v)}
+          className="group flex items-center gap-1 w-full px-2.5 py-1.5 text-left text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
-          <Sparkles className="w-3.5 h-3.5 text-sky-500" />
-          {MODELS.find((m) => m.id === modelId)?.name}
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">Gratis</span>
-          <ChevronDown className={cn('w-3.5 h-3.5 text-slate-400 transition-transform', modelOpen && 'rotate-180')} />
+          <span>Recientes</span>
+          <ChevronDown
+            className={cn(
+              'w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-all',
+              !recentsExpanded && '-rotate-90 opacity-100'
+            )}
+          />
         </button>
-        {modelOpen && (
-          <div className="absolute top-11 left-1/2 -translate-x-1/2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl py-1.5 animate-in fade-in slide-in-from-top-2">
-            {MODELS.map((m) => (
-              <button
-                key={m.id}
-                disabled={!m.available}
-                onClick={() => setModelOpen(false)}
-                className={cn(
-                  'w-full flex items-start gap-3 px-4 py-2.5 text-left',
-                  m.available ? 'hover:bg-slate-50' : 'opacity-60 cursor-not-allowed'
-                )}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800">{m.name}</p>
-                  <p className="text-xs text-slate-400">{m.description}</p>
-                </div>
-                {m.id === modelId ? (
-                  <Check className="w-4 h-4 text-slate-700 mt-0.5" />
-                ) : (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold mt-0.5">
-                    {m.badge}
-                  </span>
-                )}
-              </button>
-            ))}
+
+        {recentsExpanded && (
+          <div className="space-y-0.5 pt-0.5">
+            {filteredConversations.length === 0 ? (
+              <p className="px-2.5 py-3 text-xs text-slate-400 dark:text-slate-500">
+                {searchQuery.trim() ? 'Sin resultados.' : 'Todavía no tenés chats recientes.'}
+              </p>
+            ) : (
+              filteredConversations.map((c) => {
+                const active = c.id === convId
+                const isPinned = pinnedIds.includes(c.id)
+                const menuOpenForRow = chatMenuId === c.id
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => openConversation(c.id)}
+                    className={cn(
+                      'group relative flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[13px] cursor-pointer transition-colors',
+                      active || menuOpenForRow
+                        ? 'bg-slate-200/85 dark:bg-[#0f172a] text-slate-900 dark:text-white'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#0f172a]'
+                    )}
+                  >
+                    <span className="truncate flex-1 pr-1">{c.title}</span>
+
+                    {/* Acciones que aparecen en hover (… y Pin) igual que en ChatGPT */}
+                    <div
+                      className={cn(
+                        'flex items-center gap-0.5 shrink-0 transition-opacity',
+                        isPinned || menuOpenForRow
+                          ? 'opacity-100'
+                          : 'opacity-0 group-hover:opacity-100'
+                      )}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setChatMenuId((prev) => (prev === c.id ? null : c.id))}
+                        aria-label="Más opciones"
+                        title="Opciones"
+                        className="p-1 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                      >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => togglePin(c.id, e)}
+                        aria-label={isPinned ? 'Desfijar chat' : 'Fijar chat'}
+                        title={isPinned ? 'Desfijar chat' : 'Fijar arriba'}
+                        className={cn(
+                          'p-1 rounded-md transition-colors',
+                          isPinned
+                            ? 'text-sky-500 dark:text-sky-400'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10'
+                        )}
+                      >
+                        <Pin className="w-3.5 h-3.5 rotate-45" />
+                      </button>
+                    </div>
+
+                    {/* Menú contextual de los 3 puntos (…) */}
+                    {menuOpenForRow && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-2 top-9 z-30 w-40 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-[#0f172a] shadow-xl py-1 animate-in fade-in"
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            togglePin(c.id, e)
+                            setChatMenuId(null)
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-left"
+                        >
+                          <Pin className="w-3.5 h-3.5 rotate-45" />
+                          <span>{isPinned ? 'Desfijar' : 'Fijar chat'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChatMenuId(null)
+                            deleteConversation(c.id)
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 text-left"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Eliminar</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
           </div>
         )}
       </div>
-      {historyOpen && (
-        <div className="absolute top-14 left-3 z-30 w-72 max-h-[70vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl py-1.5">
-          {conversations.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-slate-400">Todavía no tenés conversaciones guardadas.</p>
+
+      {/* Pie del sidebar: Cuenta registrada + Plan + Botón Upgrade */}
+      <div className="p-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-800/80 space-y-2.5">
+        <Link
+          href={profile?.role === 'empresa' ? '/empresa/dashboard' : '/candidato/perfil'}
+          className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-[#0f172a] transition-colors"
+        >
+          {profile?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.avatar_url}
+              alt={displayName}
+              className="w-8 h-8 rounded-full object-cover shrink-0"
+            />
           ) : (
-            conversations.map((c) => (
-              <div
-                key={c.id}
-                className={cn(
-                  'group flex items-center gap-1 px-2 mx-1 rounded-xl hover:bg-slate-50',
-                  c.id === convId && 'bg-slate-100'
-                )}
-              >
-                <button
-                  onClick={() => openConversation(c.id)}
-                  className="flex-1 text-left px-2 py-2 text-sm text-slate-700 truncate"
-                >
-                  {c.title}
-                </button>
-                <button
-                  onClick={() => deleteConversation(c.id)}
-                  aria-label="Borrar conversación"
-                  className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-      {empty ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4 gap-8">
-          <div className="text-center space-y-3">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500 via-sky-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-sky-500/20">
-              <Sparkles className="w-6 h-6" />
+            <div className="w-8 h-8 rounded-full bg-[#10a37f] text-white text-xs font-bold flex items-center justify-center shrink-0">
+              {initials}
             </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              ¿Qué empleo buscamos hoy?
-            </h1>
-            <p className="text-sm text-slate-500">
-              Dejá que la IA encuentre vacantes y se postule por vos.
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-slate-900 dark:text-white leading-tight truncate">
+              {displayName}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5 truncate">
+              {planLabel}
             </p>
           </div>
-          {composer}
-          <div className="flex flex-wrap justify-center gap-2 max-w-3xl">
-            {SUGGESTIONS.map(({ icon: Icon, label }) => (
-              <button
-                key={label}
-                onClick={() => send(label)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
-              >
-                <Icon className="w-3.5 h-3.5 text-slate-400" />
-                {label}
-              </button>
-            ))}
-          </div>
+        </Link>
+
+        {showUpgradeButton && (
+          <Link
+            href="/planes"
+            className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-full border border-slate-300 dark:border-slate-700/80 bg-white dark:bg-[#091024] hover:bg-slate-100 dark:hover:bg-[#0f172a] text-xs font-semibold text-slate-900 dark:text-white transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>Upgrade</span>
+          </Link>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-x-0 top-16 bottom-0 z-10 flex bg-background overflow-hidden font-google-sans">
+      {/* Sidebar escritorio (estilo ChatGPT) */}
+      <aside
+        className={cn(
+          'hidden md:block h-full shrink-0 transition-all duration-200 overflow-hidden',
+          sidebarOpen ? 'w-[260px]' : 'w-0'
+        )}
+      >
+        {sidebarContent}
+      </aside>
+
+      {/* Drawer lateral móvil */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 top-16 z-40 flex md:hidden">
+          <div
+            className="fixed inset-0 top-16 bg-slate-950/50 backdrop-blur-xs"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative z-10 h-full">{sidebarContent}</div>
         </div>
-      ) : (
-        <>
-          <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-8">
-            <div className="max-w-3xl mx-auto space-y-6">
-              {messages.map((m) => (
-                <div key={m.id} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div
+      )}
+
+      {/* Área principal del chat */}
+      <div className="flex-1 flex flex-col min-w-0 h-full relative">
+        {/* Barra superior sin barrita divisoria (border-b) */}
+        <header className="h-14 shrink-0 px-3 sm:px-5 flex items-center justify-between bg-transparent z-20">
+          <div className="flex items-center gap-1.5">
+            {/* Botón para abrir historial en móvil */}
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              aria-label="Abrir historial"
+              title="Abrir historial"
+              className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+
+            {/* Botón para mostrar historial en escritorio cuando está plegado */}
+            {!sidebarOpen && (
+              <div className="hidden md:flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  aria-label="Mostrar historial"
+                  title="Mostrar panel lateral"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <PanelLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={newChat}
+                  aria-label="Nuevo chat"
+                  title="Nuevo chat"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <SquarePen className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Selector de modelos con background transparente y texto visible */}
+          <div className="relative" ref={modelMenuRef}>
+            <button
+              type="button"
+              onClick={() => setModelOpen((o) => !o)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[15px] sm:text-base font-semibold text-slate-800 dark:text-white bg-transparent hover:bg-slate-100/70 dark:hover:bg-white/10 transition-colors"
+            >
+              <Sparkles className="w-4 h-4 text-sky-500 shrink-0" />
+              <span>{MODELS.find((m) => m.id === modelId)?.name}</span>
+              <ChevronDown className={cn('w-4 h-4 text-slate-500 dark:text-slate-300 transition-transform', modelOpen && 'rotate-180')} />
+            </button>
+            {modelOpen && (
+              <div className="absolute top-11 left-1/2 -translate-x-1/2 w-72 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl overflow-hidden z-30 animate-in fade-in slide-in-from-top-2">
+                {MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    disabled={!m.available}
+                    onClick={() => setModelOpen(false)}
                     className={cn(
-                      'text-sm leading-relaxed whitespace-pre-wrap max-w-[85%]',
-                      m.role === 'user'
-                        ? 'bg-slate-900 text-white rounded-3xl rounded-br-lg px-4 py-2.5'
-                        : 'text-slate-800'
+                      'w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors',
+                      m.available ? 'hover:bg-slate-50 dark:hover:bg-slate-800' : 'opacity-60 cursor-not-allowed'
                     )}
                   >
-                    {m.content}
-                    {m.files && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {m.files.map((n, i) => (
-                          <span key={n + i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 text-[11px]">
-                            <Paperclip className="w-3 h-3" /> {n}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{m.name}</p>
+                      <p className="text-xs text-slate-400">{m.description}</p>
+                    </div>
+                    {m.id === modelId ? (
+                      <Check className="w-4 h-4 text-slate-700 dark:text-slate-200 mt-0.5" />
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold mt-0.5">
+                        {m.badge}
+                      </span>
                     )}
-                    {m.profile && (
-                      <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 space-y-2 whitespace-normal">
-                        <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                          <Wand2 className="w-3.5 h-3.5" /> Propuesta para tu perfil (podés editarla)
-                        </p>
-                        {m.profile.nombre !== undefined && (
-                          <input
-                            value={m.profile.nombre}
-                            onChange={(e) => editProfile(m.id, { nombre: e.target.value })}
-                            disabled={m.profileState !== 'idle'}
-                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-slate-400"
-                            aria-label="Nombre"
-                          />
-                        )}
-                        {m.profile.ubicacion !== undefined && (
-                          <input
-                            value={m.profile.ubicacion}
-                            onChange={(e) => editProfile(m.id, { ubicacion: e.target.value })}
-                            disabled={m.profileState !== 'idle'}
-                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-slate-400"
-                            aria-label="Ubicación"
-                          />
-                        )}
-                        {m.profile.bio !== undefined && (
-                          <textarea
-                            value={m.profile.bio}
-                            onChange={(e) => editProfile(m.id, { bio: e.target.value })}
-                            disabled={m.profileState !== 'idle'}
-                            rows={8}
-                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-slate-400 resize-y"
-                            aria-label="Resumen profesional"
-                          />
-                        )}
-                        <button
-                          onClick={() => confirmProfileSave(m)}
-                          disabled={m.profileState !== 'idle'}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-60"
-                        >
-                          {m.profileState === 'sending' ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : m.profileState === 'done' ? (
-                            <Check className="w-3.5 h-3.5" />
-                          ) : null}
-                          {m.profileState === 'done' ? 'Guardado' : 'Guardar en mi perfil'}
-                        </button>
-                      </div>
-                    )}
-                    {m.pending && (
-                      <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 space-y-2 whitespace-normal">
-                        <p className="text-xs font-semibold text-slate-500">Postulaciones listas para enviar</p>
-                        {m.pending.map((p) => (
-                          <div key={p.job_id} className="flex items-center gap-2 text-sm">
-                            <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="font-medium">{p.titulo}</span>
-                            {p.empresa && <span className="text-slate-400">· {p.empresa}</span>}
-                          </div>
-                        ))}
-                        <button
-                          onClick={() => confirm(m)}
-                          disabled={m.pendingState !== 'idle'}
-                          className="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-60"
-                        >
-                          {m.pendingState === 'sending' ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : m.pendingState === 'done' ? (
-                            <Check className="w-3.5 h-3.5" />
-                          ) : null}
-                          {m.pendingState === 'done' ? 'Enviadas' : `Confirmar y postular (${m.pending.length})`}
-                        </button>
-                      </div>
-                    )}
-                    {m.email && (
-                      <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3 space-y-2 whitespace-normal">
-                        <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                          <Mail className="w-3.5 h-3.5" /> Correo listo para enviar (podés editarlo)
-                        </p>
-                        <input
-                          value={m.email.to}
-                          onChange={(e) => editEmail(m.id, { to: e.target.value })}
-                          disabled={m.emailState !== 'idle'}
-                          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-slate-400"
-                          aria-label="Destinatario"
-                        />
-                        <input
-                          value={m.email.subject}
-                          onChange={(e) => editEmail(m.id, { subject: e.target.value })}
-                          disabled={m.emailState !== 'idle'}
-                          className="w-full text-sm font-medium border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-slate-400"
-                          aria-label="Asunto"
-                        />
-                        <textarea
-                          value={m.email.body}
-                          onChange={(e) => editEmail(m.id, { body: e.target.value })}
-                          disabled={m.emailState !== 'idle'}
-                          rows={6}
-                          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-slate-400 resize-y"
-                          aria-label="Mensaje"
-                        />
-                        <label className="flex items-center gap-2 text-xs text-slate-500">
-                          <input
-                            type="checkbox"
-                            checked={m.email.attach_cv}
-                            disabled={m.emailState !== 'idle'}
-                            onChange={(e) => editEmail(m.id, { attach_cv: e.target.checked })}
-                          />
-                          <Paperclip className="w-3 h-3" /> Adjuntar mi CV
-                        </label>
-                        <button
-                          onClick={() => sendEmail(m)}
-                          disabled={m.emailState !== 'idle'}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-60"
-                        >
-                          {m.emailState === 'sending' ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : m.emailState === 'done' ? (
-                            <Check className="w-3.5 h-3.5" />
-                          ) : null}
-                          {m.emailState === 'done' ? 'Enviado' : 'Enviar correo'}
-                        </button>
-                      </div>
-                    )}
-                    {m.needsGmail && gmail?.configured && !gmail.connected && (
-                      <button
-                        onClick={connectGmail}
-                        className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        <Mail className="w-3.5 h-3.5" /> Conectar Gmail
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {loading && (
-                <div className="flex gap-1 py-2">
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
-                      style={{ animationDelay: `${i * 120}ms` }}
-                    />
-                  ))}
-                </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Espaciador derecho para mantener el selector centrado */}
+          <div className="w-9 md:w-16" />
+        </header>
+
+        {/* Aviso de conexión con Gmail bien espaciado debajo del header (nunca se solapa con el selector) */}
+        {gmailBanner && (
+          <div className="px-4 pt-3 shrink-0">
+            <div
+              className={cn(
+                'max-w-3xl mx-auto flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl border text-xs',
+                gmailBanner.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
               )}
+            >
+              <div className="flex items-center gap-2">
+                <MailIcon className="w-4 h-4 shrink-0" />
+                <span>{gmailBanner.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGmailBanner(null)}
+                aria-label="Cerrar aviso"
+                className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-          <div className="px-4 pb-4 pt-2">{composer}</div>
-        </>
-      )}
+        )}
+
+        {empty ? (
+          <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center px-4 py-6 gap-7">
+            <div className="text-center space-y-3.5">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500 via-sky-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-sky-500/20">
+                <Sparkles className="w-7 h-7" />
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                ¿Qué empleo buscamos hoy?
+              </h1>
+              <p className="text-base sm:text-lg text-slate-500 dark:text-slate-400">
+                Dejá que la IA encuentre vacantes, mejore tu CV y se postule por vos.
+              </p>
+            </div>
+            {composer}
+            <div className="flex flex-wrap justify-center gap-3 max-w-3xl px-2">
+              {SUGGESTIONS.map(({ icon: Icon, label }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => send(label)}
+                  className="inline-flex items-center gap-2.5 px-5 py-3 min-h-[44px] rounded-full border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 text-sm font-medium text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 transition-colors shadow-xs leading-normal"
+                >
+                  <Icon className="w-4 h-4 text-slate-400 dark:text-white shrink-0" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-6">
+              <div className="max-w-3xl mx-auto space-y-6">
+                {messages.map((m) => {
+                  const isEditingProfile = !!editingProfileIds[m.id]
+                  return (
+                    <div key={m.id} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      {m.role === 'user' ? (
+                        <div className="flex flex-col items-end gap-2 max-w-[85%]">
+                          {/* Previsualización de archivos / imágenes enviadas (por encima de la burbuja) */}
+                          {m.attachments && m.attachments.length > 0 ? (
+                            <div className="flex flex-wrap justify-end gap-2.5">
+                              {m.attachments.map((f, i) =>
+                                f.mime.startsWith('image/') ? (
+                                  <button
+                                    type="button"
+                                    key={f.name + i}
+                                    onClick={() => openAttachment(f)}
+                                    title={`Ver ${f.name} en tamaño completo`}
+                                    className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-2xl sm:rounded-3xl overflow-hidden border border-transparent shadow-md bg-transparent group cursor-pointer transition-transform hover:scale-[1.01]"
+                                  >
+                                    <img
+                                      src={`data:${f.mime};base64,${f.data}`}
+                                      alt={f.name}
+                                      className="w-full h-full object-cover select-none"
+                                    />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    key={f.name + i}
+                                    onClick={() => openAttachment(f)}
+                                    title={`Abrir ${f.name}`}
+                                    className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-slate-900/90 dark:bg-slate-800/90 text-white text-xs border border-white/10 shadow-sm hover:bg-slate-800 cursor-pointer transition-colors"
+                                  >
+                                    <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">
+                                      PDF
+                                    </span>
+                                    <span className="font-medium truncate max-w-[180px]">{f.name}</span>
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          ) : m.files && m.files.length > 0 ? (
+                            <div className="flex flex-wrap justify-end gap-1.5">
+                              {m.files.map((n, i) => (
+                                <span
+                                  key={n + i}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-800/90 text-white text-xs font-medium border border-white/10"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-indigo-400" /> {n}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {/* Burbuja de texto enviada por el usuario (debajo de la vista previa) */}
+                          {m.content &&
+                            m.content !== DEFAULT_ATTACHMENT_PROMPT &&
+                            m.content !== 'Analizá el archivo adjunto.' && (
+                            <div className="bg-slate-900 dark:bg-indigo-600 text-white rounded-3xl rounded-br-lg px-4 py-2.5 shadow-xs whitespace-pre-wrap text-sm leading-relaxed">
+                              {m.content}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="w-full max-w-[92%] text-slate-800 dark:text-slate-100 text-[15px] sm:text-base leading-relaxed">
+                          <ChatMarkdown content={m.content} role="assistant" />
+
+                        {/* Propuesta de Perfil / CV con vista previa de PDF en rectángulo con bordes redondeados */}
+                        {m.profile && (
+                          <div className="mt-4 rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-4 space-y-3.5 whitespace-normal shadow-sm">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                                <Wand2 className="w-3.5 h-3.5 text-indigo-500" />
+                                Propuesta de CV / Perfil lista para revisar y confirmar
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingProfileIds((prev) => ({ ...prev, [m.id]: !prev[m.id] }))
+                                }
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                <Pencil className="w-3 h-3" />
+                                {isEditingProfile ? 'Ver vista previa PDF' : 'Editar contenido'}
+                              </button>
+                            </div>
+
+                            {/* Vista previa en rectángulo con bordes redondeados del PDF */}
+                            <RoundedPdfPreview
+                              nombre={m.profile.nombre ?? profile?.nombre}
+                              email={profile?.email}
+                              ubicacion={m.profile.ubicacion ?? profile?.ubicacion ?? undefined}
+                              bio={m.profile.bio ?? profile?.bio ?? undefined}
+                              title={`CV_${(m.profile.nombre || profile?.nombre || 'Candidato').replace(/\s+/g, '_')}.pdf`}
+                              subtitle="Vista previa del documento generado por la IA"
+                              defaultExpanded={!isEditingProfile}
+                            />
+
+                            {/* Campos editables si el usuario desea retocar antes de confirmar */}
+                            {isEditingProfile && (
+                              <div className="space-y-2.5 pt-1">
+                                {m.profile.nombre !== undefined && (
+                                  <div>
+                                    <label className="block text-[11px] font-medium text-slate-500 mb-1">Nombre</label>
+                                    <input
+                                      value={m.profile.nombre}
+                                      onChange={(e) => editProfile(m.id, { nombre: e.target.value })}
+                                      disabled={m.profileState !== 'idle'}
+                                      className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500"
+                                      aria-label="Nombre"
+                                    />
+                                  </div>
+                                )}
+                                {m.profile.ubicacion !== undefined && (
+                                  <div>
+                                    <label className="block text-[11px] font-medium text-slate-500 mb-1">Ubicación</label>
+                                    <input
+                                      value={m.profile.ubicacion}
+                                      onChange={(e) => editProfile(m.id, { ubicacion: e.target.value })}
+                                      disabled={m.profileState !== 'idle'}
+                                      className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500"
+                                      aria-label="Ubicación"
+                                    />
+                                  </div>
+                                )}
+                                {m.profile.bio !== undefined && (
+                                  <div>
+                                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                                      Resumen profesional y experiencia
+                                    </label>
+                                    <AutoResizeTextarea
+                                      value={m.profile.bio}
+                                      onChange={(e) => editProfile(m.id, { bio: e.target.value })}
+                                      disabled={m.profileState !== 'idle'}
+                                      className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 leading-relaxed"
+                                      aria-label="Resumen profesional"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => confirmProfileSave(m)}
+                                disabled={m.profileState !== 'idle'}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-60 transition-colors"
+                              >
+                                {m.profileState === 'sending' ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : m.profileState === 'done' ? (
+                                  <Check className="w-3.5 h-3.5" />
+                                ) : null}
+                                {m.profileState === 'done' ? 'Guardado en tu perfil' : 'Confirmar y guardar en mi perfil'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Postulaciones listas para confirmar con preview redondeada del CV PDF adjunto */}
+                        {m.pending && (
+                          <div className="mt-4 rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-4 space-y-3 whitespace-normal shadow-sm">
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                              <Briefcase className="w-3.5 h-3.5 text-indigo-500" />
+                              Postulaciones listas para revisar y confirmar
+                            </p>
+                            <div className="space-y-1.5">
+                              {m.pending.map((p) => (
+                                <div
+                                  key={p.job_id}
+                                  className="flex items-center gap-2 text-sm px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60"
+                                >
+                                  <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="font-medium text-slate-800 dark:text-slate-100">{p.titulo}</span>
+                                  {p.empresa && <span className="text-slate-400">· {p.empresa}</span>}
+                                </div>
+                              ))}
+                            </div>
+
+                            {profile && (
+                              <RoundedPdfPreview
+                                pdfUrl={profile.cv_url}
+                                nombre={profile.nombre}
+                                email={profile.email}
+                                ubicacion={profile.ubicacion ?? undefined}
+                                bio={profile.bio ?? undefined}
+                                title={profile.cv_url ? 'Mi_CV_Adjunto.pdf' : `CV_${(profile.nombre || 'Candidato').replace(/\s+/g, '_')}.pdf`}
+                                subtitle="CV que se enviará con tu postulación"
+                                defaultExpanded={false}
+                              />
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => confirm(m)}
+                              disabled={m.pendingState !== 'idle'}
+                              className="mt-1 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-60 transition-colors"
+                            >
+                              {m.pendingState === 'sending' ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : m.pendingState === 'done' ? (
+                                <Check className="w-3.5 h-3.5" />
+                              ) : null}
+                              {m.pendingState === 'done' ? 'Enviadas' : `Confirmar y postular (${m.pending.length})`}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Correo listo para revisar y confirmar con vista previa del PDF en rectángulo redondeado */}
+                        {m.email && (
+                          <div className="mt-4 rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-4 space-y-3 whitespace-normal shadow-sm">
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                              <MailIcon className="w-3.5 h-3.5 text-emerald-500" />
+                              Correo listo para revisar y confirmar (podés editarlo)
+                            </p>
+                            <div className="space-y-2">
+                              <input
+                                value={m.email.to}
+                                onChange={(e) => editEmail(m.id, { to: e.target.value })}
+                                disabled={m.emailState !== 'idle'}
+                                placeholder="Destinatario"
+                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500"
+                                aria-label="Destinatario"
+                              />
+                              <input
+                                value={m.email.subject}
+                                onChange={(e) => editEmail(m.id, { subject: e.target.value })}
+                                disabled={m.emailState !== 'idle'}
+                                placeholder="Asunto"
+                                className="w-full text-sm font-medium border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500"
+                                aria-label="Asunto"
+                              />
+                              <AutoResizeTextarea
+                                value={m.email.body}
+                                onChange={(e) => editEmail(m.id, { body: e.target.value })}
+                                disabled={m.emailState !== 'idle'}
+                                className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 leading-relaxed"
+                                aria-label="Mensaje"
+                              />
+                            </div>
+
+                            {/* Preview del PDF adjunto en rectángulo con bordes redondeados */}
+                            {m.email.attach_cv ? (
+                              <RoundedPdfPreview
+                                pdfUrl={profile?.cv_url}
+                                nombre={profile?.nombre}
+                                email={profile?.email}
+                                ubicacion={profile?.ubicacion ?? undefined}
+                                bio={profile?.bio ?? undefined}
+                                title={
+                                  profile?.cv_url
+                                    ? `CV_${(profile?.nombre || 'Candidato').replace(/\s+/g, '_')}.pdf`
+                                    : 'CV del perfil (PDF)'
+                                }
+                                subtitle={
+                                  profile?.cv_url
+                                    ? 'Documento PDF adjunto al correo para revisar antes de enviar'
+                                    : 'Vista previa de tu CV (subí un archivo PDF en Mi Perfil si querés reemplazarlo)'
+                                }
+                                defaultExpanded={true}
+                                rightSlot={
+                                  <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60">
+                                    <input
+                                      type="checkbox"
+                                      checked={m.email.attach_cv}
+                                      disabled={m.emailState !== 'idle'}
+                                      onChange={(e) => editEmail(m.id, { attach_cv: e.target.checked })}
+                                      className="rounded"
+                                    />
+                                    <span>Adjuntar</span>
+                                  </label>
+                                }
+                              />
+                            ) : (
+                              <label className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 cursor-pointer px-3 py-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                                <input
+                                  type="checkbox"
+                                  checked={m.email.attach_cv}
+                                  disabled={m.emailState !== 'idle'}
+                                  onChange={(e) => editEmail(m.id, { attach_cv: e.target.checked })}
+                                />
+                                <AttachFileIcon className="w-3.5 h-3.5" /> Adjuntar mi CV en PDF al correo
+                              </label>
+                            )}
+
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => sendEmail(m)}
+                                disabled={m.emailState !== 'idle'}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-60 transition-colors"
+                              >
+                                {m.emailState === 'sending' ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : m.emailState === 'done' ? (
+                                  <Check className="w-3.5 h-3.5" />
+                                ) : null}
+                                {m.emailState === 'done' ? 'Correo enviado' : 'Confirmar y enviar correo'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {m.needsGmail && gmail?.configured && !gmail.connected && (
+                          <button
+                            type="button"
+                            onClick={connectGmail}
+                            className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          >
+                            <MailIcon className="w-3.5 h-3.5" /> Conectar Gmail
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    </div>
+                  )
+                })}
+                {loading && (
+                  <div className="flex gap-1 py-2">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
+                        style={{ animationDelay: `${i * 120}ms` }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-4 pb-4 pt-2 shrink-0">{composer}</div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

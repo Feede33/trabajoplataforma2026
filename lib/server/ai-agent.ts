@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { CANDIDATE_MODELS, makeHttpsPost } from '@/lib/gemini'
 import { getGmailConnection, isGoogleConfigured, isValidEmail, sendGmail } from '@/lib/server/google'
+import { cleanChatText } from '@/lib/chat-format'
 
 /**
  * Agente de IA para postulaciones.
@@ -179,13 +180,29 @@ Ayudas al candidato a encontrar empleo y a postularse sin hacerlo una por una.
 Reglas:
 - Responde siempre en español rioplatense, breve y claro. Usa listas cortas cuando enumeres empleos.
 - Usa las herramientas para obtener datos reales. NUNCA inventes empleos, empresas, ids ni contactos.
+- FORMATO, EMOJIS E ICONOS:
+  * Estructura cada vacante o puesto recomendado de forma ordenada y limpia, separando cada detalle en su propia línea con su emoji:
+    1. **Nombre del Puesto - Rubro**
+       🏢 Nombre de la Empresa o Comercio
+       📍 Ubicación / Barrio
+       🕒 Turno o Horario
+       ✨ Por qué encaja con el perfil del candidato
+       ✉️ Correo de contacto (si aplica)
+  * Usa siempre EMOJIS E ICONOS UNICODE REALES (💼 para puestos, 🏢 para empresas, 📍 para ubicación, 💰 para salario, 🕒 para horarios, ✉️ para correos, 📞 para contacto, ✨ para recomendaciones, ✅ para requisitos).
+  * NUNCA pongas asteriscos antes de los emojis (está PROHIBIDO escribir "* 🏢" o "* 📍"). Coloca el emoji directamente al inicio de la línea.
+  * Si usas negrita para el título, ciérrala SIEMPRE con ** antes de cualquier otro texto o emoji (ejemplo correcto: "**Puesto** 📍 Montevideo", NUNCA "**Puesto📍 Montevideo" sin cerrar).
+  * No dejes asteriscos huérfanos o sueltos en el texto.
 - Para recomendar, primero lee el perfil (get_my_profile); si tiene CV adjunto, léelo también con read_my_cv. Luego busca empleos acordes. Explica en una línea por qué encaja cada uno.
 - Si el perfil/CV está vacío o es pobre, sugiere completarlo y ofrécete a redactarlo; si el usuario quiere ajustarlo o mejorarlo, redacta la versión y llama a propose_profile_update (el usuario la revisa y confirma; nunca digas que ya se guardó).
 - Para postular usa apply_to_jobs con los id exactos de search_jobs. Si el usuario dice "postulame a todos/5", usa los resultados más relevantes. No postules a empleos a los que ya se postuló (revisa list_my_applications si hay duda).
 - Los empleos informales no tienen postulación en la plataforma: da el contacto para que el usuario escriba.
 - Para postular por correo usa prepare_email (un solo correo por vez). Si el usuario no da un mensaje, usa uno por defecto del estilo: "Hola, estoy buscando una vacante en su empresa. Adjunto mi CV para que lo consideren. Quedo a disposición." Personalízalo con el puesto y el contexto de la conversación, y fírmalo con el nombre del perfil. Nunca digas que el correo fue enviado: queda pendiente de que el usuario lo confirme.
 - Después de apply_to_jobs, informa claramente si quedó pendiente de confirmación o si ya fue enviada.
-- Si el usuario adjunta archivos (imágenes o PDF), léelos y úsalos como contexto: puede ser un CV, un aviso de empleo o una captura.${deep ? DEEP_SEARCH_PROMPT : ''}`
+- Si el usuario adjunta archivos (imágenes o PDF):
+  * Examina inmediatamente la imagen o documento.
+  * Si es una imagen general (foto, dibujo, captura, logo, etc.) o pide analizarla: DESCRIBE DIRECTAMENTE qué ves o qué representa en texto plano de forma prolija, sin llamar a herramientas de búsqueda de empleo ni de CV a menos que la imagen sea explícitamente una oferta de trabajo o el usuario pida postularse.
+  * Si es un aviso de empleo o captura de clasificados: resume claramente los datos (puesto, requisitos, ubicación, contacto) y pregúntale si quiere buscar ofertas similares.
+  * Si es un CV: analiza el perfil profesional y destaca sus fortalezas.${deep ? DEEP_SEARCH_PROMPT : ''}`
 }
 
 type GeminiPart = Record<string, any>
@@ -570,11 +587,12 @@ export async function runAgent(opts: {
 
     const calls = modelContent.parts.filter((p) => p.functionCall)
     if (calls.length === 0) {
-      result.reply = modelContent.parts
+      const rawReply = modelContent.parts
         .filter((p) => typeof p.text === 'string' && !p.thought)
         .map((p) => p.text)
         .join('')
         .trim()
+      result.reply = cleanChatText(rawReply)
       return result
     }
 
@@ -596,6 +614,26 @@ export async function runAgent(opts: {
       })
     }
     contents.push({ role: 'user', parts: responses })
+  }
+
+  // Si agotó los pasos de herramientas, solicitamos una respuesta final directa en texto
+  try {
+    contents.push({
+      role: 'user',
+      parts: [{ text: 'Por favor responde al usuario directamente en texto claro con la información y análisis disponibles, sin llamar a más herramientas.' }],
+    })
+    const finalContent = await callGeminiChat(contents, deepSearch)
+    const finalReply = finalContent.parts
+      .filter((p) => typeof p.text === 'string' && !p.thought)
+      .map((p) => p.text)
+      .join('')
+      .trim()
+    if (finalReply) {
+      result.reply = cleanChatText(finalReply)
+      return result
+    }
+  } catch (err) {
+    console.warn('ai-chat: error en resumen final tras agotar pasos:', err)
   }
 
   result.reply = 'No pude completar la solicitud. ¿Podés reformularla?'

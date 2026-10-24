@@ -39,7 +39,7 @@ export function Navbar() {
   })()
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+    <header className={`sticky top-0 z-40 w-full bg-white/90 dark:bg-background/90 backdrop-blur-md transition-colors ${pathname === '/ia-chat' ? 'border-b-0' : 'border-b border-slate-200/80 dark:border-slate-800/80'}`}>
       <div className="w-full px-3 sm:px-5 lg:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}

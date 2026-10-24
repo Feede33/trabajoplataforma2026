@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .font-google-sans {
+    font-family: 'Google Sans', 'Google Sans Text', system-ui, -apple-system, sans-serif;
+  }
+}
+
 @layer base {
   :root {
     --background: 210 40% 98%;
@@ -54,8 +60,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Google Sans', 'Google Sans Text', var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
     min-height: 100vh;
   }
 }
@@ -125,13 +131,14 @@
 /* Inputs, selects y textareas en modo oscuro */
 .dark input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent),
 .dark select,
-.dark textarea {
+.dark textarea:not(.bg-transparent) {
   background-color: hsl(222.2 47.4% 9%);
   color: hsl(var(--foreground));
   border-color: hsl(var(--border));
 }
 
-.dark input.bg-transparent {
+.dark input.bg-transparent,
+.dark textarea.bg-transparent {
   background-color: transparent !important;
   color: hsl(var(--foreground));
 }

@@ -5,5 +5,9 @@ export const metadata = {
 }
 
 export default function IAChatPage() {
-  return <AIChat />
+  return (
+    <div className="font-google-sans">
+      <AIChat />
+    </div>
+  )
 }
