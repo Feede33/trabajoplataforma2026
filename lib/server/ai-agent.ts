@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { CANDIDATE_MODELS, makeHttpsPost } from '@/lib/gemini'
+import { getGmailConnection, isGoogleConfigured, isValidEmail, sendGmail } from '@/lib/server/google'
 
 /**
  * Agente de IA para postulaciones.
@@ -19,6 +20,13 @@ export interface PendingApplication {
   mensaje: string
 }
 
+export interface PendingEmail {
+  to: string
+  subject: string
+  body: string
+  attach_cv: boolean
+}
+
 export interface ChatTurn {
   role: 'user' | 'assistant'
   content: string
@@ -28,6 +36,10 @@ export interface AgentResult {
   reply: string
   pending: PendingApplication[]
   applied: { job_id: string; titulo: string }[]
+  /** Correo propuesto, a la espera de que el usuario lo confirme (nunca se envía solo) */
+  pendingEmail: PendingEmail | null
+  /** La IA necesitó Gmail pero el usuario no lo tiene conectado */
+  needsGmail: boolean
   /** Se actualizó el perfil (bio/ubicación/nombre) */
   profileUpdated: boolean
 }
@@ -40,6 +52,27 @@ const TOOLS = [
     name: 'get_my_profile',
     description: 'Devuelve el perfil del candidato (nombre, email, bio/resumen del CV, ubicación y si tiene CV adjunto).',
     parameters: { type: 'OBJECT', properties: {} },
+  },
+  {
+    name: 'read_my_cv',
+    description:
+      'Lee el archivo de CV (PDF) adjunto del candidato y devuelve su contenido en texto: experiencia, estudios, habilidades, idiomas. Úsalo para recomendar empleos o ajustar el CV.',
+    parameters: { type: 'OBJECT', properties: {} },
+  },
+  {
+    name: 'prepare_email',
+    description:
+      'Prepara UN correo de postulación espontánea o de contacto a una empresa, desde el Gmail del usuario. NO lo envía: el usuario lo revisa y confirma con un botón. Usar solo con direcciones de correo reales (de un aviso informal o dadas por el usuario).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        to: { type: 'STRING', description: 'Correo del destinatario.' },
+        subject: { type: 'STRING' },
+        body: { type: 'STRING', description: 'Cuerpo del mensaje en español, breve, con saludo y firma con el nombre del candidato.' },
+        attach_cv: { type: 'BOOLEAN', description: 'Adjuntar el CV del perfil (por defecto true).' },
+      },
+      required: ['to', 'subject', 'body'],
+    },
   },
   {
     name: 'update_my_profile',
@@ -119,15 +152,59 @@ Ayudas al candidato a encontrar empleo y a postularse sin hacerlo una por una.
 Reglas:
 - Responde siempre en español rioplatense, breve y claro. Usa listas cortas cuando enumeres empleos.
 - Usa las herramientas para obtener datos reales. NUNCA inventes empleos, empresas, ids ni contactos.
-- Para recomendar, primero lee el perfil (get_my_profile) y luego busca empleos acordes. Explica en una línea por qué encaja cada uno.
+- Para recomendar, primero lee el perfil (get_my_profile); si tiene CV adjunto, léelo también con read_my_cv. Luego busca empleos acordes. Explica en una línea por qué encaja cada uno.
 - Si el perfil/CV está vacío o es pobre, sugiere completarlo y ofrécete a redactarlo; solo llama a update_my_profile si el usuario lo pide o aprueba el texto.
 - Para postular usa apply_to_jobs con los id exactos de search_jobs. Si el usuario dice "postulame a todos/5", usa los resultados más relevantes. No postules a empleos a los que ya se postuló (revisa list_my_applications si hay duda).
 - Los empleos informales no tienen postulación en la plataforma: da el contacto para que el usuario escriba.
+- Para postular por correo usa prepare_email (un solo correo por vez). Si el usuario no da un mensaje, usa uno por defecto del estilo: "Hola, estoy buscando una vacante en su empresa. Adjunto mi CV para que lo consideren. Quedo a disposición." Personalízalo con el puesto y el contexto de la conversación, y fírmalo con el nombre del perfil. Nunca digas que el correo fue enviado: queda pendiente de que el usuario lo confirme.
 - Después de apply_to_jobs, informa claramente si quedó pendiente de confirmación o si ya fue enviada.`
 }
 
 type GeminiPart = Record<string, any>
 type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] }
+
+/** Extrae el contenido de un PDF de CV con Gemini (lectura multimodal). */
+async function extractCvText(pdf: Buffer): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('Falta GEMINI_API_KEY en el servidor (.env.local)')
+  let lastError: Error | null = null
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+      const { statusCode, data } = await makeHttpsPost(url, {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: 'application/pdf', data: pdf.toString('base64') } },
+              {
+                text: 'Transcribe de forma ordenada y fiel el contenido de este currículum: datos de contacto, perfil, experiencia laboral (puesto, empresa, fechas, tareas), educación, habilidades e idiomas. No inventes nada. Solo texto plano.',
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0 },
+      })
+      if (statusCode !== 200) {
+        if ([404, 429, 503].includes(statusCode)) {
+          lastError = new Error(`Modelo ${model} no disponible (${statusCode})`)
+          continue
+        }
+        throw new Error(data?.error?.message || 'Error de Gemini')
+      }
+      const text = (data?.candidates?.[0]?.content?.parts || [])
+        .filter((p: any) => typeof p.text === 'string' && !p.thought)
+        .map((p: any) => p.text)
+        .join('')
+        .trim()
+      if (!text) throw new Error('Gemini no devolvió texto')
+      return text.slice(0, 12000)
+    } catch (err: any) {
+      lastError = err
+    }
+  }
+  throw lastError || new Error('No hay modelos de Gemini disponibles')
+}
 
 async function callGeminiChat(contents: GeminiContent[]): Promise<GeminiContent> {
   const apiKey = process.env.GEMINI_API_KEY
@@ -179,6 +256,53 @@ function clampLimit(n: unknown, def = 8): number {
   return Math.max(1, Math.min(20, Math.floor(v)))
 }
 
+/** Descarga el CV del propio usuario desde Storage (nunca de otra carpeta). */
+export async function loadOwnCv(
+  db: SupabaseClient,
+  userId: string
+): Promise<{ buf: Buffer; filename: string; mime: string; ext: string } | { error: string }> {
+  const { data: prof } = await db.from('profiles').select('cv_url').eq('id', userId).maybeSingle()
+  const cvUrl: string | null = prof?.cv_url ?? null
+  if (!cvUrl) return { error: 'El usuario no tiene un CV adjunto. Sugiérele subirlo en Mi Perfil y CV.' }
+  const marker = '/cvs/'
+  const idx = cvUrl.indexOf(marker)
+  const path = idx >= 0 ? decodeURIComponent(cvUrl.slice(idx + marker.length).split('?')[0]) : ''
+  const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '')
+  if (!path || !path.startsWith(safeId + '/') || path.includes('..')) {
+    return { error: 'No se pudo acceder al CV adjunto.' }
+  }
+  const { data: file, error } = await db.storage.from('cvs').download(path)
+  if (error || !file) return { error: 'No se pudo descargar el CV.' }
+  const buf = Buffer.from(await file.arrayBuffer())
+  if (buf.length > 5 * 1024 * 1024) return { error: 'El CV es demasiado grande.' }
+  const ext = (path.split('.').pop() || 'pdf').toLowerCase()
+  const mimes: Record<string, string> = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  }
+  return { buf, ext, mime: mimes[ext] || 'application/octet-stream', filename: `CV.${ext}` }
+}
+
+export async function sendConfirmedEmail(
+  db: SupabaseClient,
+  user: AgentUser,
+  mail: PendingEmail
+): Promise<void> {
+  let attachment
+  if (mail.attach_cv) {
+    const cv = await loadOwnCv(db, user.userId)
+    if ('error' in cv) throw new Error(cv.error)
+    attachment = { filename: cv.filename, mime: cv.mime, data: cv.buf }
+  }
+  await sendGmail(db, user.userId, {
+    to: mail.to,
+    subject: mail.subject.slice(0, 200),
+    body: mail.body.slice(0, 5000),
+    attachment,
+  })
+}
+
 export async function applyToJobs(
   db: SupabaseClient,
   user: AgentUser,
@@ -221,7 +345,14 @@ export async function runAgent(opts: {
   autoApply: boolean
 }): Promise<AgentResult> {
   const { db, user, history, autoApply } = opts
-  const result: AgentResult = { reply: '', pending: [], applied: [], profileUpdated: false }
+  const result: AgentResult = {
+    reply: '',
+    pending: [],
+    applied: [],
+    pendingEmail: null,
+    needsGmail: false,
+    profileUpdated: false,
+  }
 
   const contents: GeminiContent[] = history.map((t) => ({
     role: t.role === 'user' ? 'user' : 'model',
@@ -237,6 +368,36 @@ export async function runAgent(opts: {
           .eq('id', user.userId)
           .maybeSingle()
         return { ...data, tiene_cv_adjunto: !!data?.cv_url, cv_url: undefined }
+      }
+      case 'read_my_cv': {
+        const cv = await loadOwnCv(db, user.userId)
+        if ('error' in cv) return { error: cv.error }
+        if (cv.ext !== 'pdf') {
+          return { error: 'El CV está en formato Word. Por ahora solo puedo leer PDF; pídele al usuario que suba una versión PDF.' }
+        }
+        return { contenido_cv: await extractCvText(cv.buf) }
+      }
+      case 'prepare_email': {
+        if (!isGoogleConfigured()) return { error: 'El envío por Gmail no está configurado en la plataforma.' }
+        if (!isValidEmail(args.to)) return { error: 'La dirección de correo no es válida.' }
+        if (typeof args.subject !== 'string' || typeof args.body !== 'string' || !args.subject.trim() || !args.body.trim()) {
+          return { error: 'Faltan asunto o mensaje.' }
+        }
+        const conn = await getGmailConnection(db, user.userId)
+        if (!conn) {
+          result.needsGmail = true
+          return { error: 'El usuario aún no conectó su Gmail. Dile que use el botón "Conectar Gmail" que aparece en el chat y luego reintente.' }
+        }
+        result.pendingEmail = {
+          to: args.to.trim(),
+          subject: args.subject.trim().slice(0, 200),
+          body: args.body.trim().slice(0, 5000),
+          attach_cv: args.attach_cv !== false,
+        }
+        return {
+          estado: 'PENDIENTE_DE_CONFIRMACION',
+          nota: 'Aún NO se envió. El usuario verá el correo y un botón para enviarlo. Pídele que lo revise y confirme.',
+        }
       }
       case 'update_my_profile': {
         const patch: Record<string, string> = {}

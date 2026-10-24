@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+import { isValidEmail } from '@/lib/server/google'
 import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/server/auth'
-import { applyToJobs, runAgent, ChatTurn } from '@/lib/server/ai-agent'
+import { applyToJobs, runAgent, sendConfirmedEmail, ChatTurn } from '@/lib/server/ai-agent'
 
 export const maxDuration = 60
 
@@ -37,6 +38,28 @@ export async function POST(request: Request) {
         }))
       const { applied, skipped } = await applyToJobs(db, user, items)
       return NextResponse.json({ applied, skipped })
+    }
+
+    // Confirmación explícita de UN correo: se envía exactamente lo que el usuario vio en pantalla.
+    if (body.confirmEmail && typeof body.confirmEmail === 'object') {
+      const e = body.confirmEmail
+      if (!isValidEmail(e.to) || typeof e.subject !== 'string' || typeof e.body !== 'string' || !e.subject.trim() || !e.body.trim()) {
+        return NextResponse.json({ error: 'Correo inválido.' }, { status: 400 })
+      }
+      try {
+        await sendConfirmedEmail(db, user, {
+          to: e.to.trim(),
+          subject: e.subject.trim(),
+          body: e.body.trim(),
+          attach_cv: e.attach_cv !== false,
+        })
+        return NextResponse.json({ sent: true, to: e.to.trim() })
+      } catch (err: any) {
+        if (err.message === 'GMAIL_NOT_CONNECTED') {
+          return NextResponse.json({ error: 'Conectá tu Gmail para enviar correos.', code: 'GMAIL_NOT_CONNECTED' }, { status: 409 })
+        }
+        return NextResponse.json({ error: err.message || 'No se pudo enviar el correo.' }, { status: 502 })
+      }
     }
 
     const history: ChatTurn[] = (Array.isArray(body.messages) ? body.messages : [])
