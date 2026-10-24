@@ -1551,12 +1551,12 @@ export function AIChat() {
             )}
           </div>
 
-          {/* Selector de modelos con background transparente y texto visible */}
+          {/* Selector de modelos con background con blur y texto visible */}
           <div className="relative" ref={modelMenuRef}>
             <button
               type="button"
               onClick={() => setModelOpen((o) => !o)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[15px] sm:text-base font-semibold text-slate-800 dark:text-white bg-transparent hover:bg-slate-100/70 dark:hover:bg-white/10 transition-colors"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[15px] sm:text-base font-semibold text-slate-800 dark:text-white bg-white/40 dark:bg-white/5 backdrop-blur-md border border-slate-200/50 dark:border-white/10 shadow-xs hover:bg-slate-100/70 dark:hover:bg-white/15 transition-all"
             >
               <Sparkles className="w-4 h-4 text-sky-500 shrink-0" />
               <span>{MODELS.find((m) => m.id === modelId)?.name}</span>
