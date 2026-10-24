@@ -200,10 +200,21 @@ function PlanesContent() {
         </div>
 
         {isCandidato && billing && (
-          <div className="p-4 rounded-2xl bg-violet-50/80 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/50 text-sm text-slate-700 dark:text-slate-200 flex items-center justify-between">
-            <span>
-              Tenés <strong>{billing.creditos}</strong> consultas de IA disponibles en tu cuenta.
-            </span>
+          <div className="p-4 rounded-2xl bg-violet-50/80 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/50 text-sm text-slate-700 dark:text-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Gemini: <strong className="text-emerald-700 dark:text-emerald-400">Gratis e Ilimitado</strong>
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">|</span>
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                Claude: <strong className={billing.creditosClaude > 0 ? 'text-indigo-600 dark:text-indigo-400' : ''}>{billing.creditosClaude}</strong> consultas
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">|</span>
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                ChatGPT: <strong className={billing.creditosChatgpt > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}>{billing.creditosChatgpt}</strong> consultas
+              </span>
+            </div>
             <Link href="/ia-chat" className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1">
               Ir al Chat de IA <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -293,7 +304,9 @@ function PlanesContent() {
                       <h3 className="text-lg font-extrabold text-slate-900">{p.nombre}</h3>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-indigo-100 text-indigo-800">
-                      {p.creditos} consultas
+                      {billing?.creditosClaude && billing.creditosClaude > 0
+                        ? `${billing.creditosClaude} disp.`
+                        : `${p.creditos} consultas`}
                     </span>
                   </div>
 
@@ -351,7 +364,9 @@ function PlanesContent() {
                       </h3>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-emerald-400 text-emerald-950">
-                      {p.creditos} consultas
+                      {billing?.creditosChatgpt && billing.creditosChatgpt > 0
+                        ? `${billing.creditosChatgpt} disp.`
+                        : `${p.creditos} consultas`}
                     </span>
                   </div>
 
@@ -478,7 +493,7 @@ function PlanesContent() {
           {isCandidato && billing && (
             <div className="p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 backdrop-blur-md border border-amber-400/40 dark:border-amber-400/30 text-sm text-amber-900 dark:text-amber-200 flex items-center justify-between">
               <span>
-                Te quedan <strong>{billing.creditos}</strong> usos de IA disponibles en tu cuenta.
+                Te quedan <strong>{billing.creditosPublicar}</strong> usos de IA disponibles para publicar clasificados.
               </span>
               <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
             </div>

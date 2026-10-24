@@ -1082,10 +1082,24 @@ export function AIChat() {
     const typed = text.trim()
     if ((!typed && attachments.length === 0) || loading) return
 
-    // Validar créditos para modelos avanzados (Claude o GPT) en candidatos
-    if (modelId !== 'gemini' && (!billing || billing.creditos <= 0) && !isAdmin) {
-      setNotice('El modelo seleccionado requiere créditos de IA. Podés comprar un paquete en la página de Planes o usar Gemini (Gratis).')
-      return
+    // Validar créditos específicos para modelos de pago (Claude o GPT) en candidatos
+    const currentModel = (subModelId || modelId).toLowerCase()
+    const isClaude = currentModel.includes('claude')
+    const isOpenAi = currentModel.includes('gpt') || currentModel.includes('openai')
+    const isPaid = isClaude || isOpenAi
+
+    if (isPaid && !isAdmin) {
+      const claudeCredits = billing?.creditosClaude ?? 0
+      const gptCredits = billing?.creditosChatgpt ?? 0
+
+      if (isClaude && claudeCredits <= 0) {
+        setNotice('No tenés consultas de Claude disponibles. Podés adquirir el Pack Claude en Planes o usar Gemini Gratis.')
+        return
+      }
+      if (isOpenAi && gptCredits <= 0) {
+        setNotice('No tenés consultas de ChatGPT disponibles. Podés adquirir el Pack ChatGPT en Planes o usar Gemini Gratis.')
+        return
+      }
     }
 
     const content = typed || DEFAULT_ATTACHMENT_PROMPT
@@ -1506,14 +1520,15 @@ export function AIChat() {
     .map((part) => part[0]?.toUpperCase() || '')
     .join('') || 'U'
 
+  const chatCreditsCount = (billing?.creditosClaude ?? 0) + (billing?.creditosChatgpt ?? 0)
   const planLabel = isAdmin
     ? 'Admin'
     : billing?.plan === 'anual'
     ? 'Plan Anual'
     : billing?.plan === 'mensual'
     ? 'Plan Mensual'
-    : billing?.creditos && billing.creditos > 0
-    ? `Pro · ${billing.creditos} créditos`
+    : chatCreditsCount > 0
+    ? `Pro · ${chatCreditsCount} consultas`
     : 'Free'
 
   const hasActiveSubscription = !!billing && (billing.plan === 'mensual' || billing.plan === 'anual')
@@ -1893,8 +1908,14 @@ export function AIChat() {
                         <Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                       ) : (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-white/10 text-slate-700 dark:text-slate-300 font-semibold mt-0.5 shrink-0">
-                          {m.requiresCredits && billing?.creditos && billing.creditos > 0
-                            ? `${billing.creditos} disp.`
+                          {m.id === 'claude'
+                            ? billing?.creditosClaude && billing.creditosClaude > 0
+                              ? `${billing.creditosClaude} disp.`
+                              : 'Pack'
+                            : m.id === 'gpt'
+                            ? billing?.creditosChatgpt && billing.creditosChatgpt > 0
+                              ? `${billing.creditosChatgpt} disp.`
+                              : 'Pack'
                             : m.badge}
                         </span>
                       )}

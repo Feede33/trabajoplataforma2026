@@ -9,7 +9,13 @@ export interface BillingStatus {
   avisosLimite: number
   /** Avisos formales creados este mes */
   avisosUsados: number
-  /** Usos de IA disponibles (usuarios no admin) */
+  /** Usos de IA para publicar clasificados/empleos informales (creditos_5, creditos_20) */
+  creditosPublicar: number
+  /** Consultas de IA para Claude (candidato_claude) */
+  creditosClaude: number
+  /** Consultas de IA para ChatGPT (candidato_chatgpt) */
+  creditosChatgpt: number
+  /** Compatibilidad: alias a creditosPublicar */
   creditos: number
 }
 
@@ -28,18 +34,26 @@ export async function fetchBillingStatus(userId: string): Promise<BillingStatus>
   const [subRes, usageRes, creditsRes] = await Promise.all([
     supabase.from('subscriptions').select('plan, avisos_mes_limite, current_period_end').eq('user_id', userId).maybeSingle(),
     supabase.from('job_usage').select('creados').eq('user_id', userId).eq('periodo', currentPeriod()).maybeSingle(),
-    supabase.from('ai_credits').select('balance').eq('user_id', userId).maybeSingle(),
+    supabase.from('ai_credits').select('*').eq('user_id', userId).maybeSingle(),
   ])
 
   const sub = subRes.data as { plan: 'mensual' | 'anual'; avisos_mes_limite: number; current_period_end: string } | null
   const active = !!sub && new Date(sub.current_period_end).getTime() > Date.now()
+
+  const cData = creditsRes.data as Record<string, any> | null
+  const creditosPublicar = typeof cData?.balance === 'number' ? Math.max(0, cData.balance) : 0
+  const creditosClaude = typeof cData?.balance_claude === 'number' ? Math.max(0, cData.balance_claude) : 0
+  const creditosChatgpt = typeof cData?.balance_chatgpt === 'number' ? Math.max(0, cData.balance_chatgpt) : 0
 
   return {
     plan: active ? sub!.plan : 'gratis',
     periodEnd: active ? sub!.current_period_end : null,
     avisosLimite: active ? sub!.avisos_mes_limite : FREE_AVISOS_MES,
     avisosUsados: (usageRes.data as { creados: number } | null)?.creados ?? 0,
-    creditos: (creditsRes.data as { balance: number } | null)?.balance ?? 0,
+    creditosPublicar,
+    creditosClaude,
+    creditosChatgpt,
+    creditos: creditosPublicar,
   }
 }
 

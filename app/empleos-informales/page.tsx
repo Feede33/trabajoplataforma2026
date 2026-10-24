@@ -185,7 +185,7 @@ export default function EmpleosInformalesPage() {
     if (!profile || isAdmin) return
     try {
       const status = await fetchBillingStatus(profile.id)
-      setCredits(status.creditos)
+      setCredits(status.creditosPublicar ?? status.creditos)
     } catch {
       setCredits(null)
     }

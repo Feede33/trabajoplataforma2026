@@ -89,6 +89,49 @@ export async function POST(request: Request) {
       console.error('Pago no acreditado:', result, 'orden', payment.external_reference, 'pago', payment.id)
     }
 
+    // Sincronización de seguridad: si la orden es de Claude o ChatGPT y fulfill_order en la BD
+    // aún no se migró a la versión 012, aseguramos que los créditos vayan a la columna correcta
+    if (result === 'ok' || result === 'already_paid') {
+      try {
+        const { data: order } = await service
+          .from('orders')
+          .select('product, creditos, user_id, kind')
+          .eq('id', String(payment.external_reference))
+          .single()
+
+        if (order && order.kind === 'credits') {
+          const { data: credRow } = await service.from('ai_credits').select('*').eq('user_id', order.user_id).maybeSingle()
+          const cData = credRow as Record<string, any> | null
+
+          if (order.product === 'candidato_claude' && cData && 'balance_claude' in cData) {
+            if ((cData.balance_claude || 0) < order.creditos && cData.balance >= order.creditos) {
+              await service
+                .from('ai_credits')
+                .update({
+                  balance_claude: (cData.balance_claude || 0) + order.creditos,
+                  balance: Math.max(0, (cData.balance || 0) - order.creditos),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', order.user_id)
+            }
+          } else if (order.product === 'candidato_chatgpt' && cData && 'balance_chatgpt' in cData) {
+            if ((cData.balance_chatgpt || 0) < order.creditos && cData.balance >= order.creditos) {
+              await service
+                .from('ai_credits')
+                .update({
+                  balance_chatgpt: (cData.balance_chatgpt || 0) + order.creditos,
+                  balance: Math.max(0, (cData.balance || 0) - order.creditos),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', order.user_id)
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Advertencia en sincronización de saldos de webhook:', syncErr)
+      }
+    }
+
     return NextResponse.json({ received: true, result })
   } catch (error: any) {
     console.error('Error en webhook de Mercado Pago:', error)

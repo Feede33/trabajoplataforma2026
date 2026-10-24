@@ -159,16 +159,33 @@ export async function POST(request: Request) {
     }
 
     const requestedModel = typeof body.model === 'string' ? body.model.toLowerCase() : 'gemini'
-    const isPaidModel = requestedModel.includes('claude') || requestedModel.includes('gpt') || requestedModel.includes('openai')
+    const isClaude = requestedModel.includes('claude')
+    const isOpenAi = requestedModel.includes('gpt') || requestedModel.includes('openai')
+    const isPaidModel = isClaude || isOpenAi
 
     if (isPaidModel && !ctx.isAdmin) {
-      const { data: credRow } = await db.from('ai_credits').select('balance').eq('user_id', ctx.userId).maybeSingle()
-      const balance = credRow?.balance ?? 0
-      if (balance <= 0) {
+      const { data: credRow } = await db.from('ai_credits').select('*').eq('user_id', ctx.userId).maybeSingle()
+      const cData = credRow as Record<string, any> | null
+      const balanceClaude = typeof cData?.balance_claude === 'number' ? cData.balance_claude : 0
+      const balanceChatgpt = typeof cData?.balance_chatgpt === 'number' ? cData.balance_chatgpt : 0
+
+      if (isClaude && balanceClaude <= 0) {
         return NextResponse.json(
           {
-            error: 'Para usar Claude o GPT necesitás saldo de créditos. Podés adquirir un paquete en la página de Planes o usar Gemini Gratis.',
+            error: 'No tenés consultas de Claude disponibles. Podés adquirir el Pack Claude en la página de Planes o usar Gemini Gratis.',
             code: 'NO_CREDITS',
+            provider: 'claude',
+          },
+          { status: 402 }
+        )
+      }
+
+      if (isOpenAi && balanceChatgpt <= 0) {
+        return NextResponse.json(
+          {
+            error: 'No tenés consultas de ChatGPT disponibles. Podés adquirir el Pack ChatGPT en la página de Planes o usar Gemini Gratis.',
+            code: 'NO_CREDITS',
+            provider: 'chatgpt',
           },
           { status: 402 }
         )
@@ -186,9 +203,29 @@ export async function POST(request: Request) {
       model: requestedModel,
     })
 
-    // Descontar crédito si usó un modelo de pago
+    // Descontar crédito específico según el proveedor de pago usado
     if (isPaidModel && !ctx.isAdmin) {
-      await db.rpc('consume_ai_credit', { p_user: ctx.userId })
+      if (isClaude) {
+        const { error: rpcErr } = await db.rpc('consume_claude_credit', { p_user: ctx.userId })
+        if (rpcErr) {
+          const { data: cRow } = await db.from('ai_credits').select('*').eq('user_id', ctx.userId).maybeSingle()
+          const cur = (cRow as any)?.balance_claude || 1
+          await db
+            .from('ai_credits')
+            .update({ balance_claude: Math.max(0, cur - 1), updated_at: new Date().toISOString() })
+            .eq('user_id', ctx.userId)
+        }
+      } else if (isOpenAi) {
+        const { error: rpcErr } = await db.rpc('consume_chatgpt_credit', { p_user: ctx.userId })
+        if (rpcErr) {
+          const { data: cRow } = await db.from('ai_credits').select('*').eq('user_id', ctx.userId).maybeSingle()
+          const cur = (cRow as any)?.balance_chatgpt || 1
+          await db
+            .from('ai_credits')
+            .update({ balance_chatgpt: Math.max(0, cur - 1), updated_at: new Date().toISOString() })
+            .eq('user_id', ctx.userId)
+        }
+      }
     }
 
     return NextResponse.json(result)
