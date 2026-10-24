@@ -20,6 +20,9 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'Postulauy.com — Plataforma de Empleos y Oportunidades en Uruguay',
   description: 'Conectamos a las mejores empresas con talentos en todo Uruguay. Publicá tus vacantes o postulate a cientos de empleos.',
+  verification: {
+    google: '1EZ5rEiLyq_kDI-a7rGSmATJZq7NmBxqGDR3cbrvbaM',
+  },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
