@@ -7,6 +7,7 @@ import {
   Briefcase,
   Check,
   ChevronDown,
+  ChevronUp,
   Download,
   ExternalLink,
   Eye,
@@ -33,13 +34,61 @@ import { Switch } from '@/components/ui/switch'
 import { GlassContainer } from '@/components/ui/glass-container'
 import { ChatMarkdown } from './ChatMarkdown'
 
-// Modelos disponibles. Solo el gratuito está activo; el resto se habilitará con los planes.
+// Proveedores principales para el selector superior (solo nombre de la empresa/marca)
 const MODELS = [
-  { id: 'gemini-flash-lite', name: 'Gemini Flash Lite', badge: 'Gratis', description: 'Rápido y liviano. Incluido en tu plan.', available: true },
-  { id: 'gemini-pro', name: 'Gemini Pro', badge: 'Pronto', description: 'Más razonamiento para casos complejos.', available: false },
-  { id: 'claude', name: 'Claude', badge: 'Pronto', description: 'Excelente redacción de CV y correos.', available: false },
-  { id: 'gpt', name: 'GPT', badge: 'Pronto', description: 'Modelo de OpenAI.', available: false },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    badge: 'Gratis',
+    description: 'Rápido y liviano. Incluido gratis en tu cuenta.',
+    available: true,
+    requiresCredits: false,
+    defaultButtonLabel: 'Flash',
+  },
+  {
+    id: 'claude',
+    name: 'Claude',
+    badge: 'Pack Claude',
+    description: 'Redacción superior de CV, cartas y correos.',
+    available: true,
+    requiresCredits: true,
+    defaultButtonLabel: 'Sonnet',
+  },
+  {
+    id: 'gpt',
+    name: 'OpenAI',
+    badge: 'Pack ChatGPT',
+    description: 'Razonamiento avanzado y 1M de contexto.',
+    available: true,
+    requiresCredits: true,
+    defaultButtonLabel: 'GPT',
+  },
 ]
+
+export interface SubModelOption {
+  id: string
+  name: string
+  shortLabel?: string
+  description: string
+  badge?: string
+}
+
+const SUB_MODELS: Record<string, SubModelOption[]> = {
+  gemini: [
+    { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', shortLabel: 'Gemini 3.5 Flash', description: 'Equilibrio y velocidad' },
+    { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', shortLabel: 'Gemini 3.8 Flash', description: 'Ayuda completa' },
+    { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', shortLabel: 'Gemini 3.5 Flash Lite', description: 'Respuestas rápidas' },
+  ],
+  claude: [
+    { id: 'claude-sonnet-5.5', name: 'Claude Sonnet 5.5', shortLabel: 'Claude Sonnet 5.5', description: 'Redacción y análisis de CV' },
+    { id: 'claude-haiku-5.5', name: 'Claude Haiku 5.5', shortLabel: 'Claude Haiku 5.5', description: 'Respuestas rápidas y breves' },
+    { id: 'claude-opus-5.5', name: 'Claude Opus 5.5', shortLabel: 'Claude Opus 5.5', description: 'Razonamiento profundo' },
+  ],
+  gpt: [
+    { id: 'gpt-5.4', name: 'GPT-5.4', shortLabel: 'GPT-5.4', description: 'Razonamiento de vanguardia' },
+    { id: 'gpt-5.2', name: 'GPT-5.2', shortLabel: 'GPT-5.2', description: 'Equilibrio y velocidad' },
+  ],
+}
 
 type ConversationRow = { id: string; title: string; updated_at: string }
 
@@ -234,7 +283,13 @@ type Message = {
   profileState?: 'idle' | 'sending' | 'done'
 }
 
-type SendOptions = { autoApply: boolean; attachments: AttachedFile[]; includeCv: boolean; deepSearch: boolean }
+type SendOptions = {
+  autoApply: boolean
+  attachments: AttachedFile[]
+  includeCv: boolean
+  deepSearch: boolean
+  model?: string
+}
 
 async function sendToAgent(
   history: Message[],
@@ -251,6 +306,7 @@ async function sendToAgent(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({
+      model: opts.model,
       autoApply: opts.autoApply,
       attachments: opts.attachments,
       includeCv: opts.includeCv,
@@ -540,12 +596,31 @@ export function AIChat() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [modelOpen, setModelOpen] = useState(false)
   const [modelId, setModelId] = useState(MODELS[0].id)
+  const [subModelId, setSubModelId] = useState<string>(SUB_MODELS.gemini[0].id)
+  const [subModelButtonLabel, setSubModelButtonLabel] = useState<string>('Flash')
+  const [subModelOpen, setSubModelOpen] = useState(false)
+  const subModelMenuRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const modelMenuRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const composerBoxRef = useRef<HTMLDivElement>(null)
   const [isMultiLine, setIsMultiLine] = useState(false)
+
+  const onSelectCompany = (id: string) => {
+    setModelId(id)
+    setModelOpen(false)
+    const company = MODELS.find((m) => m.id === id)
+    if (company?.defaultButtonLabel) {
+      setSubModelButtonLabel(company.defaultButtonLabel)
+    }
+    const defaultSub = SUB_MODELS[id]?.[0]
+    if (defaultSub) {
+      setSubModelId(defaultSub.id)
+    }
+  }
+
+  const currentSubList = SUB_MODELS[modelId] || SUB_MODELS.gemini
 
   useEffect(() => {
     setAutoApply(localStorage.getItem('ia-chat-auto') === '1')
@@ -864,6 +939,9 @@ export function AIChat() {
       if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
         setModelOpen(false)
       }
+      if (subModelMenuRef.current && !subModelMenuRef.current.contains(e.target as Node)) {
+        setSubModelOpen(false)
+      }
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
@@ -872,8 +950,15 @@ export function AIChat() {
   async function send(text: string) {
     const typed = text.trim()
     if ((!typed && attachments.length === 0) || loading) return
+
+    // Validar créditos para modelos avanzados (Claude o GPT) en candidatos
+    if (modelId !== 'gemini' && (!billing || billing.creditos <= 0) && !isAdmin) {
+      setNotice('El modelo seleccionado requiere créditos de IA. Podés comprar un paquete en la página de Planes o usar Gemini (Gratis).')
+      return
+    }
+
     const content = typed || DEFAULT_ATTACHMENT_PROMPT
-    const sendOpts: SendOptions = { autoApply, attachments, includeCv, deepSearch }
+    const sendOpts: SendOptions = { autoApply, attachments, includeCv, deepSearch, model: subModelId || modelId }
     const next: Message[] = [
       ...messages,
       {
@@ -1157,13 +1242,79 @@ export function AIChat() {
           )}
         </div>
 
-        {/* Acciones de la derecha: Switch Auto + Botón Enviar */}
+        {/* Acciones de la derecha: Selector de versión de modelo + Switch Auto + Botón Enviar */}
         <div
           className={cn(
             'flex items-center gap-2 sm:gap-2.5 shrink-0 select-none',
             isExpanded ? 'order-4 ml-auto' : 'order-3'
           )}
         >
+          {/* Selector de sub-modelo: botón pill con menú desplegable hacia arriba adaptado al tema */}
+          <div className="relative" ref={subModelMenuRef}>
+            <button
+              type="button"
+              onClick={() => setSubModelOpen((o) => !o)}
+              className="h-8 px-3.5 rounded-full bg-slate-100 hover:bg-slate-200/90 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border border-slate-200/90 dark:border-slate-700/80 text-[13px] font-medium transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer select-none font-google-sans"
+              title="Versión del modelo"
+            >
+              <span>{subModelButtonLabel}</span>
+              <ChevronUp
+                className={cn(
+                  'w-3.5 h-3.5 text-slate-500 dark:text-slate-400 transition-transform duration-200 stroke-[2.2]',
+                  subModelOpen && 'rotate-180'
+                )}
+              />
+            </button>
+
+            {subModelOpen && (
+              <div className="absolute bottom-full mb-2.5 right-0 z-40 animate-in fade-in zoom-in-95 duration-150">
+                <div className="w-[260px] sm:w-[275px] p-2 rounded-[22px] border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl shadow-slate-900/15 dark:shadow-black/70 font-google-sans select-none">
+                  <div className="space-y-0.5">
+                    {currentSubList.map((sub) => {
+                      const isSelected = sub.id === subModelId
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => {
+                            setSubModelId(sub.id)
+                            setSubModelButtonLabel(sub.name)
+                            setSubModelOpen(false)
+                          }}
+                          className={cn(
+                            'w-full flex items-center gap-2.5 px-3 py-2 rounded-[16px] text-left transition-colors cursor-pointer',
+                            isSelected
+                              ? 'bg-slate-100/90 dark:bg-slate-800/90 text-slate-900 dark:text-white'
+                              : 'hover:bg-slate-100/70 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300'
+                          )}
+                        >
+                          <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 stroke-[2.5]" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13.5px] font-semibold text-slate-900 dark:text-white leading-tight">
+                              {sub.name}
+                            </p>
+                            <p className="text-[11.5px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5 truncate">
+                              {sub.description}
+                            </p>
+                          </div>
+                          {sub.badge && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700 shrink-0 ml-1.5">
+                              {sub.badge}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div
             className="flex items-center gap-1.5 sm:gap-2"
             title="Auto: la IA se postula automáticamente sin pedir confirmación previa"
@@ -1549,7 +1700,13 @@ export function AIChat() {
               className="!rounded-full !px-4 !py-1.5 text-[14px] sm:text-[15px] font-medium transition-all duration-300 select-none flex items-center justify-center cursor-pointer shadow-md active:scale-[0.98]"
             >
               <div className="flex items-center gap-2 text-slate-900 dark:text-white font-google-sans">
-                <Sparkles className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 shrink-0" />
+                {modelId === 'claude' ? (
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                ) : modelId === 'gpt' ? (
+                  <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 shrink-0" />
+                )}
                 <span className="tracking-tight">{MODELS.find((m) => m.id === modelId)?.name}</span>
                 <ChevronDown
                   className={cn(
@@ -1567,7 +1724,7 @@ export function AIChat() {
                   variant="prominent"
                   tint="warm"
                   hover={false}
-                  className="!p-1.5 !rounded-2xl w-72 shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden font-google-sans bg-white/70 dark:bg-slate-900/80"
+                  className="!p-1.5 !rounded-2xl w-80 shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden font-google-sans bg-white/70 dark:bg-slate-900/80"
                 >
                   {MODELS.map((m) => (
                     <button
@@ -1576,8 +1733,7 @@ export function AIChat() {
                       disabled={!m.available}
                       onClick={() => {
                         if (m.available) {
-                          setModelId(m.id)
-                          setModelOpen(false)
+                          onSelectCompany(m.id)
                         }
                       }}
                       className={cn(
@@ -1588,14 +1744,23 @@ export function AIChat() {
                       )}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">{m.name}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{m.description}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{m.name}</p>
+                          {m.id === 'gemini' && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
+                              Base
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{m.description}</p>
                       </div>
                       {m.id === modelId ? (
                         <Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                       ) : (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-white/10 text-slate-700 dark:text-slate-300 font-semibold mt-0.5 shrink-0">
-                          {m.badge}
+                          {m.requiresCredits && billing?.creditos && billing.creditos > 0
+                            ? `${billing.creditos} disp.`
+                            : m.badge}
                         </span>
                       )}
                     </button>

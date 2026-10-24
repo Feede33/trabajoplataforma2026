@@ -406,25 +406,25 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
   return (
     <aside className="w-full lg:w-96 xl:w-[420px] shrink-0">
-      <div className="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl shadow-black/25 flex flex-col gap-4 sticky top-20">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl shadow-slate-900/5 dark:shadow-black/25 flex flex-col gap-4 sticky top-20">
 
         {/* Header con diseño amplio y sin colisiones */}
-        <div className="border-b border-slate-800/90 pb-4 space-y-3">
+        <div className="border-b border-slate-200/90 dark:border-slate-800/90 pb-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-sm shadow-emerald-500/15 shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm shadow-emerald-500/10 dark:shadow-emerald-500/15 shrink-0">
                 <MessageCircle className="w-5 h-5" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-extrabold text-white tracking-tight truncate">
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight truncate">
                     Contactos Directos
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-full inline-flex items-center justify-center text-xs font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shrink-0">
+                  <span className="px-2.5 py-0.5 rounded-full inline-flex items-center justify-center text-xs font-black bg-emerald-100 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 shrink-0">
                     {contacts.length}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 font-medium truncate">WhatsApp directo de empresas</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">WhatsApp directo de empresas</p>
               </div>
             </div>
           </div>
@@ -450,7 +450,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 text-xs font-bold transition-all hover:scale-[1.02] active:scale-95"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white border border-slate-200 dark:border-slate-700/80 text-xs font-bold transition-all hover:scale-[1.02] active:scale-95"
                 title="Agregar contacto manualmente"
               >
                 <Plus className="w-3.5 h-3.5 shrink-0" />
@@ -468,12 +468,12 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar empresa, rubro, ciudad..."
-            className="w-full pl-9 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-800/80 text-slate-100 placeholder:text-slate-500 border border-slate-700/70 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
+            className="w-full pl-9 pr-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 border border-slate-200 dark:border-slate-700/70 focus:border-emerald-500 dark:focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all shadow-sm dark:shadow-inner"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
             >
               <X className="w-4 h-4" />
             </button>
@@ -488,15 +488,15 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                 e.currentTarget.scrollLeft += e.deltaY
               }
             }}
-            className="flex items-center gap-2 overflow-x-auto pt-1 pb-2.5 text-xs scroll-smooth [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-800/60 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600 hover:[&::-webkit-scrollbar-thumb]:bg-emerald-500 [&::-webkit-scrollbar-thumb]:rounded-full"
+            className="flex items-center gap-2 overflow-x-auto pt-1 pb-2.5 text-xs scroll-smooth [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-slate-800/60 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600 hover:[&::-webkit-scrollbar-thumb]:bg-emerald-500 [&::-webkit-scrollbar-thumb]:rounded-full"
           >
             {categoriesList.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCat(cat)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${selectedCat === cat
-                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  ? 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-slate-950 font-bold shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 border border-slate-200/80 dark:border-transparent dark:bg-slate-800/70 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800'
                   }`}
               >
                 {cat}
@@ -506,19 +506,19 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
         )}
 
         {/* Contacts List */}
-        <div className="flex flex-col gap-4 max-h-[640px] overflow-y-auto pr-1 select-text scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent pt-1">
+        <div className="flex flex-col gap-4 max-h-[640px] overflow-y-auto pr-1 select-text scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent pt-1">
           {loading ? (
             <div className="space-y-3 py-2">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="bg-slate-800/40 rounded-2xl p-4 border border-slate-800 animate-pulse space-y-2.5">
-                  <div className="h-4 w-2/3 bg-slate-700/60 rounded" />
-                  <div className="h-3 w-1/3 bg-slate-700/40 rounded" />
+                <div key={n} className="bg-slate-100/80 dark:bg-slate-800/40 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 animate-pulse space-y-2.5">
+                  <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-700/60 rounded" />
+                  <div className="h-3 w-1/3 bg-slate-200/70 dark:bg-slate-700/40 rounded" />
                 </div>
               ))}
             </div>
           ) : filteredContacts.length === 0 ? (
-            <div className="py-8 text-center text-slate-500 text-xs sm:text-sm">
-              <Building2 className="w-9 h-9 mx-auto text-slate-600 mb-2.5 opacity-60" />
+            <div className="py-8 text-center text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
+              <Building2 className="w-9 h-9 mx-auto text-slate-400 dark:text-slate-600 mb-2.5 opacity-60" />
               <p>No se encontraron contactos con ese criterio.</p>
             </div>
           ) : (
@@ -529,21 +529,21 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
               return (
                 <div
                   key={contact.id}
-                  className="group relative bg-slate-800/60 hover:bg-slate-800/90 border border-slate-700/60 hover:border-emerald-500/50 rounded-2xl p-4 transition-all flex flex-col gap-2.5 shadow-sm"
+                  className="group relative bg-slate-50/70 hover:bg-white dark:bg-slate-800/60 dark:hover:bg-slate-800/90 border border-slate-200/90 hover:border-emerald-400/80 dark:border-slate-700/60 dark:hover:border-emerald-500/50 rounded-2xl p-4 transition-all flex flex-col gap-2.5 shadow-sm hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-sm sm:text-[15px] text-white truncate">
+                        <span className="font-extrabold text-sm sm:text-[15px] text-slate-900 dark:text-white truncate">
                           {contact.nombre}
                         </span>
                       </div>
                       <div className="flex items-center flex-wrap gap-2 mt-1.5">
-                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/35">
+                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-500/35">
                           {contact.categoria}
                         </span>
                         {contact.zona && (
-                          <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
                             <MapPin className="w-3 h-3 text-slate-400" />
                             {contact.zona}
                           </span>
@@ -554,7 +554,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     {effectiveAdmin && (
                       <button
                         onClick={() => handleDelete(contact.id, contact.nombre)}
-                        className="text-slate-500 hover:text-rose-400 transition-colors p-1"
+                        className="text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-400 transition-colors p-1"
                         title="Eliminar contacto"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -563,25 +563,25 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                   </div>
 
                   {contact.nota && (
-                    <p className="text-xs text-slate-300/90 leading-relaxed line-clamp-2">
+                    <p className="text-xs text-slate-600 dark:text-slate-300/90 leading-relaxed line-clamp-2">
                       {contact.nota}
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-700/50 mt-1">
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-700/50 mt-1">
                     <button
                       onClick={() => handleCopy(contact.id, contact.whatsapp)}
-                      className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-semibold text-slate-200 hover:text-white transition-colors group/copy"
+                      className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-semibold text-slate-700 hover:text-slate-950 dark:text-slate-200 dark:hover:text-white transition-colors group/copy"
                       title="Copiar número"
                     >
                       {isCopied ? (
                         <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-400 font-sans text-xs font-bold">¡Copiado!</span>
+                          <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-emerald-600 dark:text-emerald-400 font-sans text-xs font-bold">¡Copiado!</span>
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3.5 h-3.5 text-slate-400 group-hover/copy:text-slate-200" />
+                          <Copy className="w-3.5 h-3.5 text-slate-400 group-hover/copy:text-slate-600 dark:group-hover/copy:text-slate-200" />
                           <span>{formatPhoneNumberDisplay(contact.whatsapp)}</span>
                         </>
                       )}
@@ -591,9 +591,9 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                       href={waUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 shrink-0"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-600/20 dark:shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 shrink-0"
                     >
-                      <MessageCircle className="w-3.5 h-3.5 fill-slate-950" />
+                      <MessageCircle className="w-3.5 h-3.5 fill-white dark:fill-slate-950" />
                       <span>WhatsApp</span>
                     </a>
                   </div>
@@ -604,8 +604,8 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
         </div>
 
         {/* Footer info tip */}
-        <div className="text-xs text-slate-400 text-center border-t border-slate-800/90 pt-3 flex items-center justify-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <div className="text-xs text-slate-500 dark:text-slate-400 text-center border-t border-slate-200/90 dark:border-slate-800/90 pt-3 flex items-center justify-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>Comunicate directamente para consultar vacantes</span>
         </div>
       </div>
@@ -616,30 +616,30 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
       {mounted && effectiveAdmin && isAiModalOpen && createPortal(
         <div
           onPaste={handlePaste}
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6 overflow-y-auto"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 dark:bg-black/80 backdrop-blur-md p-3 sm:p-6 overflow-y-auto"
         >
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 w-full max-w-2xl my-auto shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 w-full max-w-2xl my-auto shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Modal */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20 shrink-0">
                   <Sparkles className="w-5 h-5 fill-slate-950" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-white text-base sm:text-lg flex items-center gap-2">
+                  <h3 className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg flex items-center gap-2">
                     Importar Contactos de Empresas con IA
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Sube una foto/captura o pega una lista. La IA detecta datos y filtra duplicados.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAiModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors shrink-0"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -647,7 +647,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
             {/* Alerta de Error */}
             {aiError && (
-              <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>{aiError}</span>
               </div>
@@ -655,8 +655,8 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
             {/* Aviso de Éxito al guardar */}
             {saveSuccessNotice && (
-              <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 font-bold animate-pulse">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 font-bold animate-pulse">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <span>{saveSuccessNotice}</span>
               </div>
             )}
@@ -665,13 +665,13 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
             {aiStep === 'upload' && (
               <div className="space-y-4">
                 {/* Selector de modo: Imagen vs Texto */}
-                <div className="flex bg-slate-800/80 p-1 rounded-2xl border border-slate-700/60 max-w-xs mx-auto">
+                <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/60 max-w-xs mx-auto">
                   <button
                     type="button"
                     onClick={() => setInputMode('image')}
                     className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${inputMode === 'image'
                       ? 'bg-emerald-500 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                       }`}
                   >
                     <Camera className="w-3.5 h-3.5" />
@@ -682,7 +682,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     onClick={() => setInputMode('text')}
                     className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${inputMode === 'text'
                       ? 'bg-emerald-500 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                       }`}
                   >
                     <FileText className="w-3.5 h-3.5" />
@@ -700,10 +700,10 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     onDragLeave={() => setIsDragging(false)}
                     onClick={() => fileInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 ${isDragging
-                      ? 'border-emerald-400 bg-emerald-500/10'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10'
                       : imagePreview
-                        ? 'border-emerald-500/50 bg-slate-800/50'
-                        : 'border-slate-700 hover:border-slate-500 bg-slate-800/30 hover:bg-slate-800/50'
+                        ? 'border-emerald-500/50 bg-slate-50 dark:bg-slate-800/50'
+                        : 'border-slate-300 hover:border-slate-400 bg-slate-50/70 hover:bg-slate-100/70 dark:border-slate-700 dark:hover:border-slate-500 dark:bg-slate-800/30 dark:hover:bg-slate-800/50'
                       }`}
                   >
                     <input
@@ -719,25 +719,25 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                         <img
                           src={imagePreview}
                           alt="Previsualización"
-                          className="max-h-52 rounded-2xl object-contain border border-slate-700 shadow-md"
+                          className="max-h-52 rounded-2xl object-contain border border-slate-200 dark:border-slate-700 shadow-md"
                         />
-                        <div className="flex items-center gap-2 text-xs text-slate-300">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                           <span className="font-medium">{imageName || 'Imagen cargada'}</span>
-                          <span className="text-slate-500">• Clic para cambiar foto</span>
+                          <span className="text-slate-400 dark:text-slate-500">• Clic para cambiar foto</span>
                         </div>
                       </div>
                     ) : (
                       <>
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                           <UploadCloud className="w-6 h-6" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-bold text-white">
+                          <p className="text-sm font-bold text-slate-800 dark:text-white">
                             Arrastra una imagen o haz clic para seleccionarla
                           </p>
-                          <p className="text-xs text-slate-400">
-                            Puedes hacer <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-emerald-400">Ctrl + V</kbd> para pegar capturas de pantalla de historias o WhatsApp
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Puedes hacer <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-emerald-600 dark:text-emerald-400">Ctrl + V</kbd> para pegar capturas de pantalla de historias o WhatsApp
                           </p>
                         </div>
                       </>
@@ -745,7 +745,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-slate-300">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                       Pega aquí la lista de empresas, teléfonos o notas:
                     </label>
                     <textarea
@@ -753,17 +753,17 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                       onChange={(e) => setRawText(e.target.value)}
                       rows={8}
                       placeholder={`Ejemplo:\nEmpresa Pro Limpieza - 099123456 - Montevideo - Buscan operarios\nLogística Express - 098765432 - Canelones - Choferes furgón\nGastronomía del Sol - 091223344`}
-                      className="w-full p-4 rounded-2xl bg-slate-800 border border-slate-700 text-slate-100 placeholder:text-slate-500 text-xs sm:text-sm font-mono focus:border-emerald-500 focus:outline-none"
+                      className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs sm:text-sm font-mono focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
                 )}
 
                 {/* Botón de Procesar con IA */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsAiModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
                   >
                     Cancelar
                   </button>
@@ -793,29 +793,29 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
             {aiStep === 'review' && (
               <div className="flex-1 space-y-4 overflow-hidden">
                 {/* Métricas y resumen de deduplicación */}
-                <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-center">
+                <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-center">
                   <div>
-                    <span className="text-xs text-slate-400 block font-medium">Detectadas</span>
-                    <span className="text-base font-extrabold text-white">{totalExtracted}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">Detectadas</span>
+                    <span className="text-base font-extrabold text-slate-900 dark:text-white">{totalExtracted}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-emerald-400 block font-medium">Nuevas</span>
-                    <span className="text-base font-extrabold text-emerald-400">{newCount}</span>
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 block font-medium">Nuevas</span>
+                    <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">{newCount}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-amber-400 block font-medium">Repetidas</span>
-                    <span className="text-base font-extrabold text-amber-400">{duplicatesCount}</span>
+                    <span className="text-xs text-amber-600 dark:text-amber-400 block font-medium">Repetidas</span>
+                    <span className="text-base font-extrabold text-amber-600 dark:text-amber-400">{duplicatesCount}</span>
                   </div>
                 </div>
 
                 {/* Filtros rápidos de selección */}
-                <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 px-1 gap-2">
-                  <span>Seleccionadas para guardar: <strong className="text-white">{selectedCount}</strong></span>
+                <div className="flex flex-wrap items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1 gap-2">
+                  <span>Seleccionadas para guardar: <strong className="text-slate-900 dark:text-white">{selectedCount}</strong></span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setExtractedItems((prev) => prev.map((i) => ({ ...i, selected: !i.isDuplicate })))}
-                      className="text-xs text-emerald-400 hover:underline font-bold"
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-bold"
                     >
                       Solo Nuevas
                     </button>
@@ -823,7 +823,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     <button
                       type="button"
                       onClick={() => setExtractedItems((prev) => prev.map((i) => ({ ...i, selected: true })))}
-                      className="text-xs text-slate-300 hover:underline"
+                      className="text-xs text-slate-700 dark:text-slate-300 hover:underline"
                     >
                       Todas
                     </button>
@@ -831,7 +831,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     <button
                       type="button"
                       onClick={() => setExtractedItems((prev) => prev.map((i) => ({ ...i, selected: false })))}
-                      className="text-xs text-slate-400 hover:underline"
+                      className="text-xs text-slate-500 dark:text-slate-400 hover:underline"
                     >
                       Ninguna
                     </button>
@@ -844,10 +844,10 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     <div
                       key={item.id}
                       className={`p-3.5 rounded-2xl border transition-all space-y-2.5 overflow-hidden ${item.isDuplicate
-                        ? 'bg-amber-950/20 border-amber-500/40'
+                        ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-500/40'
                         : item.selected
-                          ? 'bg-slate-800/80 border-emerald-500/40'
-                          : 'bg-slate-800/40 border-slate-700/60 opacity-60'
+                          ? 'bg-slate-50/90 dark:bg-slate-800/80 border-emerald-500/40'
+                          : 'bg-slate-50/40 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/60 opacity-60'
                         }`}
                     >
                       {/* Fila superior: Checkbox + Nombre + Badges + Eliminar */}
@@ -862,7 +862,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                                 prev.map((it) => (it.id === item.id ? { ...it, selected: checked } : it))
                               )
                             }}
-                            className="w-4 h-4 rounded text-emerald-500 bg-slate-900 border-slate-600 focus:ring-emerald-500 shrink-0"
+                            className="w-4 h-4 rounded text-emerald-600 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 focus:ring-emerald-500 shrink-0"
                           />
                           <input
                             type="text"
@@ -873,19 +873,19 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                                 prev.map((it) => (it.id === item.id ? { ...it, nombre: val } : it))
                               )
                             }}
-                            className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-emerald-500 text-sm font-bold text-white focus:outline-none px-1 py-0.5 flex-1 min-w-0"
+                            className="bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-emerald-500 text-sm font-bold text-slate-900 dark:text-white focus:outline-none px-1 py-0.5 flex-1 min-w-0"
                             placeholder="Nombre de empresa"
                           />
                         </label>
 
                         <div className="flex items-center gap-2 shrink-0 ml-auto">
                           {item.isDuplicate ? (
-                            <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/35 flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/35 flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" />
                               Repetida
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/35 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
                               Nueva
                             </span>
@@ -894,7 +894,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                           <button
                             type="button"
                             onClick={() => setExtractedItems((prev) => prev.filter((it) => it.id !== item.id))}
-                            className="text-slate-500 hover:text-rose-400 p-1 rounded-lg"
+                            className="text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-400 p-1 rounded-lg"
                             title="Quitar de la lista"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -904,7 +904,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
                       {/* Aviso de duplicado si corresponde */}
                       {item.isDuplicate && item.duplicateReason && (
-                        <p className="text-[11px] text-amber-300/90 pl-6 flex items-center gap-1 break-words">
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300/90 pl-6 flex items-center gap-1 break-words">
                           ⚠️ {item.duplicateReason}
                         </p>
                       )}
@@ -922,7 +922,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                               )
                             }}
                             placeholder="WhatsApp / Teléfono"
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-slate-200 focus:border-emerald-500 focus:outline-none"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 focus:border-emerald-500 focus:outline-none"
                           />
                         </div>
 
@@ -935,7 +935,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                                 prev.map((it) => (it.id === item.id ? { ...it, categoria: val } : it))
                               )
                             }}
-                            className="w-full px-2 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
+                            className="w-full px-2 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 focus:border-emerald-500 focus:outline-none"
                           >
                             {CATEGORIAS_SUGERIDAS.map((cat) => (
                               <option key={cat} value={cat}>
@@ -956,7 +956,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                               )
                             }}
                             placeholder="Zona (opcional)"
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 focus:border-emerald-500 focus:outline-none"
                           />
                         </div>
                       </div>
@@ -973,7 +973,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                             )
                           }}
                           placeholder="Nota o descripción (opcional)"
-                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/80 text-xs text-slate-300 focus:border-emerald-500 focus:outline-none"
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-300 focus:border-emerald-500 focus:outline-none"
                         />
                       </div>
                     </div>
@@ -981,14 +981,14 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                 </div>
 
                 {/* Footer de Acciones del paso 2 */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-800">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => {
                       setAiStep('upload')
                       setAiError('')
                     }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Volver a escanear</span>
@@ -998,7 +998,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     <button
                       type="button"
                       onClick={() => setIsAiModalOpen(false)}
-                      className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+                      className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
                     >
                       Cancelar
                     </button>
@@ -1033,38 +1033,38 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
       {/* MODAL 2: Formulario Manual para 1 Contacto (Renderizado con Portal al Body)*/}
       {/* ========================================================================= */}
       {mounted && effectiveAdmin && isModalOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 dark:bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
           <div
-            className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md my-auto shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md my-auto shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <PhoneCall className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">Publicar Contacto de Empresa</h3>
-                  <p className="text-xs text-slate-400">Aparecerá en el directorio de WhatsApp</p>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Publicar Contacto de Empresa</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Aparecerá en el directorio de WhatsApp</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {formError && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs">
                 {formError}
               </div>
             )}
 
             <form onSubmit={handleCreate} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Nombre de la Empresa *
                 </label>
                 <input
@@ -1073,12 +1073,12 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Ej: Empresa 1, Limpieza Pro UY"
                   required
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Número de WhatsApp *
                 </label>
                 <input
@@ -1087,19 +1087,19 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                   onChange={(e) => setWhatsapp(e.target.value)}
                   placeholder="Ej: 096123123 o +598 96 123 123"
                   required
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 text-sm focus:border-emerald-500 focus:outline-none font-mono"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:border-emerald-500 focus:outline-none font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Categoría / Rubro *
                   </label>
                   <select
                     value={categoria}
                     onChange={(e) => setCategoria(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:border-emerald-500 focus:outline-none"
                   >
                     {CATEGORIAS_SUGERIDAS.map((cat) => (
                       <option key={cat} value={cat}>
@@ -1110,7 +1110,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Zona / Ubicación (Opcional)
                   </label>
                   <input
@@ -1118,14 +1118,14 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     value={zona}
                     onChange={(e) => setZona(e.target.value)}
                     placeholder="Ej: Montevideo"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 text-xs focus:border-emerald-500 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               {categoria === 'Otro' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Especifique Categoría
                   </label>
                   <input
@@ -1133,13 +1133,13 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                     value={categoriaPersonalizada}
                     onChange={(e) => setCategoriaPersonalizada(e.target.value)}
                     placeholder="Ej: Metalúrgica, Pintura..."
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Nota o Descripción (Opcional)
                 </label>
                 <input
@@ -1147,15 +1147,15 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                   value={nota}
                   onChange={(e) => setNota(e.target.value)}
                   placeholder="Ej: Buscan personal para turno mañana"
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 text-xs focus:border-emerald-500 focus:outline-none"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
                 >
                   Cancelar
                 </button>

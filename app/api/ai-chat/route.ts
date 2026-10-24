@@ -113,6 +113,23 @@ export async function POST(request: Request) {
       }
     }
 
+    const requestedModel = typeof body.model === 'string' ? body.model.toLowerCase() : 'gemini'
+    const isPaidModel = requestedModel.includes('claude') || requestedModel.includes('gpt') || requestedModel.includes('openai')
+
+    if (isPaidModel && !ctx.isAdmin) {
+      const { data: credRow } = await db.from('ai_credits').select('balance').eq('user_id', ctx.userId).maybeSingle()
+      const balance = credRow?.balance ?? 0
+      if (balance <= 0) {
+        return NextResponse.json(
+          {
+            error: 'Para usar Claude o GPT necesitás saldo de créditos. Podés adquirir un paquete en la página de Planes o usar Gemini Gratis.',
+            code: 'NO_CREDITS',
+          },
+          { status: 402 }
+        )
+      }
+    }
+
     const result = await runAgent({
       db,
       user,
@@ -121,7 +138,14 @@ export async function POST(request: Request) {
       attachments,
       includeCv: body.includeCv === true,
       deepSearch: body.deepSearch === true,
+      model: requestedModel,
     })
+
+    // Descontar crédito si usó un modelo de pago
+    if (isPaidModel && !ctx.isAdmin) {
+      await db.rpc('consume_ai_credit', { p_user: ctx.userId })
+    }
+
     return NextResponse.json(result)
   } catch (err: any) {
     console.error('Error en /api/ai-chat:', err)

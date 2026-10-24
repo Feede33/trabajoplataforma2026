@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { CANDIDATE_MODELS, makeHttpsPost } from '@/lib/gemini'
+import { callClaudeChat, formatToolsForClaude } from '@/lib/server/claude'
+import { callOpenAiChat, formatToolsForOpenAi } from '@/lib/server/openai'
 import { getGmailConnection, isGoogleConfigured, isValidEmail, sendGmail } from '@/lib/server/google'
 import { cleanChatText } from '@/lib/chat-format'
 
@@ -391,8 +393,9 @@ export async function runAgent(opts: {
   attachments?: Attachment[]
   includeCv?: boolean
   deepSearch?: boolean
+  model?: string
 }): Promise<AgentResult> {
-  const { db, user, history, autoApply, attachments = [], includeCv = false, deepSearch = false } = opts
+  const { db, user, history, autoApply, attachments = [], includeCv = false, deepSearch = false, model = 'gemini' } = opts
   const result: AgentResult = {
     reply: '',
     pending: [],
@@ -580,6 +583,136 @@ export async function runAgent(opts: {
     }
   }
 
+  // 1. Motor Anthropic Claude
+  if (model && (model === 'claude' || model.includes('claude'))) {
+    try {
+      let specificModel = 'claude-3-7-sonnet-20250219'
+      if (model.includes('haiku')) {
+        specificModel = 'claude-3-5-haiku-20241022'
+      } else if (model.includes('opus')) {
+        specificModel = 'claude-3-opus-20240229'
+      } else if (model.includes('sonnet')) {
+        specificModel = 'claude-3-5-sonnet-20241022'
+      }
+
+      const claudeTools = formatToolsForClaude(TOOLS)
+      const claudeMessages: any[] = history.map((t) => ({
+        role: t.role === 'user' ? 'user' : 'assistant',
+        content: t.content,
+      }))
+      const lastMsg = claudeMessages[claudeMessages.length - 1]
+      if (attachments.length > 0) {
+        const textAtts = attachments.map((a) => `[Archivo adjunto: ${a.name}]`).join('\n')
+        lastMsg.content = `${lastMsg.content}\n${textAtts}`
+      }
+
+      const maxSteps = deepSearch ? 10 : MAX_STEPS
+      for (let step = 0; step < maxSteps; step++) {
+        const res = await callClaudeChat({
+          system: systemPrompt(deepSearch),
+          messages: claudeMessages,
+          tools: claudeTools,
+          model: specificModel,
+        })
+
+        const toolCalls = res.content.filter((c) => c.type === 'tool_use')
+        const textBlocks = res.content.filter((c) => c.type === 'text')
+
+        if (toolCalls.length === 0) {
+          const fullText = textBlocks.map((b) => b.text || '').join('').trim()
+          result.reply = cleanChatText(fullText)
+          return result
+        }
+
+        claudeMessages.push({ role: 'assistant', content: res.content })
+
+        const toolResults: any[] = []
+        for (const tc of toolCalls) {
+          let output: unknown
+          try {
+            output = await execTool(tc.name || '', tc.input || {})
+          } catch (err: any) {
+            output = { error: err.message || 'Error en herramienta' }
+          }
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tc.id,
+            content: JSON.stringify(output),
+          })
+        }
+        claudeMessages.push({ role: 'user', content: toolResults })
+      }
+    } catch (err: any) {
+      console.warn('ai-chat: error en Claude, intentando con Gemini:', err.message)
+      if (err.message?.includes('saldo') || err.message?.includes('balance')) {
+        throw err
+      }
+    }
+  }
+
+  // 2. Motor OpenAI GPT
+  if (model && (model === 'gpt' || model.includes('gpt') || model.includes('openai'))) {
+    try {
+      let specificModel = 'gpt-4o'
+      if (model.includes('5.4')) {
+        specificModel = 'gpt-5.4'
+      } else if (model.includes('5.2')) {
+        specificModel = 'gpt-5.2'
+      } else if (model.includes('astra')) {
+        specificModel = 'gpt-6-astra'
+      }
+
+      const openAiTools = formatToolsForOpenAi(TOOLS)
+      const openAiMessages: any[] = [
+        { role: 'system', content: systemPrompt(deepSearch) },
+        ...history.map((t) => ({ role: t.role as any, content: t.content })),
+      ]
+
+      const maxSteps = deepSearch ? 10 : MAX_STEPS
+      for (let step = 0; step < maxSteps; step++) {
+        const res = await callOpenAiChat({
+          messages: openAiMessages,
+          tools: openAiTools,
+          model: specificModel,
+        })
+
+        const msg = res.message
+        openAiMessages.push(msg)
+
+        if (!msg.tool_calls || msg.tool_calls.length === 0) {
+          result.reply = cleanChatText(msg.content || '')
+          return result
+        }
+
+        for (const tc of msg.tool_calls) {
+          let args: Record<string, any> = {}
+          try {
+            args = JSON.parse(tc.function.arguments || '{}')
+          } catch {}
+
+          let output: unknown
+          try {
+            output = await execTool(tc.function.name, args)
+          } catch (err: any) {
+            output = { error: err.message || 'Error en herramienta' }
+          }
+
+          openAiMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: JSON.stringify(output),
+          })
+        }
+      }
+    } catch (err: any) {
+      console.warn('ai-chat: error en OpenAI, intentando con Gemini:', err.message)
+      if (err.message?.includes('saldo') || err.message?.includes('balance')) {
+        throw err
+      }
+    }
+  }
+
+  // 3. Motor Base Google Gemini (Gratuito por defecto)
   const maxSteps = deepSearch ? 12 : MAX_STEPS
   for (let step = 0; step < maxSteps; step++) {
     const modelContent = await callGeminiChat(contents, deepSearch)
