@@ -1420,8 +1420,8 @@ export function AIChat() {
         className={cn(
           'relative border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900 shadow-sm focus-within:shadow-md focus-within:border-slate-300 dark:focus-within:border-slate-600 transition-all duration-200',
           isExpanded
-            ? 'rounded-3xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-y-2.5'
-            : 'rounded-full px-3 sm:px-3.5 py-2 sm:py-2.5 min-h-[56px] flex flex-nowrap items-center gap-2 sm:gap-2.5'
+            ? 'rounded-3xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-y-2.5'
+            : 'rounded-full px-2.5 sm:px-3.5 py-1.5 sm:py-2.5 min-h-[52px] sm:min-h-[56px] flex flex-nowrap items-center gap-1.5 sm:gap-2.5'
         )}
       >
         <input
@@ -1537,7 +1537,7 @@ export function AIChat() {
             <Plus className={cn('w-5 h-5 transition-transform text-slate-600 dark:text-white', menuOpen && 'rotate-45')} />
           </button>
           {menuOpen && (
-            <div className="absolute bottom-full mb-2.5 left-0 w-72 sm:w-80 rounded-2xl border border-slate-200/90 dark:border-[#333538] bg-white dark:bg-[#1e1f20] shadow-2xl shadow-black/40 p-1.5 z-40 animate-in fade-in slide-in-from-bottom-2 font-google-sans">
+            <div className="absolute bottom-full mb-2.5 left-0 w-72 sm:w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200/90 dark:border-[#333538] bg-white dark:bg-[#1e1f20] shadow-2xl shadow-black/40 p-1.5 z-40 animate-in fade-in slide-in-from-bottom-2 font-google-sans">
               {ATTACH_OPTIONS.map(({ id, icon: Icon, label }) => {
                 const status = id === 'cv' ? includeCv : id === 'deep' ? deepSearch : false
                 const showDivider = id === 'deep'
@@ -1596,13 +1596,13 @@ export function AIChat() {
             <button
               type="button"
               onClick={() => setSubModelOpen((o) => !o)}
-              className="h-8 px-3.5 rounded-full bg-slate-100 hover:bg-slate-200/90 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border border-slate-200/90 dark:border-slate-700/80 text-[13px] font-medium transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer select-none font-google-sans"
+              className="h-8 px-2 sm:px-3.5 rounded-full bg-slate-100 hover:bg-slate-200/90 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border border-slate-200/90 dark:border-slate-700/80 text-[12px] sm:text-[13px] font-medium transition-all flex items-center gap-1 sm:gap-1.5 shadow-2xs active:scale-95 cursor-pointer select-none font-google-sans max-w-[110px] sm:max-w-none"
               title="Versión del modelo"
             >
-              <span>{subModelButtonLabel}</span>
+              <span className="truncate max-w-[75px] sm:max-w-none">{subModelButtonLabel}</span>
               <ChevronUp
                 className={cn(
-                  'w-3.5 h-3.5 text-slate-500 dark:text-slate-400 transition-transform duration-200 stroke-[2.2]',
+                  'w-3.5 h-3.5 text-slate-500 dark:text-slate-400 transition-transform duration-200 stroke-[2.2] shrink-0',
                   subModelOpen && 'rotate-180'
                 )}
               />
@@ -1610,7 +1610,7 @@ export function AIChat() {
 
             {subModelOpen && (
               <div className="absolute bottom-full mb-2.5 right-0 z-40 animate-in fade-in zoom-in-95 duration-150">
-                <div className="w-[260px] sm:w-[275px] p-2 rounded-[22px] border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl shadow-slate-900/15 dark:shadow-black/70 font-google-sans select-none">
+                <div className="w-[260px] sm:w-[275px] max-w-[calc(100vw-2rem)] p-2 rounded-[22px] border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xl shadow-slate-900/15 dark:shadow-black/70 font-google-sans select-none">
                   <div className="space-y-0.5">
                     {currentSubList.map((sub) => {
                       const isSelected = sub.id === subModelId
@@ -1985,7 +1985,7 @@ export function AIChat() {
       {mobileSidebarOpen && (
         <div className="fixed inset-0 top-16 z-40 flex md:hidden">
           <div
-            className="fixed inset-0 top-16 bg-slate-950/50 backdrop-blur-xs"
+            className="fixed inset-0 top-16 bg-slate-950/50 backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
           />
           <div className="relative z-10 h-full">{sidebarContent}</div>
@@ -2067,7 +2067,7 @@ export function AIChat() {
                   variant="prominent"
                   tint="warm"
                   hover={false}
-                  className="!p-1.5 !rounded-2xl w-80 shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden font-google-sans bg-white/70 dark:bg-slate-900/80"
+                  className="!p-1.5 !rounded-2xl w-[calc(100vw-2rem)] max-w-xs sm:w-80 shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden font-google-sans bg-white/70 dark:bg-slate-900/80"
                 >
                   {MODELS.map((m) => (
                     <button
@@ -2156,21 +2156,21 @@ export function AIChat() {
               <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500 via-sky-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-sky-500/20">
                 <Sparkles className="w-7 h-7" />
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                 ¿Qué empleo buscamos hoy?
               </h1>
-              <p className="text-base sm:text-lg text-slate-500 dark:text-slate-400">
+              <p className="text-sm sm:text-lg text-slate-500 dark:text-slate-400">
                 Dejá que la IA encuentre vacantes, mejore tu CV y se postule por vos.
               </p>
             </div>
             {composer}
-            <div className="flex flex-wrap justify-center gap-3 max-w-3xl px-2">
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-3 max-w-3xl px-2">
               {SUGGESTIONS.map(({ icon: Icon, label }) => (
                 <button
                   key={label}
                   type="button"
                   onClick={() => send(label)}
-                  className="inline-flex items-center gap-2.5 px-5 py-3 min-h-[44px] rounded-full border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 text-sm font-medium text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 transition-colors shadow-xs leading-normal"
+                  className="inline-flex items-center gap-2 sm:gap-2.5 px-3.5 sm:px-5 py-2.5 sm:py-3 min-h-[40px] sm:min-h-[44px] rounded-full border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 transition-colors shadow-xs leading-normal"
                 >
                   <Icon className="w-4 h-4 text-slate-400 dark:text-white shrink-0" />
                   <span>{label}</span>

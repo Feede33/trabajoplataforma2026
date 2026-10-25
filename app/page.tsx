@@ -269,22 +269,22 @@ export default function HomePage() {
 
       {/* Stats Counter Bar */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-14 relative z-10">
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 sm:p-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-4 sm:p-8 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 text-center">
           <div>
-            <p className="text-3xl sm:text-4xl font-extrabold text-indigo-600">+1.500</p>
-            <p className="text-xs sm:text-sm font-medium text-slate-600 mt-1">Empleos activos</p>
+            <p className="text-2xl sm:text-4xl font-extrabold text-indigo-600">+1.500</p>
+            <p className="text-[11px] sm:text-sm font-medium text-slate-600 mt-1">Empleos activos</p>
           </div>
           <div>
-            <p className="text-3xl sm:text-4xl font-extrabold text-slate-900">+450</p>
-            <p className="text-xs sm:text-sm font-medium text-slate-600 mt-1">Empresas contratando</p>
+            <p className="text-2xl sm:text-4xl font-extrabold text-slate-900">+450</p>
+            <p className="text-[11px] sm:text-sm font-medium text-slate-600 mt-1">Empresas contratando</p>
           </div>
           <div>
-            <p className="text-3xl sm:text-4xl font-extrabold text-emerald-600">24hs</p>
-            <p className="text-xs sm:text-sm font-medium text-slate-600 mt-1">Tiempo de respuesta</p>
+            <p className="text-2xl sm:text-4xl font-extrabold text-emerald-600">24hs</p>
+            <p className="text-[11px] sm:text-sm font-medium text-slate-600 mt-1">Tiempo de respuesta</p>
           </div>
           <div>
-            <p className="text-3xl sm:text-4xl font-extrabold text-indigo-600">98%</p>
-            <p className="text-xs sm:text-sm font-medium text-slate-600 mt-1">Candidatos conformes</p>
+            <p className="text-2xl sm:text-4xl font-extrabold text-indigo-600">98%</p>
+            <p className="text-[11px] sm:text-sm font-medium text-slate-600 mt-1">Candidatos conformes</p>
           </div>
         </div>
       </section>
@@ -350,22 +350,22 @@ export default function HomePage() {
               <Link
                 key={idx}
                 href={`/empleos?rubro=${encodeURIComponent(cat.query)}`}
-                className="group relative bg-white rounded-2xl border border-slate-200 p-6 hover:border-indigo-300 hover:shadow-lg transition-all flex items-center justify-between"
+                className="group relative bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 hover:border-indigo-300 hover:shadow-lg transition-all flex items-center justify-between"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
                   <div
-                    className={`w-12 h-12 rounded-xl bg-gradient-to-tr ${cat.color} flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform`}
+                    className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr ${cat.color} flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform shrink-0`}
                   >
-                    <Icon className="w-6 h-6" />
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                    <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-sm sm:text-base">
                       {cat.name}
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">{cat.count}</p>
+                    <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">{cat.count}</p>
                   </div>
                 </div>
-                <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all shrink-0" />
               </Link>
             )
           })}
@@ -376,7 +376,7 @@ export default function HomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
           {/* For Candidates */}
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-3xl p-6 sm:p-10 flex flex-col justify-between">
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-3xl p-5 sm:p-10 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200">
                 <Users className="w-6 h-6" />
@@ -384,7 +384,7 @@ export default function HomePage() {
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">
                 Para Candidatos
               </span>
-              <h3 className="text-2xl font-bold text-slate-900">
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
                 Llevá tu carrera al siguiente nivel
               </h3>
               <p className="text-sm text-slate-600 leading-relaxed">
@@ -405,7 +405,7 @@ export default function HomePage() {
           </div>
 
           {/* For Companies */}
-          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white border border-slate-800 rounded-3xl p-6 sm:p-10 flex flex-col justify-between">
+          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white border border-slate-800 rounded-3xl p-5 sm:p-10 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/30">
                 <Building2 className="w-6 h-6" />
@@ -413,7 +413,7 @@ export default function HomePage() {
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
                 Para Empresas
               </span>
-              <h3 className="text-2xl font-bold text-white">
+              <h3 className="text-xl sm:text-2xl font-bold text-white">
                 Contratá al mejor talento más rápido
               </h3>
               <p className="text-sm text-slate-300 leading-relaxed">

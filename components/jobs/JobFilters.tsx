@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Search, MapPin, Filter, RotateCcw } from 'lucide-react'
+import { Search, MapPin, Filter, RotateCcw, X } from 'lucide-react'
 import { RUBROS, MODALIDADES, TIPOS_CONTRATO, DEPARTAMENTOS_UY } from '@/lib/utils'
 
 export interface FilterState {
@@ -17,9 +17,10 @@ interface JobFiltersProps {
   onChange: (filters: FilterState) => void
   onReset: () => void
   totalCount: number
+  onClose?: () => void
 }
 
-export function JobFilters({ filters, onChange, onReset, totalCount }: JobFiltersProps) {
+export function JobFilters({ filters, onChange, onReset, totalCount, onClose }: JobFiltersProps) {
   const hasActiveFilters =
     filters.q !== '' ||
     filters.rubro !== '' ||
@@ -39,15 +40,27 @@ export function JobFilters({ filters, onChange, onReset, totalCount }: JobFilter
           <Filter className="w-4 h-4 text-indigo-600" />
           <h3 className="font-bold text-slate-900 text-sm">Filtros de búsqueda</h3>
         </div>
-        {hasActiveFilters && (
-          <button
-            onClick={onReset}
-            className="flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 font-medium"
-          >
-            <RotateCcw className="w-3 h-3" />
-            Limpiar
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasActiveFilters && (
+            <button
+              onClick={onReset}
+              className="flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 font-medium"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Limpiar
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors lg:hidden"
+              aria-label="Cerrar filtros"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search Input */}
@@ -186,6 +199,16 @@ export function JobFilters({ filters, onChange, onReset, totalCount }: JobFilter
       <div className="pt-4 border-t border-slate-100 text-xs text-slate-500 text-center">
         Mostrando <span className="font-bold text-slate-800">{totalCount}</span> vacantes encontradas
       </div>
+
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full lg:hidden py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-colors flex items-center justify-center gap-2"
+        >
+          <span>Ver {totalCount} {totalCount === 1 ? 'empleo' : 'empleos'}</span>
+        </button>
+      )}
     </div>
   )
 }

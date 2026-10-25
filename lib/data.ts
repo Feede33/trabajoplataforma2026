@@ -521,11 +521,48 @@ export async function updateApplicationStatus(appId: string, nuevoEstado: Applic
       const supabase = createClient()
       const { error } = await supabase.from('applications').update({ estado: nuevoEstado }).eq('id', appId)
       if (!error) return true
+
+      // Fallback si la restricción CHECK remota aún no incluye 'seleccionado'
+      if (nuevoEstado === 'seleccionado') {
+        const { error: fallbackErr } = await supabase.from('applications').update({ estado: 'entrevista' }).eq('id', appId)
+        if (!fallbackErr) {
+          const existing = getStoredApplications()
+          const updated = existing.map((a) => (a.id === appId ? { ...a, estado: nuevoEstado } : a))
+          saveStoredApplications(updated)
+          return true
+        }
+      }
     } catch { }
   }
 
   const existing = getStoredApplications()
   const updated = existing.map((a) => (a.id === appId ? { ...a, estado: nuevoEstado } : a))
+  saveStoredApplications(updated)
+  return true
+}
+
+export async function markApplicationsAsSeen(appIds: string[]): Promise<boolean> {
+  if (!appIds || appIds.length === 0) return true
+
+  const validUuids = appIds.filter(isValidUUID)
+  if (isSupabaseConfigured() && validUuids.length > 0) {
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('applications')
+        .update({ estado: 'visto' })
+        .in('id', validUuids)
+      if (error) {
+        console.warn('Error marcando postulaciones como vistas en Supabase:', error)
+      }
+    } catch (err) {
+      console.warn('Error en markApplicationsAsSeen:', err)
+    }
+  }
+
+  const existing = getStoredApplications()
+  const idSet = new Set(appIds)
+  const updated = existing.map((a) => (idSet.has(a.id) ? { ...a, estado: 'visto' as ApplicationEstado } : a))
   saveStoredApplications(updated)
   return true
 }

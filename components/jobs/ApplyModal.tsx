@@ -193,7 +193,7 @@ export function ApplyModal({
         </button>
 
         {isSuccess ? (
-          <div className="p-8 text-center space-y-4">
+          <div className="p-5 sm:p-8 text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto animate-bounce">
               <CheckCircle2 className="w-9 h-9" />
             </div>
@@ -219,7 +219,7 @@ export function ApplyModal({
           </div>
         ) : !profile ? (
           /* Usuario NO autenticado -> Forzar inicio de sesión */
-          <div className="p-8 text-center space-y-6">
+          <div className="p-5 sm:p-8 text-center space-y-6">
             <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
               <Lock className="w-8 h-8" />
             </div>
@@ -252,7 +252,7 @@ export function ApplyModal({
           </div>
         ) : profile.role === 'empresa' ? (
           /* Cuenta Empresa -> Advertir que debe ser candidato */
-          <div className="p-8 text-center space-y-6">
+          <div className="p-5 sm:p-8 text-center space-y-6">
             <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
               <Building2 className="w-8 h-8" />
             </div>
@@ -273,7 +273,7 @@ export function ApplyModal({
           </div>
         ) : activeExistingApp ? (
           /* Candidato YA postulado a esta oferta */
-          <div className="p-8 text-center space-y-5">
+          <div className="p-5 sm:p-8 text-center space-y-5">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
               <CheckCircle2 className="w-9 h-9" />
             </div>

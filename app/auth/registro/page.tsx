@@ -60,8 +60,8 @@ function RegistroContent() {
 
   if (successMessage) {
     return (
-      <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-8 shadow-xl text-center space-y-5">
+      <div className="min-h-[85vh] flex items-center justify-center px-4 py-8 sm:py-12">
+        <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-xl text-center space-y-5">
           <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-9 h-9" />
           </div>
@@ -83,8 +83,8 @@ function RegistroContent() {
   }
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-8 shadow-xl space-y-6">
+    <div className="min-h-[85vh] flex items-center justify-center px-4 py-8 sm:py-12">
+      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-xl space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-md shadow-indigo-200">
@@ -137,7 +137,7 @@ function RegistroContent() {
           type="button"
           onClick={handleGoogleSignup}
           disabled={isGoogleLoading || isLoading}
-          className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm border border-slate-200 shadow-sm hover:border-slate-300 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+          className="w-full py-2.5 px-3 sm:px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm border border-slate-200 shadow-sm hover:border-slate-300 transition-all flex items-center justify-center gap-2 sm:gap-3 disabled:opacity-50"
         >
           <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -157,7 +157,7 @@ function RegistroContent() {
               fill="#EA4335"
             />
           </svg>
-          <span>
+          <span className="truncate">
             {isGoogleLoading
               ? 'Conectando con Google...'
               : role === 'empresa'

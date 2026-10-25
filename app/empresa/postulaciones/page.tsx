@@ -5,30 +5,27 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Users,
-  FileText,
-  Mail,
-  ExternalLink,
-  Download,
   Building2,
   ArrowRight,
   Search,
   Filter,
-  Eye,
-  Briefcase
+  Briefcase,
+  Unlock,
+  Lock
 } from 'lucide-react'
 import {
   fetchApplicationsForEmpresa,
   fetchJobsByEmpresa,
-  updateApplicationStatus
+  updateApplicationStatus,
+  markApplicationsAsSeen
 } from '@/lib/data'
 import {
   ApplicationWithDetails,
   ApplicationEstado,
   JobWithEmpresa
 } from '@/lib/supabase/database.types'
-import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/lib/context/AuthContext'
+import { CandidateCard } from '@/components/empresa/CandidateCard'
 import { CandidateDetailsModal } from '@/components/empresa/CandidateDetailsModal'
 
 function EmpresaPostulacionesContent() {
@@ -44,6 +41,7 @@ function EmpresaPostulacionesContent() {
   const [selectedJob, setSelectedJob] = useState<string>(initialJobId)
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [modalApp, setModalApp] = useState<ApplicationWithDetails | null>(null)
+  const [isMarkingAll, setIsMarkingAll] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -76,6 +74,23 @@ function EmpresaPostulacionesContent() {
     }
   }
 
+  const handleMarkAllAsSeen = async () => {
+    const pendingToMark = filtered.filter((a) => a.estado === 'pendiente')
+    if (pendingToMark.length === 0) return
+
+    setIsMarkingAll(true)
+    try {
+      const ids = pendingToMark.map((a) => a.id)
+      await markApplicationsAsSeen(ids)
+      const idSet = new Set(ids)
+      setApplications((prev) =>
+        prev.map((a) => (idSet.has(a.id) ? { ...a, estado: 'visto' } : a))
+      )
+    } finally {
+      setIsMarkingAll(false)
+    }
+  }
+
   const filtered = applications.filter((app) => {
     if (selectedJob !== 'todos') {
       const matchJob = app.job_id === selectedJob || app.job?.slug === selectedJob
@@ -94,16 +109,10 @@ function EmpresaPostulacionesContent() {
     return true
   })
 
-  const getStatusBadge = (estado: ApplicationEstado) => {
-    const map: Record<ApplicationEstado, { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }> = {
-      pendiente: { variant: 'warning', label: 'Pendiente' },
-      visto: { variant: 'primary', label: 'CV Visto' },
-      entrevista: { variant: 'success', label: 'En Proceso' },
-      rechazado: { variant: 'danger', label: 'Descartado' },
-    }
-    const cur = map[estado] || { variant: 'warning', label: estado }
-    return <Badge variant={cur.variant} size="sm">{cur.label}</Badge>
-  }
+  const pendingCount = applications.filter((a) => a.estado === 'pendiente').length
+  const pendingInCurrentView = filtered.filter((a) => a.estado === 'pendiente').length
+  const seenCount = applications.filter((a) => a.estado === 'visto').length
+  const interviewCount = applications.filter((a) => a.estado === 'entrevista').length
 
   if (isLoading || loadingData) {
     return (
@@ -161,6 +170,12 @@ function EmpresaPostulacionesContent() {
             <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-extrabold text-xs">
               {applications.length} {applications.length === 1 ? 'postulación' : 'postulaciones'}
             </span>
+            {pendingCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-extrabold text-xs flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                {pendingCount} sin abrir
+              </span>
+            )}
           </div>
           <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
             Postulaciones Recibidas
@@ -170,13 +185,32 @@ function EmpresaPostulacionesContent() {
           </p>
         </div>
 
-        <Link
-          href="/empresa/dashboard"
-          className="text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors self-start sm:self-auto flex items-center gap-1.5"
-        >
-          <Briefcase className="w-4 h-4 text-indigo-600" />
-          <span>Volver al Dashboard</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {pendingInCurrentView > 0 && (
+            <button
+              type="button"
+              onClick={handleMarkAllAsSeen}
+              disabled={isMarkingAll}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-300 dark:border-amber-800 font-bold text-xs shadow-sm transition-all"
+              title="Desbloquea y marca todas las postulaciones visibles como vistas sin necesidad de abrirlas una por una"
+            >
+              <Unlock className="w-3.5 h-3.5 text-amber-600" />
+              <span>
+                {isMarkingAll
+                  ? 'Desbloqueando...'
+                  : `Desbloquear todas (${pendingInCurrentView})`}
+              </span>
+            </button>
+          )}
+
+          <Link
+            href="/empresa/dashboard"
+            className="text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors self-start sm:self-auto flex items-center gap-1.5"
+          >
+            <Briefcase className="w-4 h-4 text-indigo-600" />
+            <span>Volver al Dashboard</span>
+          </Link>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -184,7 +218,7 @@ function EmpresaPostulacionesContent() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Job Filter Dropdown */}
           {jobs.length > 0 && (
-            <div className="flex items-center gap-2 min-w-[220px]">
+            <div className="flex items-center gap-2 w-full sm:w-auto sm:min-w-[220px]">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
                 Aviso:
               </span>
@@ -209,22 +243,31 @@ function EmpresaPostulacionesContent() {
           {/* Status Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none">
             {[
-              { id: 'todos', label: 'Todos' },
-              { id: 'pendiente', label: 'Pendientes' },
-              { id: 'visto', label: 'Vistos' },
-              { id: 'entrevista', label: 'En Proceso' },
-              { id: 'rechazado', label: 'Descartados' }
+              { id: 'todos', label: 'Todos', count: applications.length },
+              { id: 'pendiente', label: 'Sin abrir', count: pendingCount },
+              { id: 'visto', label: 'CV Visto', count: seenCount },
+              { id: 'entrevista', label: 'En Proceso', count: interviewCount },
+              { id: 'rechazado', label: 'Descartados', count: applications.filter((a) => a.estado === 'rechazado').length }
             ].map((st) => (
               <button
                 key={st.id}
                 onClick={() => setFilterStatus(st.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
                   filterStatus === st.id
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                {st.label}
+                <span>{st.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    filterStatus === st.id
+                      ? 'bg-white/20 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}
+                >
+                  {st.count}
+                </span>
               </button>
             ))}
           </div>
@@ -277,109 +320,12 @@ function EmpresaPostulacionesContent() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((app) => (
-            <div
+            <CandidateCard
               key={app.id}
-              className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-3">
-                {/* Header: Name + Status */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-sm flex items-center justify-center shrink-0">
-                      {app.candidato?.nombre ? app.candidato.nombre[0].toUpperCase() : 'C'}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-slate-900 dark:text-white text-base truncate">
-                        {app.candidato?.nombre || 'Candidato'}
-                      </h3>
-                      <a
-                        href={`mailto:${app.candidato?.email}`}
-                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mt-0.5 truncate"
-                      >
-                        <Mail className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{app.candidato?.email || 'Sin correo'}</span>
-                      </a>
-                    </div>
-                  </div>
-                  {getStatusBadge(app.estado)}
-                </div>
-
-                {/* Job Applied For */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
-                  <span className="text-slate-400 dark:text-slate-500 block text-[10px] uppercase font-semibold">
-                    Postulado a:
-                  </span>
-                  <Link
-                    href={`/empleos/${app.job?.slug}`}
-                    className="font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 flex items-center gap-1 mt-0.5"
-                  >
-                    <span className="truncate">{app.job?.titulo}</span>
-                    <ExternalLink className="w-3 h-3 shrink-0 text-slate-400" />
-                  </Link>
-                </div>
-
-                {/* Cover letter message */}
-                {app.mensaje ? (
-                  <div className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50/70 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <p className="font-semibold text-slate-700 dark:text-slate-300 text-[11px] mb-1">
-                      Mensaje del candidato:
-                    </p>
-                    <p className="italic line-clamp-3">"{app.mensaje}"</p>
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-slate-400 italic px-1">Sin carta de presentación escrita.</p>
-                )}
-
-                {/* CV Attachment button */}
-                <div>
-                  {app.candidato?.cv_url ? (
-                    <a
-                      href={app.candidato.cv_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/30 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-colors"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Ver Currículum (PDF)</span>
-                      <Download className="w-3 h-3 text-indigo-500 ml-auto" />
-                    </a>
-                  ) : (
-                    <div className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Sin CV adjunto</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Status Update & Full Profile Modal */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>{formatRelativeTime(app.created_at)}</span>
-                  <button
-                    onClick={() => setModalApp(app)}
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold flex items-center gap-1"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Ver Ficha Completa</span>
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-1.5 pt-1">
-                  <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Cambiar estado:</span>
-                  <select
-                    value={app.estado}
-                    onChange={(e) => handleStatusChange(app.id, e.target.value as ApplicationEstado)}
-                    className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="visto">CV Visto</option>
-                    <option value="entrevista">En Proceso</option>
-                    <option value="rechazado">Descartado</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+              application={app}
+              onStatusChange={handleStatusChange}
+              onOpenModal={(selected) => setModalApp(selected)}
+            />
           ))}
         </div>
       )}

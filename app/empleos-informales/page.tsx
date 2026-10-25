@@ -731,8 +731,8 @@ export default function EmpleosInformalesPage() {
         <div className="max-w-[1440px] mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="max-w-2xl space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold tracking-wide">
-                <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+              <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-[11px] sm:text-xs font-bold tracking-wide">
+                <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500 shrink-0" />
                 <span>Contacto Directo: WhatsApp • Teléfono • Email • Presencial</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -1063,7 +1063,7 @@ export default function EmpleosInformalesPage() {
               return (
                 <div
                   key={job.id}
-                  className="bg-white rounded-3xl p-6 border border-slate-200 hover:border-amber-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-5"
+                  className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 hover:border-amber-300 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 sm:space-y-5"
                 >
                   <div className="space-y-3">
                     {/* Top Badges */}

@@ -24,8 +24,10 @@ import {
   CheckCircle2,
   RefreshCw,
   Layers,
-  ArrowRight
+  ArrowRight,
+  ChevronDown
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
   CompanyContact,
   fetchCompanyContacts,
@@ -76,6 +78,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCat, setSelectedCat] = useState('Todos')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [mobileExpanded, setMobileExpanded] = useState(false)
 
   // Manual Create Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -406,10 +409,10 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
 
   return (
     <aside className="w-full lg:w-96 xl:w-[420px] shrink-0">
-      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl shadow-slate-900/5 dark:shadow-black/25 flex flex-col gap-4 sticky top-20">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-3xl p-4 sm:p-6 shadow-xl shadow-slate-900/5 dark:shadow-black/25 flex flex-col gap-4 lg:sticky lg:top-20">
 
         {/* Header con diseño amplio y sin colisiones */}
-        <div className="border-b border-slate-200/90 dark:border-slate-800/90 pb-4 space-y-3">
+        <div className={cn("space-y-3", mobileExpanded ? "border-b border-slate-200/90 dark:border-slate-800/90 pb-4" : "lg:border-b lg:border-slate-200/90 dark:lg:border-slate-800/90 lg:pb-4")}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm shadow-emerald-500/10 dark:shadow-emerald-500/15 shrink-0">
@@ -427,6 +430,17 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">WhatsApp directo de empresas</p>
               </div>
             </div>
+
+            {/* Botón toggle móvil para expandir/plegar en celular */}
+            <button
+              type="button"
+              onClick={() => setMobileExpanded((prev) => !prev)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all shrink-0"
+              aria-expanded={mobileExpanded}
+            >
+              <span>{mobileExpanded ? 'Ocultar' : 'Ver'}</span>
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", mobileExpanded && "rotate-180")} />
+            </button>
           </div>
 
           {/* Botones de acción del Administrador distribuidos limpiamente */}
@@ -460,7 +474,9 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
           )}
         </div>
 
-        {/* Search */}
+        {/* Contenido desplegable (oculto en móvil salvo que se expanda, siempre visible en desktop) */}
+        <div className={cn("flex flex-col gap-4", !mobileExpanded && "hidden lg:flex")}>
+          {/* Search */}
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -608,6 +624,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
           <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>Comunicate directamente para consultar vacantes</span>
         </div>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -619,7 +636,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 dark:bg-black/80 backdrop-blur-md p-3 sm:p-6 overflow-y-auto"
         >
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 w-full max-w-2xl my-auto shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-7 w-full max-w-2xl my-auto shadow-2xl flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Modal */}
@@ -1035,7 +1052,7 @@ export function CompanyContactsSidebar({ isAdmin = false }: CompanyContactsSideb
       {mounted && effectiveAdmin && isModalOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 dark:bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
           <div
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md my-auto shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 w-full max-w-md my-auto shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">

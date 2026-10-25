@@ -174,7 +174,7 @@ export default function CandidatoPostulacionesPage() {
           {filtered.map((app) => (
             <div
               key={app.id}
-              className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all space-y-4"
+              className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-6 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all space-y-4"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>

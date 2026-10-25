@@ -180,6 +180,7 @@ function EmpleosContent() {
               onChange={handleFilterChange}
               onReset={handleReset}
               totalCount={filteredJobs.length}
+              onClose={() => setMobileFiltersOpen(false)}
             />
           </div>
         )}

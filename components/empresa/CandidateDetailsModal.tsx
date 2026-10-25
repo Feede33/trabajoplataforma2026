@@ -46,6 +46,12 @@ export function CandidateDetailsModal({
     }
   }, [isOpen, onClose])
 
+  useEffect(() => {
+    if (isOpen && application && application.estado === 'pendiente' && onStatusChange) {
+      onStatusChange(application.id, 'visto')
+    }
+  }, [isOpen, application, onStatusChange])
+
   if (!isOpen || !application) return null
 
   const { candidato, job, estado, mensaje, created_at, id } = application
@@ -77,24 +83,24 @@ export function CandidateDetailsModal({
 
       <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white font-black text-xl flex items-center justify-center shrink-0 shadow-md shadow-indigo-200 dark:shadow-none">
-              {candidato?.nombre ? candidato.nombre[0].toUpperCase() : <User className="w-6 h-6" />}
+        <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3 sm:gap-4 bg-slate-50/50 dark:bg-slate-900/50">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-indigo-600 text-white font-black text-lg sm:text-xl flex items-center justify-center shrink-0 shadow-md shadow-indigo-200 dark:shadow-none">
+              {candidato?.nombre ? candidato.nombre[0].toUpperCase() : <User className="w-5 h-5 sm:w-6 sm:h-6" />}
             </div>
             <div className="min-w-0">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white truncate">
                 {candidato?.nombre || 'Candidato sin nombre'}
               </h2>
-              <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  {candidato?.email || 'Sin correo registrado'}
+              <div className="flex flex-wrap items-center gap-2 mt-0.5 sm:mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1 min-w-0">
+                  <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate max-w-[170px] sm:max-w-none">{candidato?.email || 'Sin correo registrado'}</span>
                 </span>
                 {candidato?.ubicacion && (
                   <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    {candidato.ubicacion}
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{candidato.ubicacion}</span>
                   </span>
                 )}
               </div>
@@ -111,7 +117,7 @@ export function CandidateDetailsModal({
         </div>
 
         {/* Scrollable Content */}
-        <div className="p-6 overflow-y-auto space-y-6 text-sm">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 text-sm">
           {/* Postulación Info Banner */}
           <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>

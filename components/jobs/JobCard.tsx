@@ -26,7 +26,7 @@ export function JobCard({ job, featured = false, isApplied = false }: JobCardPro
 
   return (
     <div
-      className={`group relative bg-white rounded-2xl border transition-all duration-200 p-6 flex flex-col justify-between ${
+      className={`group relative bg-white rounded-2xl border transition-all duration-200 p-4 sm:p-6 flex flex-col justify-between ${
         featured
           ? 'border-indigo-200 shadow-md shadow-indigo-100/50 hover:shadow-xl hover:border-indigo-300'
           : 'border-slate-200 hover:border-indigo-300 hover:shadow-lg'

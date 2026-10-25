@@ -59,10 +59,16 @@
     @apply border-border;
   }
 
+  html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
     font-family: 'Google Sans', 'Google Sans Text', var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
     min-height: 100vh;
+    overflow-x: hidden;
   }
 }
 

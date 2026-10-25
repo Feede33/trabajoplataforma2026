@@ -109,7 +109,7 @@ export function EditJobModal({ job, isOpen, onClose, onJobUpdated }: EditJobModa
     <div className="fixed inset-0 !m-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
       <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800">
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 p-5 sm:p-6 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6 flex items-center justify-between z-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20">
               <Pencil className="w-5 h-5" />
@@ -133,7 +133,7 @@ export function EditJobModal({ job, isOpen, onClose, onJobUpdated }: EditJobModa
         </div>
 
         {/* Content & Form */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
           {errorMessage && (
             <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300">
               <AlertCircle className="w-4 h-4 shrink-0" />

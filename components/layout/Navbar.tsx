@@ -44,8 +44,8 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex-1 flex items-center justify-start gap-6">
-            <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-              <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-sky-500/20 group-hover:shadow-sky-500/35 group-hover:scale-105 transition-all border border-slate-200/60 dark:border-slate-800">
+            <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-sky-500/20 group-hover:shadow-sky-500/35 group-hover:scale-105 transition-all border border-slate-200/60 dark:border-slate-800">
                 <Image
                   src="/logo-navbar.png"
                   alt="PostulaUY"
@@ -57,10 +57,10 @@ export function Navbar() {
                 />
               </div>
               <div className="flex flex-col">
-                <span className="font-extrabold text-xl text-slate-900 tracking-tight flex items-center">
+                <span className="font-extrabold text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight flex items-center">
                   Postula<span className="bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 bg-clip-text text-transparent font-black ml-0.5">UY<span className="text-xs font-bold ml-0.5">.com</span></span>
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium -mt-1 uppercase tracking-wider">
+                <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-medium -mt-0.5 sm:-mt-1 uppercase tracking-wider">
                   Plataforma Laboral
                 </span>
               </div>
@@ -311,11 +311,11 @@ export function Navbar() {
           </div>
 
           {/* Mobile hamburger button */}
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex md:hidden items-center gap-1.5 sm:gap-2">
             <ModeToggle />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="Abrir menú"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -326,14 +326,14 @@ export function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 bg-white px-5 pt-3 pb-6 space-y-4">
+        <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-5 pt-3 pb-6 space-y-4 shadow-xl">
           <div className="space-y-1">
             <Link
               href="/empleos"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
-              <Search className="w-4 h-4 text-indigo-600" />
+              <Search className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               Explorar Empleos
             </Link>
 
@@ -354,7 +354,7 @@ export function Navbar() {
             <Link
               href="/ia-chat"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
               <Sparkles className="w-4 h-4 text-sky-500" />
               IA Chat
@@ -363,9 +363,9 @@ export function Navbar() {
             <Link
               href="/planes"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
             >
-              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               Planes
             </Link>
 
@@ -374,17 +374,17 @@ export function Navbar() {
                 <Link
                   href="/empresa/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  <LayoutDashboard className="w-4 h-4 text-indigo-600" />
+                  <LayoutDashboard className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   Panel Empresa
                 </Link>
                 <Link
                   href="/empresa/postulaciones"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  <Users className="w-4 h-4 text-indigo-600" />
+                  <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   Ver Candidatos
                 </Link>
               </>
@@ -395,37 +395,37 @@ export function Navbar() {
                 <Link
                   href="/candidato/postulaciones"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  <Briefcase className="w-4 h-4 text-indigo-600" />
+                  <Briefcase className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   Mis Postulaciones
                 </Link>
                 <Link
                   href="/candidato/perfil"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
-                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   Mi Perfil y CV
                 </Link>
               </>
             )}
           </div>
 
-          <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
             {profile ? (
               <>
-                <div className="px-3 py-2 bg-slate-50 rounded-xl">
-                  <p className="text-xs text-slate-500">Sesión actual</p>
-                  <p className="text-sm font-semibold text-slate-900">{profile.nombre}</p>
-                  <p className="text-xs text-indigo-600 capitalize">{userRoleLabel}</p>
+                <div className="px-3 py-2 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Sesión actual</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{profile.nombre}</p>
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 capitalize">{userRoleLabel}</p>
                 </div>
                 <button
                   onClick={async () => {
                     setMobileMenuOpen(false)
                     await logout()
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-xl transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   Cerrar Sesión
@@ -433,18 +433,28 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <Link
-                  href="/auth/login"
-                  prefetch={false}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-                >
-                  Iniciar Sesión
-                </Link>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/auth/login"
+                    prefetch={false}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                  >
+                    Iniciar Sesión
+                  </Link>
+                  <Link
+                    href="/auth/registro"
+                    prefetch={false}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl transition-colors border border-indigo-200/50 dark:border-indigo-800/50"
+                  >
+                    Registrarse
+                  </Link>
+                </div>
                 <Link
                   href="/empresa/publicar"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm"
                 >
                   <PlusCircle className="w-4 h-4" />
                   Publicar Empleo

@@ -250,8 +250,8 @@ export default function CandidatoPerfilPage() {
           </div>
 
           {/* CV Section */}
-          <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Currículum Vitae (PDF)
               </label>
@@ -268,7 +268,7 @@ export default function CandidatoPerfilPage() {
               )}
             </div>
 
-            <label className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 bg-white cursor-pointer transition-colors group">
+            <label className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 bg-white cursor-pointer transition-colors group">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                   <FileText className="w-5 h-5" />

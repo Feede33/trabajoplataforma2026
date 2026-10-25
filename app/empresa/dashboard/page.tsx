@@ -9,31 +9,28 @@ import {
   Clock,
   ExternalLink,
   ArrowRight,
-  Lock,
   Building2,
   Trash2,
   Pencil,
-  FileText,
-  Mail,
-  Download,
   Search,
   Filter,
-  CheckCircle2,
-  ChevronDown,
   Eye,
-  AlertCircle
+  Mail,
+  CheckCheck
 } from 'lucide-react'
 import {
   fetchJobsByEmpresa,
   fetchApplicationsForEmpresa,
   toggleJobState,
   deleteJob,
-  updateApplicationStatus
+  updateApplicationStatus,
+  markApplicationsAsSeen
 } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails, JobEstado, ApplicationEstado } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
+import { CandidateCard } from '@/components/empresa/CandidateCard'
 import { CandidateDetailsModal } from '@/components/empresa/CandidateDetailsModal'
 
 export default function EmpresaDashboard() {
@@ -47,6 +44,7 @@ export default function EmpresaDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('todos')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedModalApp, setSelectedModalApp] = useState<ApplicationWithDetails | null>(null)
+  const [isMarkingAll, setIsMarkingAll] = useState(false)
 
   const postulacionesSectionRef = useRef<HTMLDivElement>(null)
   const publicacionesSectionRef = useRef<HTMLDivElement>(null)
@@ -98,6 +96,23 @@ export default function EmpresaDashboard() {
     }
   }
 
+  const handleMarkAllAsSeen = async () => {
+    const pendingToMark = filteredApplications.filter((a) => a.estado === 'pendiente')
+    if (pendingToMark.length === 0) return
+
+    setIsMarkingAll(true)
+    try {
+      const ids = pendingToMark.map((a) => a.id)
+      await markApplicationsAsSeen(ids)
+      const idSet = new Set(ids)
+      setApplications((prev) =>
+        prev.map((a) => (idSet.has(a.id) ? { ...a, estado: 'visto' } : a))
+      )
+    } finally {
+      setIsMarkingAll(false)
+    }
+  }
+
   const scrollToPostulaciones = (status?: string, jobId?: string) => {
     if (status) setStatusFilter(status)
     if (jobId) setSelectedJobFilter(jobId)
@@ -109,7 +124,9 @@ export default function EmpresaDashboard() {
   }
 
   const activeJobs = jobs.filter((j) => j.estado === 'activo')
-  const inReviewCount = applications.filter((a) => a.estado === 'entrevista' || a.estado === 'pendiente').length
+  const pendingCount = applications.filter((a) => a.estado === 'pendiente').length
+  const seenCount = applications.filter((a) => a.estado === 'visto').length
+  const inReviewCount = applications.filter((a) => a.estado === 'entrevista').length
 
   // Filtered applications list
   const filteredApplications = applications.filter((app) => {
@@ -130,16 +147,7 @@ export default function EmpresaDashboard() {
     return true
   })
 
-  const getStatusBadge = (estado: ApplicationEstado) => {
-    const map: Record<ApplicationEstado, { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }> = {
-      pendiente: { variant: 'warning', label: 'Pendiente' },
-      visto: { variant: 'primary', label: 'CV Visto' },
-      entrevista: { variant: 'success', label: 'En Proceso' },
-      rechazado: { variant: 'danger', label: 'Descartado' },
-    }
-    const cur = map[estado] || { variant: 'warning', label: estado }
-    return <Badge variant={cur.variant} size="sm">{cur.label}</Badge>
-  }
+  const pendingInCurrentView = filteredApplications.filter((a) => a.estado === 'pendiente').length
 
   if (isLoading || loadingData) {
     return (
@@ -243,7 +251,14 @@ export default function EmpresaDashboard() {
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Postulaciones Recibidas</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Postulaciones Recibidas</p>
+                {pendingCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-extrabold text-[10px] animate-pulse">
+                    {pendingCount} sin abrir
+                  </span>
+                )}
+              </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5">{applications.length}</p>
             </div>
           </div>
@@ -254,19 +269,19 @@ export default function EmpresaDashboard() {
 
         <button
           type="button"
-          onClick={() => scrollToPostulaciones('entrevista')}
-          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md transition-all text-left flex items-center justify-between group"
+          onClick={() => scrollToPostulaciones('visto')}
+          className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:border-sky-300 dark:hover:border-sky-700 hover:shadow-md transition-all text-left flex items-center justify-between group"
         >
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Clock className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Eye className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">En Entrevista / Revisión</p>
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5">{inReviewCount}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">CVs Vistos / Revisados</p>
+              <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5">{seenCount}</p>
             </div>
           </div>
-          <span className="text-xs font-semibold text-slate-400 group-hover:text-amber-600 transition-colors hidden sm:block">
+          <span className="text-xs font-semibold text-slate-400 group-hover:text-sky-600 transition-colors hidden sm:block">
             Filtrar ↓
           </span>
         </button>
@@ -287,19 +302,44 @@ export default function EmpresaDashboard() {
               <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-extrabold text-xs">
                 {applications.length}
               </span>
+              {pendingCount > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-extrabold text-xs flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  {pendingCount} sin abrir
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Revisá quiénes se postularon, sus datos de contacto, cartas de presentación y currículums vitae.
+              Al abrir o desbloquear una carta de postulación, se registra automáticamente como <strong className="text-sky-600 dark:text-sky-400">CV Visto</strong> tanto para vos como para el candidato.
             </p>
           </div>
 
-          <Link
-            href="/empresa/postulaciones"
-            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1 shrink-0 self-start sm:self-auto"
-          >
-            <span>Ver pantalla completa</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          <div className="flex items-center gap-3">
+            {pendingInCurrentView > 0 && (
+              <button
+                type="button"
+                onClick={handleMarkAllAsSeen}
+                disabled={isMarkingAll}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-300 dark:border-amber-800 font-bold text-xs shadow-sm transition-all"
+                title="Desbloquea y marca todas las postulaciones visibles como vistas sin necesidad de abrirlas una por una"
+              >
+                <Unlock className="w-3.5 h-3.5 text-amber-600" />
+                <span>
+                  {isMarkingAll
+                    ? 'Desbloqueando...'
+                    : `Desbloquear todas (${pendingInCurrentView})`}
+                </span>
+              </button>
+            )}
+
+            <Link
+              href="/empresa/postulaciones"
+              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1 shrink-0"
+            >
+              <span>Ver pantalla completa</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
 
         {/* Filters Bar */}
@@ -333,22 +373,31 @@ export default function EmpresaDashboard() {
             {/* Filter Status Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none">
               {[
-                { id: 'todos', label: 'Todos' },
-                { id: 'pendiente', label: 'Pendientes' },
-                { id: 'visto', label: 'Vistos' },
-                { id: 'entrevista', label: 'En Proceso' },
-                { id: 'rechazado', label: 'Descartados' }
+                { id: 'todos', label: 'Todos', count: applications.length },
+                { id: 'pendiente', label: 'Sin abrir', count: pendingCount },
+                { id: 'visto', label: 'CV Visto', count: seenCount },
+                { id: 'entrevista', label: 'En Proceso', count: inReviewCount },
+                { id: 'rechazado', label: 'Descartados', count: applications.filter((a) => a.estado === 'rechazado').length }
               ].map((st) => (
                 <button
                   key={st.id}
                   onClick={() => setStatusFilter(st.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 ${
                     statusFilter === st.id
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                 >
-                  {st.label}
+                  <span>{st.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      statusFilter === st.id
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {st.count}
+                  </span>
                 </button>
               ))}
             </div>
@@ -376,7 +425,7 @@ export default function EmpresaDashboard() {
                 Aún no has recibido postulaciones
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                Cuando los postulantes envíen su currículum a tus avisos, aparecerán inmediatamente aquí para que puedas contactarlos.
+                Cuando los postulantes envíen su currículum a tus avisos, aparecerán inmediatamente aquí en sobres sellados para que puedas abrirlos.
               </p>
             </div>
           ) : filteredApplications.length === 0 ? (
@@ -402,112 +451,12 @@ export default function EmpresaDashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredApplications.map((app) => (
-                <div
+                <CandidateCard
                   key={app.id}
-                  className="bg-white dark:bg-slate-850 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                >
-                  <div className="space-y-3">
-                    {/* Candidate header & status */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-sm flex items-center justify-center shrink-0">
-                          {app.candidato?.nombre ? app.candidato.nombre[0].toUpperCase() : 'C'}
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                            {app.candidato?.nombre || 'Candidato'}
-                          </h3>
-                          <a
-                            href={`mailto:${app.candidato?.email}`}
-                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate mt-0.5"
-                          >
-                            <Mail className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{app.candidato?.email || 'Sin correo'}</span>
-                          </a>
-                        </div>
-                      </div>
-
-                      {getStatusBadge(app.estado)}
-                    </div>
-
-                    {/* Job Applied Pill */}
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold block">
-                        Postulado a:
-                      </span>
-                      <Link
-                        href={`/empleos/${app.job?.slug}`}
-                        className="font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 flex items-center gap-1.5 mt-0.5"
-                      >
-                        <span className="truncate">{app.job?.titulo}</span>
-                        <ExternalLink className="w-3 h-3 shrink-0 text-slate-400" />
-                      </Link>
-                    </div>
-
-                    {/* Candidate Cover Letter Message */}
-                    {app.mensaje ? (
-                      <div className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50/70 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-1">
-                        <p className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500">
-                          Mensaje del candidato:
-                        </p>
-                        <p className="italic line-clamp-3">"{app.mensaje}"</p>
-                      </div>
-                    ) : (
-                      <div className="text-[11px] text-slate-400 dark:text-slate-500 italic px-1">
-                        Sin carta de presentación escrita.
-                      </div>
-                    )}
-
-                    {/* CV Button */}
-                    <div>
-                      {app.candidato?.cv_url ? (
-                        <a
-                          href={app.candidato.cv_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/30 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-colors"
-                        >
-                          <FileText className="w-4 h-4" />
-                          <span>Ver Currículum (PDF)</span>
-                          <Download className="w-3.5 h-3.5 ml-auto text-indigo-500" />
-                        </a>
-                      ) : (
-                        <div className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>Sin CV adjunto</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions & Status Dropdown */}
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>{formatRelativeTime(app.created_at)}</span>
-                      <button
-                        onClick={() => setSelectedModalApp(app)}
-                        className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold flex items-center gap-1"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Ver Ficha Completa</span>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Estado:</span>
-                      <select
-                        value={app.estado}
-                        onChange={(e) => handleStatusChange(app.id, e.target.value as ApplicationEstado)}
-                        className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                      >
-                        <option value="pendiente">Pendiente</option>
-                        <option value="visto">CV Visto</option>
-                        <option value="entrevista">En Proceso</option>
-                        <option value="rechazado">Descartado</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+                  application={app}
+                  onStatusChange={handleStatusChange}
+                  onOpenModal={(selected) => setSelectedModalApp(selected)}
+                />
               ))}
             </div>
           )}
@@ -603,10 +552,10 @@ export default function EmpresaDashboard() {
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <Link
                         href={`/empleos/${job.slug}`}
-                        className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold transition-colors"
+                        className="flex-1 min-w-[70px] sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold transition-colors"
                         title="Ver y editar oferta"
                       >
                         <Pencil className="w-3.5 h-3.5 text-amber-500" />
@@ -614,7 +563,7 @@ export default function EmpresaDashboard() {
                       </Link>
                       <button
                         onClick={() => handleToggleStatus(job.id, job.estado)}
-                        className={`flex-1 text-xs font-semibold py-2 px-3 rounded-xl border transition-colors ${
+                        className={`flex-[2] min-w-[120px] text-xs font-semibold py-2 px-3 rounded-xl border transition-colors ${
                           job.estado === 'activo'
                             ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100'
                             : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
@@ -625,7 +574,7 @@ export default function EmpresaDashboard() {
                       <button
                         onClick={() => handleDeleteJob(job.id, job.titulo)}
                         title="Eliminar oferta permanentemente"
-                        className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-colors"
+                        className="flex-1 min-w-[80px] sm:flex-initial flex items-center justify-center gap-1 px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                         <span>Eliminar</span>

@@ -132,11 +132,11 @@ export default function JobDetailPage() {
           Empleos
         </Link>
         <span>/</span>
-        <span className="text-slate-800 font-medium truncate max-w-xs">{job.titulo}</span>
+        <span className="text-slate-800 font-medium truncate max-w-[140px] sm:max-w-xs">{job.titulo}</span>
       </nav>
 
       {/* Main Header Card */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm">
+      <div className="bg-white rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-5 min-w-0">
             <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
@@ -236,7 +236,7 @@ export default function JobDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Job Description */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm space-y-6">
             <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
               Descripción del Puesto
             </h2>

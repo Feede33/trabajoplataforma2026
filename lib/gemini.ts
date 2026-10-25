@@ -115,7 +115,7 @@ export function makeHttpsPost(urlStr: string, payload: any): Promise<{ statusCod
   })
 }
 
-async function callGemini(contents: any[]): Promise<any> {
+export async function callGemini(contents: any[]): Promise<any> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     throw new Error('Falta la variable de entorno GEMINI_API_KEY en el servidor (.env.local)')
