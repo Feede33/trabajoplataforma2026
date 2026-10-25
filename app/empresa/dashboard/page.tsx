@@ -36,6 +36,9 @@ import { CandidateCard } from '@/components/empresa/CandidateCard'
 import { CandidateDetailsModal } from '@/components/empresa/CandidateDetailsModal'
 import { AiCandidateSelectorModal } from '@/components/empresa/AiCandidateSelectorModal'
 import { EmpresaDashboardSkeleton } from '@/components/empresa/EmpresaDashboardSkeleton'
+import { ShinyButton } from '@/components/ui/shiny-button'
+import { LiquidMetalButton } from '@/components/ui/liquid-metal-button'
+import { useTheme } from 'next-themes'
 
 export default function EmpresaDashboard() {
   const { profile, isLoading } = useAuth()
@@ -50,6 +53,13 @@ export default function EmpresaDashboard() {
   const [selectedModalApp, setSelectedModalApp] = useState<ApplicationWithDetails | null>(null)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
   const [isAiSelectorOpen, setIsAiSelectorOpen] = useState(false)
+
+  const { resolvedTheme } = useTheme()
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const postulacionesSectionRef = useRef<HTMLDivElement>(null)
   const publicacionesSectionRef = useRef<HTMLDivElement>(null)
@@ -309,16 +319,27 @@ export default function EmpresaDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Botón con varita: Seleccionar con IA */}
-            <button
-              type="button"
-              onClick={() => setIsAiSelectorOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white font-bold text-xs shadow-md shadow-indigo-200 dark:shadow-none hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shrink-0"
-              title="Abrir asistente de selección rápida con IA estilo Tinder"
-            >
-              <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-              <span>Seleccionar con IA</span>
-            </button>
+            {/* Botón Seleccionar con IA: LiquidMetalButton en modo claro, ShinyButton en modo oscuro */}
+            {!isMounted || resolvedTheme === 'dark' ? (
+              <ShinyButton
+                onClick={() => setIsAiSelectorOpen(true)}
+                size="sm"
+                className="shrink-0 shadow-md shadow-indigo-500/20"
+                title="Abrir asistente de selección rápida con IA estilo Tinder"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
+                <span>Seleccionar con IA</span>
+              </ShinyButton>
+            ) : (
+              <LiquidMetalButton
+                label="Seleccionar con IA"
+                viewMode="both"
+                height={38}
+                onClick={() => setIsAiSelectorOpen(true)}
+                title="Abrir asistente de selección rápida con IA estilo Tinder"
+                className="shrink-0"
+              />
+            )}
 
             {pendingInCurrentView > 0 && (
               <button

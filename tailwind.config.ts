@@ -12,6 +12,8 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['"Google Sans"', '"Google Sans Text"', 'var(--font-geist-sans)', 'system-ui', '-apple-system', 'sans-serif'],
+        signika: ['Signika', '"Google Sans"', 'var(--font-geist-sans)', 'sans-serif'],
+        'dm-sans': ['"DM Sans"', '"Google Sans"', 'var(--font-geist-sans)', 'sans-serif'],
       },
       colors: {
         border: 'hsl(var(--border))',

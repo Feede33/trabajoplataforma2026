@@ -37,6 +37,9 @@ import { BillingStatus, fetchBillingStatus } from '@/lib/billing-client'
 import { Switch } from '@/components/ui/switch'
 import { GlassContainer } from '@/components/ui/glass-container'
 import { ChatMarkdown } from './ChatMarkdown'
+import { useTheme } from 'next-themes'
+import { ShinyButton } from '@/components/ui/shiny-button'
+import { LiquidMetalButton } from '@/components/ui/liquid-metal-button'
 
 // Proveedores principales para el selector superior (solo nombre de la empresa/marca)
 const MODELS = [
@@ -748,6 +751,12 @@ function RoundedPdfPreview({
 export function AIChat() {
   const router = useRouter()
   const { profile, isAdmin, isLoading, getAccessToken } = useAuth()
+  const { resolvedTheme } = useTheme()
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!isLoading && profile?.role === 'empresa' && !isAdmin) {
@@ -1702,15 +1711,32 @@ export function AIChat() {
               aria-label="Modo automático"
             />
           </div>
-          <button
-            type="button"
-            onClick={() => send(input)}
-            disabled={(!input.trim() && attachments.length === 0) || loading}
-            aria-label="Enviar"
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-900 dark:bg-blue-600 text-white disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 hover:bg-slate-700 dark:hover:bg-blue-500 transition-colors shrink-0"
-          >
-            <ArrowUp className="w-4.5 h-4.5 text-white" />
-          </button>
+          {!isMounted || resolvedTheme === 'dark' ? (
+            <ShinyButton
+              size="icon"
+              type="button"
+              onClick={() => send(input)}
+              disabled={(!input.trim() && attachments.length === 0) || loading}
+              aria-label="Enviar"
+              title="Enviar"
+              className="w-9 h-9 shrink-0 shadow-sm"
+            >
+              <ArrowUp className="w-4.5 h-4.5 text-white shrink-0" />
+            </ShinyButton>
+          ) : (
+            <LiquidMetalButton
+              viewMode="icon"
+              width={36}
+              height={36}
+              onClick={() => send(input)}
+              disabled={(!input.trim() && attachments.length === 0) || loading}
+              aria-label="Enviar"
+              title="Enviar"
+              className="shrink-0"
+            >
+              <ArrowUp className="w-4.5 h-4.5 text-white shrink-0" />
+            </LiquidMetalButton>
+          )}
         </div>
       </div>
 
