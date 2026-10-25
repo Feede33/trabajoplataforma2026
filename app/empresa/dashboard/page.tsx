@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Lock,
   Building2,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react'
 import { fetchJobsByEmpresa, fetchApplicationsForEmpresa, toggleJobState, deleteJob } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails, JobEstado } from '@/lib/supabase/database.types'
@@ -234,6 +235,14 @@ export default function EmpresaDashboard() {
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
+                    <Link
+                      href={`/empleos/${job.slug}`}
+                      className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold transition-colors"
+                      title="Ver y editar oferta"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Editar</span>
+                    </Link>
                     <button
                       onClick={() => handleToggleStatus(job.id, job.estado)}
                       className={`flex-1 text-xs font-semibold py-2 px-3 rounded-xl border transition-colors ${
@@ -302,6 +311,14 @@ export default function EmpresaDashboard() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/empleos/${job.slug}`}
+                            title="Ver y editar oferta"
+                            className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Editar</span>
+                          </Link>
                           <button
                             onClick={() => handleToggleStatus(job.id, job.estado)}
                             className={`text-xs font-semibold px-3 py-1.5 rounded-xl border transition-colors ${

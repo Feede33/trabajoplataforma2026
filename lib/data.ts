@@ -209,6 +209,54 @@ export async function toggleJobState(jobId: string, newState: JobEstado): Promis
   return true
 }
 
+export async function updateJob(
+  jobId: string,
+  updates: Partial<Omit<Job, 'id' | 'empresa_id' | 'created_at'>>
+): Promise<JobWithEmpresa> {
+  if (isSupabaseConfigured() && isValidUUID(jobId)) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('jobs')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', jobId)
+        .select(`
+          *,
+          empresa:profiles(nombre, avatar_url, website, ubicacion)
+        `)
+        .single()
+
+      if (error) {
+        throw new Error(error.message || 'Error al actualizar el empleo')
+      }
+      if (data) {
+        return data as unknown as JobWithEmpresa
+      }
+    } catch (err: any) {
+      if (err?.message) throw err
+      console.warn('Supabase update failed, saving locally', err)
+    }
+  }
+
+  const existing = getStoredJobs()
+  const idx = existing.findIndex((j) => j.id === jobId)
+  if (idx !== -1) {
+    const updated: JobWithEmpresa = {
+      ...existing[idx],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }
+    existing[idx] = updated
+    saveStoredJobs(existing)
+    return updated
+  }
+
+  throw new Error('No se encontró el empleo para actualizar')
+}
+
 export async function deleteJob(jobId: string, accessToken?: string | null): Promise<boolean> {
   if (!isValidUUID(jobId)) {
     const existing = getStoredJobs()

@@ -15,26 +15,31 @@ import {
   ChevronLeft,
   Briefcase,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Pencil
 } from 'lucide-react'
 import { fetchJobBySlug, fetchCandidateApplicationForJob } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
 import { ApplyModal } from '@/components/jobs/ApplyModal'
+import { EditJobModal } from '@/components/jobs/EditJobModal'
 import { useAuth } from '@/lib/context/AuthContext'
 
 export default function JobDetailPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
-  const { profile } = useAuth()
+  const { profile, isAdmin } = useAuth()
 
   const [job, setJob] = useState<JobWithEmpresa | null>(null)
   const [loading, setLoading] = useState(true)
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [existingApplication, setExistingApplication] = useState<ApplicationWithDetails | null>(null)
+
+  const isOwner = Boolean(profile && job && (profile.id === job.empresa_id || isAdmin))
 
   useEffect(() => {
     async function load() {
@@ -198,7 +203,15 @@ export default function JobDetailPage() {
               )}
             </button>
 
-            {existingApplication ? (
+            {isOwner ? (
+              <button
+                onClick={() => setIsEditModalOpen(true)}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm transition-all shadow-md shadow-amber-500/20 hover:shadow-lg hover:scale-[1.02]"
+              >
+                <Pencil className="w-4 h-4" />
+                <span>Editar Empleo</span>
+              </button>
+            ) : existingApplication ? (
               <button
                 onClick={() => setIsApplyModalOpen(true)}
                 className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-sm transition-all shadow-sm"
@@ -290,7 +303,26 @@ export default function JobDetailPage() {
               </div>
             </div>
 
-            {existingApplication ? (
+            {isOwner ? (
+              <div className="space-y-2.5 pt-1">
+                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
+                    <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Tu aviso de empleo</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 pl-5">
+                    Como empresa anunciante podés modificar los datos de esta oferta en cualquier momento.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-2"
+                >
+                  <Pencil className="w-4 h-4" />
+                  <span>Editar este Empleo</span>
+                </button>
+              </div>
+            ) : existingApplication ? (
               <div className="space-y-2.5 pt-1">
                 <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-emerald-900">
@@ -369,6 +401,21 @@ export default function JobDetailPage() {
         existingApplication={existingApplication}
         onApplied={(app) => setExistingApplication(app)}
       />
+
+      {/* Edit Job Modal (para la empresa dueña del aviso) */}
+      {isOwner && job && (
+        <EditJobModal
+          job={job}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onJobUpdated={(updated) => {
+            setJob(updated)
+            if (updated.slug && updated.slug !== slug) {
+              router.replace(`/empleos/${updated.slug}`)
+            }
+          }}
+        />
+      )}
     </>
   )
 }
