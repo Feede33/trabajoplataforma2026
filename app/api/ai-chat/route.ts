@@ -21,6 +21,35 @@ export const maxDuration = 60
 const MAX_HISTORY = 20
 const MAX_MESSAGE_LEN = 4000
 
+function cleanNewlines(str?: string): string {
+  if (!str) return ''
+  return str.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n')
+}
+
+function personalizeEmailText(
+  template: string,
+  meta: { empresa?: string; puesto?: string; candidateName?: string }
+): string {
+  if (!template) return ''
+  let res = cleanNewlines(template)
+
+  const empresaVal = meta.empresa?.trim() || ''
+  const puestoVal = meta.puesto?.trim() || ''
+  const nombreVal = meta.candidateName?.trim() || ''
+
+  if (empresaVal) {
+    res = res.replace(/\{\s*empresa[0-9]*\s*\}/gi, empresaVal)
+  }
+  if (puestoVal) {
+    res = res.replace(/\{\s*(puesto|cargo|vacante)[0-9]*\s*\}/gi, puestoVal)
+  }
+  if (nombreVal) {
+    res = res.replace(/\{\s*(nombre|candidato)\s*\}/gi, nombreVal)
+  }
+
+  return res
+}
+
 export async function POST(request: Request) {
   try {
     if (!isBackendConfigured()) {
@@ -66,6 +95,73 @@ export async function POST(request: Request) {
       return NextResponse.json({ saved: Object.keys(patch) })
     }
 
+    // Confirmación explícita de correos en lote (hasta 5 correos simultáneos)
+    if (Array.isArray(body.confirmEmails) && body.confirmEmails.length > 0) {
+      if (!ctx.isAdmin) {
+        return NextResponse.json({
+          error: 'La función de postular por Gmail estará disponible muy pronto (en proceso de verificación oficial con Google).',
+          code: 'GMAIL_COMING_SOON',
+          comingSoon: true,
+        }, { status: 403 })
+      }
+      const rawList = body.confirmEmails.slice(0, 5)
+      const validList = rawList.filter((e: any) =>
+        e &&
+        isValidEmail(e.to) &&
+        typeof e.subject === 'string' &&
+        typeof e.body === 'string' &&
+        e.subject.trim() &&
+        e.body.trim()
+      )
+      if (validList.length === 0) {
+        return NextResponse.json({ error: 'No hay correos válidos para enviar.' }, { status: 400 })
+      }
+
+      const results = await Promise.allSettled(
+        validList.map((e: any) => {
+          const empresa = typeof e.empresa === 'string' ? e.empresa.trim() : undefined
+          const puesto = typeof e.puesto === 'string' ? e.puesto.trim() : undefined
+          const candidateName = user.email ? user.email.split('@')[0] : 'Candidato'
+          const subject = personalizeEmailText(e.subject, { empresa, puesto, candidateName }).slice(0, 200)
+          const body = personalizeEmailText(e.body, { empresa, puesto, candidateName }).slice(0, 5000)
+
+          return sendConfirmedEmail(db, user, {
+            to: e.to.trim(),
+            subject,
+            body,
+            attach_cv: e.attach_cv !== false,
+            empresa,
+            puesto,
+            thread_id: typeof e.thread_id === 'string' ? e.thread_id : undefined,
+            in_reply_to: typeof e.in_reply_to === 'string' ? e.in_reply_to : undefined,
+          })
+        })
+      )
+
+      const sentRecipients: string[] = []
+      const failedRecipients: { to: string; error: string }[] = []
+
+      results.forEach((res, idx) => {
+        const to = validList[idx].to.trim()
+        if (res.status === 'fulfilled') {
+          sentRecipients.push(to)
+        } else {
+          failedRecipients.push({ to, error: res.reason?.message || 'Error al enviar' })
+        }
+      })
+
+      if (sentRecipients.length === 0 && failedRecipients.some((f) => f.error === 'GMAIL_NOT_CONNECTED')) {
+        return NextResponse.json({ error: 'Conectá tu Gmail para enviar correos.', code: 'GMAIL_NOT_CONNECTED' }, { status: 409 })
+      }
+
+      return NextResponse.json({
+        sent: sentRecipients.length > 0,
+        count: sentRecipients.length,
+        recipients: sentRecipients,
+        failed: failedRecipients,
+      })
+    }
+
     // Confirmación explícita de UN correo: se envía exactamente lo que el usuario vio en pantalla.
     if (body.confirmEmail && typeof body.confirmEmail === 'object') {
       if (!ctx.isAdmin) {
@@ -80,10 +176,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Correo inválido.' }, { status: 400 })
       }
       try {
+        const empresa = typeof e.empresa === 'string' ? e.empresa.trim() : undefined
+        const puesto = typeof e.puesto === 'string' ? e.puesto.trim() : undefined
+        const candidateName = user.email ? user.email.split('@')[0] : 'Candidato'
+        const subject = personalizeEmailText(e.subject, { empresa, puesto, candidateName }).slice(0, 200)
+        const body = personalizeEmailText(e.body, { empresa, puesto, candidateName }).slice(0, 5000)
+
         await sendConfirmedEmail(db, user, {
           to: e.to.trim(),
-          subject: e.subject.trim(),
-          body: e.body.trim(),
+          subject,
+          body,
           attach_cv: e.attach_cv !== false,
           thread_id: typeof e.thread_id === 'string' ? e.thread_id : undefined,
           in_reply_to: typeof e.in_reply_to === 'string' ? e.in_reply_to : undefined,

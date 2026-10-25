@@ -36,6 +36,8 @@ export interface PendingEmail {
   subject: string
   body: string
   attach_cv: boolean
+  empresa?: string
+  puesto?: string
   thread_id?: string
   in_reply_to?: string
 }
@@ -44,6 +46,18 @@ export interface PendingProfile {
   nombre?: string
   bio?: string
   ubicacion?: string
+}
+
+export interface WhatsAppContact {
+  id?: string
+  nombre: string
+  puesto?: string
+  whatsapp: string
+  rubro?: string
+  zona?: string
+  salario?: string
+  descripcion?: string
+  mensaje?: string
 }
 
 export interface Attachment {
@@ -70,14 +84,18 @@ export interface AgentResult {
   reply: string
   pending: PendingApplication[]
   applied: { job_id: string; titulo: string }[]
-  /** Correo propuesto, a la espera de que el usuario lo confirme (nunca se envía solo) */
+  /** Correo propuesto individual (para compatibilidad) */
   pendingEmail: PendingEmail | null
+  /** Lote de correos propuestos para confirmación y envío simultáneo en 1 clic (hasta 5 correos) */
+  pendingEmails: PendingEmail[]
   /** Cambios al perfil/CV propuestos por la IA (se guardan solo si el usuario confirma) */
   pendingProfile: PendingProfile | null
   /** La IA necesitó Gmail pero el usuario no lo tiene conectado */
   needsGmail: boolean
   /** Se actualizó el perfil (bio/ubicación/nombre) */
   profileUpdated: boolean
+  /** Contactos con WhatsApp recomendados (empleos informales o contactos comerciales) */
+  whatsappContacts: WhatsAppContact[]
 }
 
 const MAX_STEPS = 6
@@ -98,18 +116,35 @@ const TOOLS = [
   {
     name: 'prepare_email',
     description:
-      'Prepara UN correo de postulación o respuesta a una empresa desde el Gmail del usuario. NO lo envía: el usuario lo revisa y confirma con un botón en pantalla. Usar con correos reales.',
+      'Prepara uno o varios correos de postulación hacia empresas (hasta 5). NO los envía automáticamente: el usuario los revisa en una única tarjeta en pantalla y confirma el envío simultáneo con un solo botón en 1 clic. Úsalo con la lista `emails` cuando haya varias empresas o vacantes para postular a todas en un solo paso.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        to: { type: 'STRING', description: 'Correo del destinatario.' },
-        subject: { type: 'STRING' },
-        body: { type: 'STRING', description: 'Cuerpo del mensaje en español, breve, con saludo y firma con el nombre del candidato.' },
-        attach_cv: { type: 'BOOLEAN', description: 'Adjuntar el CV del perfil (por defecto true).' },
+        emails: {
+          type: 'ARRAY',
+          description: 'Lista de correos a preparar (hasta 5 destinatarios / empresas distintas).',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              to: { type: 'STRING', description: 'Correo de la empresa o destinatario.' },
+              empresa: { type: 'STRING', description: 'Nombre de la empresa o comercio.' },
+              puesto: { type: 'STRING', description: 'Puesto o rubro al que se postula.' },
+              subject: { type: 'STRING', description: 'Asunto claro del correo.' },
+              body: { type: 'STRING', description: 'Cuerpo del mensaje en español, con saludo, presentación del perfil, interés en la vacante y firma.' },
+              attach_cv: { type: 'BOOLEAN', description: 'Adjuntar CV del candidato en PDF (true por defecto).' },
+            },
+            required: ['to', 'subject', 'body'],
+          },
+        },
+        to: { type: 'STRING', description: 'Correo del destinatario (si es solo 1 correo).' },
+        empresa: { type: 'STRING', description: 'Nombre de la empresa (si es solo 1).' },
+        puesto: { type: 'STRING', description: 'Puesto (si es solo 1).' },
+        subject: { type: 'STRING', description: 'Asunto (si es solo 1).' },
+        body: { type: 'STRING', description: 'Cuerpo del mensaje (si es solo 1).' },
+        attach_cv: { type: 'BOOLEAN', description: 'Adjuntar CV (true por defecto).' },
         thread_id: { type: 'STRING', description: 'ID del hilo de Gmail si se responde a un correo previo.' },
         in_reply_to: { type: 'STRING', description: 'ID del mensaje previo si se responde a un correo específico.' },
       },
-      required: ['to', 'subject', 'body'],
     },
   },
   {
@@ -226,14 +261,21 @@ function systemPrompt(deep = false, isAdmin = true): string {
   const hoy = new Date().toLocaleDateString('es-UY', { timeZone: 'America/Montevideo', dateStyle: 'full' })
   const gmailInstructions = isAdmin
     ? `- POSTULACIONES Y BORRADORES POR GMAIL:
-  * Para enviar una postulación por correo usa prepare_email (el usuario lo revisa en pantalla y pulsa "Enviar correo"). Personaliza el mensaje con el puesto y contexto, y fírmalo con el nombre del candidato.
+  * Si el usuario pide postularse por correo a varias empresas (ej: "postulame a estas 4 empresas por correo", "enviá mi CV a las ofertas encontradas", etc.):
+    Llama a prepare_email pasando la lista 'emails' con todas las empresas (hasta 5) EN UN SOLO PASO.
+    Para cada elemento incluye 'to', 'empresa', 'puesto', 'subject' y 'body'.
+    IMPORTANTE SOBRE LA REDACCIÓN Y VARIABLES:
+    - Puedes usar variables dinámicas en el cuerpo y asunto como '{empresa}' (que se reemplazará por el nombre de la empresa al enviar) y '{puesto}' (que se reemplazará por el puesto objetivo de esa empresa), o redactar el texto adaptado profesionalmente para cada una.
+    - NO uses caracteres de escape dobles como "\\n" en el texto: usa saltos de línea reales de párrafo para que el mensaje quede limpio y legible.
+    En tu respuesta, menciona a qué empresas se enviará y pregúntale: "¿Te parece bien esta redacción para enviar tu CV a las empresas simultáneamente?". La plataforma le mostrará una tarjeta en pantalla para confirmar y despachar todos los correos al mismo tiempo en 1 solo clic.
+  * Para un solo correo individual usa prepare_email con 'to', 'subject' y 'body'.
   * Si el usuario quiere redactar un correo y dejarlo guardado en su cuenta de Gmail para revisarlo o enviarlo más tarde, usa create_gmail_draft.
   * Para ver qué borradores tiene pendientes usa list_gmail_drafts.
-  * Por privacidad y seguridad del usuario, la IA solo redacta borradores y envía postulaciones autorizadas por él; NO lee su bandeja de entrada ni correos personales recibidos (si el usuario te pide revisar si le respondieron o leer su correo recibido, explícale amablemente que por privacidad de Google solo gestionas envíos y borradores).
+  * Por privacidad y seguridad del usuario, la IA solo redacta borradores y envía postulaciones autorizadas por él; NO lee su bandeja de entrada ni correos personales recibidos.
   * Si el usuario aún no tiene Gmail conectado, indícale amablemente que use el botón "Conectar Gmail".`
     : `- POSTULACIONES Y CORREOS:
   * La integración directa de envío en 1 clic y borradores con Gmail está actualmente en proceso de verificación oficial con Google (24h aprox.) y estará disponible muy pronto para todos los usuarios.
-  * Si el usuario te pide postularse por correo o redactar un email a una empresa, redacta amablemente el correo completo en tu respuesta (destinatario, asunto y cuerpo) para que el candidato pueda copiarlo y enviarlo directamente desde su casilla personal. NO uses herramientas de Gmail (prepare_email o create_gmail_draft), e infórmale con amabilidad que la función de postular directo por Gmail estará disponible en breve.`
+  * Si el usuario te pide postularse por correo o redactar un email a una o varias empresas, redacta amablemente el correo completo en tu respuesta (destinatarios, asunto y cuerpo adaptado) para que el candidato pueda copiarlo o usarlo desde su correo personal, y menciónale que la función de postular directo en 1 clic por Gmail estará disponible en breve. NO uses herramientas de Gmail (prepare_email o create_gmail_draft).`
 
   return `Eres el asistente de IA de PostulaUY, una plataforma laboral de Uruguay. Hoy es ${hoy}.
 Ayudas al candidato a encontrar empleo y a postularse sin hacerlo una por una.
@@ -256,6 +298,8 @@ Reglas:
 - Para recomendar, primero lee el perfil (get_my_profile); si tiene CV adjunto, léelo también con read_my_cv. Luego busca empleos acordes. Explica en una línea por qué encaja cada uno.
 - Si el perfil/CV está vacío o es pobre, sugiere completarlo y ofrécete a redactarlo; si el usuario quiere ajustarlo o mejorarlo, redacta la versión y llama a propose_profile_update (el usuario la revisa y confirma; nunca digas que ya se guardó).
 - Para postular usa apply_to_jobs con los id exactos de search_jobs. Si el usuario dice "postulame a todos/5", usa los resultados más relevantes. No postules a empleos a los que ya se postuló (revisa list_my_applications si hay duda).
+- EMPLEOS INFORMALES Y CONTACTOS POR WHATSAPP:
+  * Cuando recomiendes empleos informales (search_informal_jobs) o contactos directos de empresas (list_company_contacts), menciona el puesto, la empresa o rubro y el teléfono/WhatsApp. La interfaz del chat mostrará automáticamente debajo de tu respuesta una tarjeta interactiva con el botón verde "Contactar por WhatsApp" para que el candidato se comunique directamente en 1 clic con su saludo y nombre prearmados.
 - Los empleos informales no tienen postulación en la plataforma: da el contacto para que el usuario escriba.
 ${gmailInstructions}
 - Después de apply_to_jobs, informa claramente si quedó pendiente de confirmación o si ya fue enviada.
@@ -462,9 +506,11 @@ export async function runAgent(opts: {
     pending: [],
     applied: [],
     pendingEmail: null,
+    pendingEmails: [],
     pendingProfile: null,
     needsGmail: false,
     profileUpdated: false,
+    whatsappContacts: [],
   }
 
   const contents: GeminiContent[] = history.map((t) => ({
@@ -513,26 +559,54 @@ export async function runAgent(opts: {
           }
         }
         if (!isGoogleConfigured()) return { error: 'El envío por Gmail no está configurado en la plataforma.' }
-        if (!isValidEmail(args.to)) return { error: 'La dirección de correo no es válida.' }
-        if (typeof args.subject !== 'string' || typeof args.body !== 'string' || !args.subject.trim() || !args.body.trim()) {
-          return { error: 'Faltan asunto o mensaje.' }
-        }
+
         const conn = await getGmailConnection(db, user.userId)
         if (!conn) {
           result.needsGmail = true
           return { error: 'El usuario aún no conectó su Gmail. Dile que use el botón "Conectar Gmail" que aparece en el chat y luego reintente.' }
         }
-        result.pendingEmail = {
-          to: args.to.trim(),
-          subject: args.subject.trim().slice(0, 200),
-          body: args.body.trim().slice(0, 5000),
-          attach_cv: args.attach_cv !== false,
-          thread_id: typeof args.thread_id === 'string' ? args.thread_id : undefined,
-          in_reply_to: typeof args.in_reply_to === 'string' ? args.in_reply_to : undefined,
+
+        const rawList: any[] = Array.isArray(args.emails) && args.emails.length > 0
+          ? args.emails
+          : [{ to: args.to, empresa: args.empresa, puesto: args.puesto, subject: args.subject, body: args.body, attach_cv: args.attach_cv, thread_id: args.thread_id, in_reply_to: args.in_reply_to }]
+
+        const cleanMultiline = (str: unknown): string => {
+          if (typeof str !== 'string') return ''
+          return str
+            .replace(/\\r\\n/g, '\n')
+            .replace(/\\n/g, '\n')
+            .replace(/\r\n/g, '\n')
+            .trim()
         }
+
+        const validatedEmails: PendingEmail[] = []
+        for (const item of rawList.slice(0, 5)) {
+          if (item && isValidEmail(item.to) && typeof item.subject === 'string' && typeof item.body === 'string' && item.subject.trim() && item.body.trim()) {
+            validatedEmails.push({
+              to: item.to.trim(),
+              empresa: typeof item.empresa === 'string' && item.empresa.trim() ? item.empresa.trim().slice(0, 100) : undefined,
+              puesto: typeof item.puesto === 'string' && item.puesto.trim() ? item.puesto.trim().slice(0, 100) : undefined,
+              subject: cleanMultiline(item.subject).slice(0, 200),
+              body: cleanMultiline(item.body).slice(0, 5000),
+              attach_cv: item.attach_cv !== false,
+              thread_id: typeof item.thread_id === 'string' ? item.thread_id : undefined,
+              in_reply_to: typeof item.in_reply_to === 'string' ? item.in_reply_to : undefined,
+            })
+          }
+        }
+
+        if (validatedEmails.length === 0) {
+          return { error: 'Faltan destinatario, asunto o cuerpo válido para preparar los correos.' }
+        }
+
+        result.pendingEmails = validatedEmails
+        result.pendingEmail = validatedEmails[0]
+
         return {
           estado: 'PENDIENTE_DE_CONFIRMACION',
-          nota: 'Aún NO se envió. El usuario verá el correo y un botón para enviarlo. Pídele que lo revise y confirme.',
+          total_correos: validatedEmails.length,
+          destinatarios: validatedEmails.map((e) => (e.empresa ? `${e.empresa} (${e.to})` : e.to)),
+          nota: 'Aún NO se enviaron. El usuario verá la propuesta en pantalla y podrá confirmar el envío a todas las empresas en 1 solo clic. Pídele que revise la redacción.',
         }
       }
       case 'create_gmail_draft': {
@@ -649,10 +723,27 @@ export async function runAgent(opts: {
           .eq('activo', true)
           .order('created_at', { ascending: false })
           .limit(200)
-        return ((data || []) as any[])
+        const rows = ((data || []) as any[])
           .filter((j) => matches([j.titulo, j.cargo, j.descripcion, j.rubro], args.query) && matches([j.zona], args.zona))
           .slice(0, clampLimit(args.limit))
           .map((j) => ({ ...j, descripcion: (j.descripcion || '').slice(0, 240) }))
+
+        for (const j of rows) {
+          const wa = j.whatsapp || (j.telefono && j.telefono.replace(/\D/g, '').length >= 8 ? j.telefono : null)
+          if (wa && !result.whatsappContacts.some((c) => c.whatsapp === wa)) {
+            result.whatsappContacts.push({
+              id: j.id,
+              nombre: j.titulo || j.cargo || 'Empleo informal',
+              puesto: j.cargo || j.titulo,
+              whatsapp: wa,
+              rubro: j.rubro,
+              zona: j.zona,
+              salario: j.salario,
+              descripcion: j.descripcion,
+            })
+          }
+        }
+        return rows
       }
       case 'list_my_applications': {
         const { data } = await db
@@ -674,9 +765,23 @@ export async function runAgent(opts: {
           .select('nombre, categoria, zona, whatsapp, nota')
           .eq('activo', true)
           .limit(300)
-        return ((data || []) as any[])
+        const rows = ((data || []) as any[])
           .filter((c) => matches([c.categoria, c.nombre, c.nota], args.categoria) && matches([c.zona], args.zona))
           .slice(0, clampLimit(args.limit))
+
+        for (const c of rows) {
+          if (c.whatsapp && !result.whatsappContacts.some((x) => x.whatsapp === c.whatsapp)) {
+            result.whatsappContacts.push({
+              nombre: c.nombre,
+              puesto: c.categoria || 'Contacto directo',
+              whatsapp: c.whatsapp,
+              rubro: c.categoria,
+              zona: c.zona,
+              descripcion: c.nota,
+            })
+          }
+        }
+        return rows
       }
       case 'apply_to_jobs': {
         const ids: string[] = Array.isArray(args.job_ids) ? args.job_ids.filter((x: unknown) => typeof x === 'string') : []

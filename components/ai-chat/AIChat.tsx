@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   ArrowUp,
   Briefcase,
+  Building2,
   Check,
   ChevronDown,
   ChevronUp,
@@ -96,9 +97,67 @@ type ConversationRow = { id: string; title: string; updated_at: string }
 
 type Pending = { job_id: string; titulo: string; empresa: string | null; mensaje: string }
 
-type PendingEmail = { to: string; subject: string; body: string; attach_cv: boolean }
+type PendingEmail = {
+  to: string
+  subject: string
+  body: string
+  attach_cv: boolean
+  empresa?: string
+  puesto?: string
+  selected?: boolean
+}
 type PendingProfile = { nombre?: string; bio?: string; ubicacion?: string }
+type WhatsAppContact = {
+  id?: string
+  nombre: string
+  puesto?: string
+  whatsapp: string
+  rubro?: string
+  zona?: string
+  salario?: string
+  descripcion?: string
+  mensaje?: string
+}
 type AttachedFile = { name: string; mime: string; data: string }
+
+function cleanNewlines(str?: string): string {
+  if (!str) return ''
+  return str.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n')
+}
+
+function formatWhatsAppUrl(phone: string, text: string): string {
+  let cleaned = phone.replace(/\D/g, '')
+  if (cleaned.startsWith('09') && cleaned.length === 9) {
+    cleaned = '598' + cleaned.substring(1)
+  } else if (cleaned.startsWith('9') && cleaned.length === 8) {
+    cleaned = '598' + cleaned
+  }
+  return `https://wa.me/${cleaned}?text=${encodeURIComponent(text)}`
+}
+
+function personalizeEmailText(
+  template: string,
+  meta: { empresa?: string; puesto?: string; candidateName?: string }
+): string {
+  if (!template) return ''
+  let res = cleanNewlines(template)
+
+  const empresaVal = meta.empresa?.trim() || ''
+  const puestoVal = meta.puesto?.trim() || ''
+  const nombreVal = meta.candidateName?.trim() || ''
+
+  if (empresaVal) {
+    res = res.replace(/\{\s*empresa[0-9]*\s*\}/gi, empresaVal)
+  }
+  if (puestoVal) {
+    res = res.replace(/\{\s*(puesto|cargo|vacante)[0-9]*\s*\}/gi, puestoVal)
+  }
+  if (nombreVal) {
+    res = res.replace(/\{\s*(nombre|candidato)\s*\}/gi, nombreVal)
+  }
+
+  return res
+}
 
 const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
 const MAX_FILES = 4
@@ -340,6 +399,8 @@ type Message = {
   pendingState?: 'idle' | 'sending' | 'done'
   /** Correo propuesto por la IA (editable) que espera confirmación */
   email?: PendingEmail
+  /** Lote de correos propuestos por la IA para postulación simultánea */
+  emails?: PendingEmail[]
   emailState?: 'idle' | 'sending' | 'done'
   needsGmail?: boolean
   /** Nombres de archivos adjuntos por el usuario en este mensaje */
@@ -349,6 +410,8 @@ type Message = {
   /** Cambios de perfil/CV propuestos por la IA (editables) */
   profile?: PendingProfile
   profileState?: 'idle' | 'sending' | 'done'
+  /** Contactos y empleos con WhatsApp para contacto directo */
+  whatsappContacts?: WhatsAppContact[]
 }
 
 type SendOptions = {
@@ -367,8 +430,10 @@ async function sendToAgent(
   reply: string
   pending: Pending[]
   email: PendingEmail | null
+  emails: PendingEmail[]
   needsGmail: boolean
   profile: PendingProfile | null
+  whatsappContacts: WhatsAppContact[]
 }> {
   const res = await fetch('/api/ai-chat', {
     method: 'POST',
@@ -384,12 +449,29 @@ async function sendToAgent(
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || 'Error al contactar a la IA')
+  const rawEmails: PendingEmail[] = (Array.isArray(data.pendingEmails) && data.pendingEmails.length > 0
+    ? data.pendingEmails
+    : (data.pendingEmail ? [data.pendingEmail] : [])
+  ).map((e: PendingEmail) => ({
+    ...e,
+    subject: cleanNewlines(e.subject),
+    body: cleanNewlines(e.body),
+  }))
+  const singleEmail = data.pendingEmail
+    ? {
+        ...data.pendingEmail,
+        subject: cleanNewlines(data.pendingEmail.subject),
+        body: cleanNewlines(data.pendingEmail.body),
+      }
+    : null
   return {
     reply: data.reply || '',
     pending: data.pending || [],
-    email: data.pendingEmail || null,
+    email: singleEmail,
+    emails: rawEmails,
     needsGmail: !!data.needsGmail,
     profile: data.pendingProfile || null,
+    whatsappContacts: Array.isArray(data.whatsappContacts) ? data.whatsappContacts : [],
   }
 }
 
@@ -421,6 +503,17 @@ async function confirmEmail(email: PendingEmail, token: string) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || 'No se pudo enviar el correo')
   return data as { sent: boolean; to: string }
+}
+
+async function confirmEmails(emails: PendingEmail[], token: string) {
+  const res = await fetch('/api/ai-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ confirmEmails: emails }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'No se pudieron enviar los correos')
+  return data as { sent: boolean; count: number; recipients: string[]; failed?: { to: string; error: string }[] }
 }
 
 async function confirmApplications(pending: Pending[], token: string) {
@@ -458,6 +551,20 @@ function AttachFileIcon({ className }: { className?: string }) {
       aria-hidden="true"
     >
       <path d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z" />
+    </svg>
+  )
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.711 1.457h.004c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
     </svg>
   )
 }
@@ -659,8 +766,11 @@ export function AIChat() {
   const [attachments, setAttachments] = useState<AttachedFile[]>([])
   const [includeCv, setIncludeCv] = useState(false)
   const [deepSearch, setDeepSearch] = useState(false)
+  const [previewCompany, setPreviewCompany] = useState<Record<string, number>>({})
   const [notice, setNotice] = useState('')
   const [editingProfileIds, setEditingProfileIds] = useState<Record<string, boolean>>({})
+  const [customWaMessages, setCustomWaMessages] = useState<Record<string, string>>({})
+  const [editingWaContactId, setEditingWaContactId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [modelOpen, setModelOpen] = useState(false)
   const [modelId, setModelId] = useState(MODELS[0].id)
@@ -1124,7 +1234,7 @@ export function AIChat() {
     try {
       const token = await getAccessToken()
       if (!token) throw new Error('Tu sesión expiró. Volvé a iniciar sesión.')
-      const { reply, pending, email, needsGmail, profile: proposed } = await sendToAgent(next, token, sendOpts)
+      const { reply, pending, email, emails, needsGmail, profile: proposed, whatsappContacts } = await sendToAgent(next, token, sendOpts)
       const withReply: Message[] = [
         ...next,
         {
@@ -1134,10 +1244,12 @@ export function AIChat() {
           pending: pending.length ? pending : undefined,
           pendingState: 'idle',
           email: email || undefined,
+          emails: emails.length > 0 ? emails : undefined,
           emailState: 'idle',
           needsGmail,
           profile: proposed || undefined,
           profileState: 'idle',
+          whatsappContacts: whatsappContacts.length > 0 ? whatsappContacts : undefined,
         },
       ]
       setMessages(withReply)
@@ -1194,6 +1306,87 @@ export function AIChat() {
       setMessages((ms) => [
         ...ms.map((m) => (m.id === msg.id ? { ...m, emailState: 'idle' as const } : m)),
         { id: crypto.randomUUID(), role: 'assistant', content: e?.message || 'No se pudo enviar el correo.' },
+      ])
+    }
+  }
+
+  function editBatchEmails(id: string, patch: { subject?: string; body?: string; attach_cv?: boolean }) {
+    setMessages((ms) =>
+      ms.map((m) => {
+        if (m.id !== id || !m.emails) return m
+        const updated = m.emails.map((e) => ({
+          ...e,
+          ...(patch.subject !== undefined ? { subject: patch.subject } : {}),
+          ...(patch.body !== undefined ? { body: patch.body } : {}),
+          ...(patch.attach_cv !== undefined ? { attach_cv: patch.attach_cv } : {}),
+        }))
+        return {
+          ...m,
+          emails: updated,
+          email: updated[0] ? { ...updated[0] } : m.email,
+        }
+      })
+    )
+  }
+
+  function editEmailByIndex(id: string, index: number, patch: Partial<PendingEmail>) {
+    setMessages((ms) =>
+      ms.map((m) => {
+        if (m.id !== id || !m.emails) return m
+        const updated = m.emails.map((e, idx) => (idx === index ? { ...e, ...patch } : e))
+        return {
+          ...m,
+          emails: updated,
+          email: updated[0] ? { ...updated[0] } : m.email,
+        }
+      })
+    )
+  }
+
+  function toggleBatchRecipient(id: string, emailToToggle: string) {
+    setMessages((ms) =>
+      ms.map((m) => {
+        if (m.id !== id || !m.emails) return m
+        const updated = m.emails.map((e) =>
+          e.to === emailToToggle ? { ...e, selected: e.selected === false ? true : false } : e
+        )
+        return { ...m, emails: updated }
+      })
+    )
+  }
+
+  async function sendBatchEmails(msg: Message) {
+    if (!msg.emails || msg.emails.length === 0) return
+    const activeEmails = msg.emails.filter((e) => e.selected !== false)
+    if (activeEmails.length === 0) {
+      setNotice('Seleccioná al menos una empresa para enviar.')
+      return
+    }
+
+    const candidateName = profile?.nombre || undefined
+    const personalizedList = activeEmails.map((e) => ({
+      ...e,
+      subject: personalizeEmailText(e.subject, { empresa: e.empresa, puesto: e.puesto, candidateName }),
+      body: personalizeEmailText(e.body, { empresa: e.empresa, puesto: e.puesto, candidateName }),
+    }))
+
+    setMessages((ms) => ms.map((m) => (m.id === msg.id ? { ...m, emailState: 'sending' } : m)))
+    try {
+      const token = await getAccessToken()
+      if (!token) throw new Error('Tu sesión expiró.')
+      const res = await confirmEmails(personalizedList, token)
+      const count = res.count || activeEmails.length
+      const failed = res.failed || []
+      const successMsg = `Correos enviados simultáneamente a ${count} empresa(s) desde tu Gmail: ${res.recipients.join(', ')}.`
+      const failMsg = failed.length > 0 ? `\n(Hubo fallas en: ${failed.map((f) => f.to).join(', ')})` : ''
+      setMessages((ms) => [
+        ...ms.map((m) => (m.id === msg.id ? { ...m, emailState: 'done' as const } : m)),
+        { id: crypto.randomUUID(), role: 'assistant', content: successMsg + failMsg },
+      ])
+    } catch (e: any) {
+      setMessages((ms) => [
+        ...ms.map((m) => (m.id === msg.id ? { ...m, emailState: 'idle' as const } : m)),
+        { id: crypto.randomUUID(), role: 'assistant', content: e?.message || 'No se pudieron enviar los correos.' },
       ])
     }
   }
@@ -2197,8 +2390,253 @@ export function AIChat() {
                           </div>
                         )}
 
-                        {/* Correo listo para revisar y confirmar con vista previa del PDF en rectángulo redondeado */}
-                        {m.email && (
+                        {/* Lote de correos para postulación simultánea (2 o más empresas) */}
+                        {m.emails && m.emails.length > 1 ? (
+                          <div className="mt-4 rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-4 sm:p-5 space-y-4 whitespace-normal shadow-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                                <MailIcon className="w-4 h-4 text-emerald-500" />
+                                Postulación simultánea por correo ({m.emails.filter((e) => e.selected !== false).length} de {m.emails.length} empresas seleccionadas)
+                              </p>
+                              <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-500/20">
+                                Envío simultáneo en 1 clic
+                              </span>
+                            </div>
+
+                            {/* Lista de empresas destinatarias con checkboxes */}
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                Empresas destinatarias (podés desmarcar si no querés postularte a alguna):
+                              </label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {m.emails.map((e, idx) => {
+                                  const isSelected = e.selected !== false
+                                  return (
+                                    <div
+                                      key={e.to + idx}
+                                      onClick={() => m.emailState === 'idle' && toggleBatchRecipient(m.id, e.to)}
+                                      className={cn(
+                                        'flex items-center gap-2.5 p-2.5 rounded-2xl border text-xs transition-all cursor-pointer select-none',
+                                        isSelected
+                                          ? 'border-indigo-200 dark:border-indigo-500/40 bg-indigo-50/50 dark:bg-indigo-950/20 text-slate-800 dark:text-slate-100 shadow-xs'
+                                          : 'border-slate-200 dark:border-slate-700/60 bg-slate-50/60 dark:bg-slate-800/40 opacity-60 text-slate-500'
+                                      )}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        disabled={m.emailState !== 'idle'}
+                                        onChange={() => {}}
+                                        className="rounded text-indigo-600 focus:ring-indigo-500 pointer-events-none"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <div className="font-semibold truncate flex items-center gap-1.5">
+                                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                          <span className="truncate">{e.empresa || 'Empresa'}</span>
+                                          {e.puesto && (
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate">
+                                              ({e.puesto})
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                          {e.to}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Selector de empresa: solo pestañas adaptadas para cada empresa */}
+                            <div className="space-y-2.5 pt-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                                  Redacción adaptada para cada empresa:
+                                </label>
+                                <div className="flex items-center gap-1.5 overflow-x-auto text-xs no-scrollbar">
+                                  {m.emails.map((e, idx) => {
+                                    const isCurrent = (previewCompany[m.id] ?? 0) === idx
+                                    return (
+                                      <button
+                                        key={e.to + idx}
+                                        type="button"
+                                        onClick={() => setPreviewCompany((prev) => ({ ...prev, [m.id]: idx }))}
+                                        className={cn(
+                                          'px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5',
+                                          isCurrent
+                                            ? 'bg-emerald-600 text-white font-medium shadow-xs'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                        )}
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                        <span className="truncate max-w-[140px] font-medium">{e.empresa || `Empresa ${idx + 1}`}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+
+                              {(() => {
+                                const targetIdx = previewCompany[m.id] ?? 0
+                                const targetEmail = m.emails[targetIdx] || m.emails[0]
+                                const candidateName = profile?.nombre || undefined
+                                const rawSub = targetEmail.subject || ''
+                                const rawBody = targetEmail.body || ''
+                                const previewSub = personalizeEmailText(rawSub, {
+                                  empresa: targetEmail.empresa,
+                                  puesto: targetEmail.puesto,
+                                  candidateName,
+                                })
+                                const previewBody = personalizeEmailText(rawBody, {
+                                  empresa: targetEmail.empresa,
+                                  puesto: targetEmail.puesto,
+                                  candidateName,
+                                })
+                                return (
+                                  <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Redacción para: {targetEmail.empresa || 'Empresa'} ({targetEmail.to})
+                                      </span>
+                                      {targetEmail.puesto && (
+                                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                          Postulación: {targetEmail.puesto}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <input
+                                      value={previewSub}
+                                      onChange={(e) => editEmailByIndex(m.id, targetIdx, { subject: e.target.value })}
+                                      disabled={m.emailState !== 'idle'}
+                                      placeholder="Asunto para esta empresa"
+                                      className="w-full text-sm font-medium border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 bg-white dark:bg-slate-900"
+                                      aria-label="Asunto adaptado"
+                                    />
+                                    <AutoResizeTextarea
+                                      value={previewBody}
+                                      onChange={(e) => editEmailByIndex(m.id, targetIdx, { body: e.target.value })}
+                                      disabled={m.emailState !== 'idle'}
+                                      placeholder="Cuerpo del mensaje para esta empresa"
+                                      className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 leading-relaxed bg-white dark:bg-slate-900"
+                                      aria-label="Mensaje adaptado"
+                                    />
+                                  </div>
+                                )
+                              })()}
+                            </div>
+
+                            {/* Preview del PDF adjunto en rectángulo con bordes redondeados */}
+                            {m.emails[0]?.attach_cv ? (
+                              <RoundedPdfPreview
+                                pdfUrl={profile?.cv_url}
+                                nombre={profile?.nombre}
+                                email={profile?.email}
+                                ubicacion={profile?.ubicacion ?? undefined}
+                                bio={profile?.bio ?? undefined}
+                                title={
+                                  profile?.cv_url
+                                    ? `CV_${(profile?.nombre || 'Candidato').replace(/\s+/g, '_')}.pdf`
+                                    : 'CV del perfil (PDF)'
+                                }
+                                subtitle={
+                                  profile?.cv_url
+                                    ? 'Documento PDF adjunto a cada correo para enviar a las empresas'
+                                    : 'Vista previa de tu CV (subí un archivo PDF en Mi Perfil si querés reemplazarlo)'
+                                }
+                                defaultExpanded={true}
+                                rightSlot={
+                                  <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(m.emails[0]?.attach_cv)}
+                                      disabled={m.emailState !== 'idle'}
+                                      onChange={(e) => editBatchEmails(m.id, { attach_cv: e.target.checked })}
+                                      className="rounded"
+                                    />
+                                    <span>Adjuntar a todos</span>
+                                  </label>
+                                }
+                              />
+                            ) : (
+                              <label className="inline-flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 cursor-pointer px-3 py-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(m.emails[0]?.attach_cv)}
+                                  disabled={m.emailState !== 'idle'}
+                                  onChange={(e) => editBatchEmails(m.id, { attach_cv: e.target.checked })}
+                                />
+                                <AttachFileIcon className="w-3.5 h-3.5" /> Adjuntar mi CV en PDF a los correos
+                              </label>
+                            )}
+
+                            {/* Botón único de confirmación simultánea */}
+                            <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                              {isAdmin ? (
+                                <button
+                                  type="button"
+                                  onClick={() => sendBatchEmails(m)}
+                                  disabled={m.emailState !== 'idle' || m.emails.filter((e) => e.selected !== false).length === 0}
+                                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-60 transition-all cursor-pointer shadow-xs"
+                                >
+                                  {m.emailState === 'sending' ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : m.emailState === 'done' ? (
+                                    <Check className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <MailIcon className="w-3.5 h-3.5" />
+                                  )}
+                                  {m.emailState === 'done'
+                                    ? 'Correos enviados simultáneamente'
+                                    : `Confirmar y enviar a las ${m.emails.filter((e) => e.selected !== false).length} empresas simultáneamente`}
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const candidateName = profile?.nombre || undefined
+                                      const tIdx = previewCompany[m.id] ?? 0
+                                      const tMail = m.emails?.[tIdx] || m.emails?.[0]
+                                      const rawS = tMail?.subject || ''
+                                      const rawB = tMail?.body || ''
+                                      const pSub = personalizeEmailText(rawS, { empresa: tMail?.empresa, puesto: tMail?.puesto, candidateName })
+                                      const pBody = personalizeEmailText(rawB, { empresa: tMail?.empresa, puesto: tMail?.puesto, candidateName })
+                                      navigator.clipboard?.writeText(`Para: ${tMail?.to}\nAsunto: ${pSub}\n\n${pBody}`)
+                                      setNotice(`¡Correo adaptado para ${tMail?.empresa || 'empresa'} copiado!`)
+                                    }}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" /> Copiar correo ({m.emails?.[previewCompany[m.id] ?? 0]?.empresa || 'empresa'})
+                                  </button>
+                                  <a
+                                    href={(() => {
+                                      const tIdx = previewCompany[m.id] ?? 0
+                                      const tMail = m.emails?.[tIdx] || m.emails?.[0]
+                                      const candidateName = profile?.nombre || undefined
+                                      const toParam = tMail?.to || ''
+                                      const rawS = tMail?.subject || ''
+                                      const rawB = tMail?.body || ''
+                                      const pSub = personalizeEmailText(rawS, { empresa: tMail?.empresa, puesto: tMail?.puesto, candidateName })
+                                      const pBody = personalizeEmailText(rawB, { empresa: tMail?.empresa, puesto: tMail?.puesto, candidateName })
+                                      return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(toParam)}&su=${encodeURIComponent(pSub)}&body=${encodeURIComponent(pBody)}`
+                                    })()}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" /> Abrir en Gmail
+                                  </a>
+                                  <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                                    Envío simultáneo en 1 clic: Próximamente
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ) : m.email ? (
                           <div className="mt-4 rounded-3xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-4 space-y-3 whitespace-normal shadow-sm">
                             <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                               <MailIcon className="w-3.5 h-3.5 text-emerald-500" />
@@ -2214,7 +2652,7 @@ export function AIChat() {
                                 aria-label="Destinatario"
                               />
                               <input
-                                value={m.email.subject}
+                                value={cleanNewlines(m.email.subject)}
                                 onChange={(e) => editEmail(m.id, { subject: e.target.value })}
                                 disabled={m.emailState !== 'idle'}
                                 placeholder="Asunto"
@@ -2222,7 +2660,7 @@ export function AIChat() {
                                 aria-label="Asunto"
                               />
                               <AutoResizeTextarea
-                                value={m.email.body}
+                                value={cleanNewlines(m.email.body)}
                                 onChange={(e) => editEmail(m.id, { body: e.target.value })}
                                 disabled={m.emailState !== 'idle'}
                                 className="w-full text-sm border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 leading-relaxed"
@@ -2294,7 +2732,7 @@ export function AIChat() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const text = `Para: ${m.email?.to}\nAsunto: ${m.email?.subject}\n\n${m.email?.body}`
+                                      const text = `Para: ${m.email?.to}\nAsunto: ${cleanNewlines(m.email?.subject)}\n\n${cleanNewlines(m.email?.body)}`
                                       navigator.clipboard?.writeText(text)
                                       setNotice('¡Texto del correo copiado al portapapeles!')
                                     }}
@@ -2309,7 +2747,7 @@ export function AIChat() {
                               )}
                             </div>
                           </div>
-                        )}
+                        ) : null}
 
                         {m.needsGmail && (
                           isAdmin && gmail?.configured && !gmail.connected ? (
@@ -2326,6 +2764,147 @@ export function AIChat() {
                               <span>La postulación directa con Gmail estará disponible muy pronto (verificación en curso con Google).</span>
                             </div>
                           ) : null
+                        )}
+
+                        {/* Tarjetas interactivas de contacto directo por WhatsApp */}
+                        {m.whatsappContacts && m.whatsappContacts.length > 0 && (
+                          <div className="mt-4 rounded-3xl border border-emerald-200/80 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20 p-4 space-y-3.5 whitespace-normal shadow-sm">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-[#25D366] text-white flex items-center justify-center shrink-0 shadow-xs">
+                                  <WhatsAppIcon className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                                    Contacto directo por WhatsApp
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    {m.whatsappContacts.length === 1
+                                      ? '1 oportunidad para contactar al instante'
+                                      : `${m.whatsappContacts.length} oportunidades para contactar al instante`}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              {m.whatsappContacts.map((c, idx) => {
+                                const contactKey = `${m.id}_wa_${idx}_${c.whatsapp}`
+                                const candidateName = profile?.nombre || 'un candidato'
+                                const defaultMsg =
+                                  c.mensaje ||
+                                  `¡Hola! Mi nombre es ${candidateName}. Vi la búsqueda de ${c.puesto || 'personal'} para ${c.nombre} en PostulaUY y me pongo en contacto para postularme. Cuento con disponibilidad inmediata y quedo a disposición para enviar mi CV y coordinar una entrevista. ¡Muchas gracias!`
+                                const currentMsg = customWaMessages[contactKey] !== undefined ? customWaMessages[contactKey] : defaultMsg
+                                const isEditing = editingWaContactId === contactKey
+
+                                return (
+                                  <div
+                                    key={contactKey}
+                                    className="rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 p-4 space-y-3 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-700/60 transition-colors"
+                                  >
+                                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                                      <div>
+                                        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                                          <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                          {c.nombre}
+                                        </h4>
+                                        {c.puesto && (
+                                          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
+                                            {c.puesto}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {c.zona && (
+                                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                            📍 {c.zona}
+                                          </span>
+                                        )}
+                                        {c.salario && (
+                                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                            💰 {c.salario}
+                                          </span>
+                                        )}
+                                        {c.rubro && (
+                                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300">
+                                            🏷️ {c.rubro}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {c.descripcion && (
+                                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                                        {c.descripcion}
+                                      </p>
+                                    )}
+
+                                    {/* Mensaje de presentación prearmado con nombre del candidato */}
+                                    <div className="space-y-1.5">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                          💬 Mensaje de presentación prearmado:
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingWaContactId(isEditing ? null : contactKey)}
+                                          className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                          {isEditing ? 'Listo' : 'Editar texto'}
+                                        </button>
+                                      </div>
+
+                                      {isEditing ? (
+                                        <AutoResizeTextarea
+                                          value={currentMsg}
+                                          onChange={(e) =>
+                                            setCustomWaMessages((prev) => ({
+                                              ...prev,
+                                              [contactKey]: e.target.value,
+                                            }))
+                                          }
+                                          placeholder="Escribí tu mensaje de presentación..."
+                                          className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-emerald-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 leading-relaxed"
+                                          aria-label="Mensaje para WhatsApp"
+                                        />
+                                      ) : (
+                                        <div className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60 leading-relaxed whitespace-pre-wrap">
+                                          {currentMsg}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Botones de acción */}
+                                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                                      <a
+                                        href={formatWhatsAppUrl(c.whatsapp, currentMsg)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                                      >
+                                        <WhatsAppIcon className="w-3.5 h-3.5" />
+                                        Contactar por WhatsApp
+                                      </a>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard?.writeText(currentMsg)
+                                          setNotice(`¡Mensaje para ${c.nombre} copiado al portapapeles!`)
+                                        }}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" /> Copiar mensaje
+                                      </button>
+                                      <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono ml-auto">
+                                        {c.whatsapp}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
