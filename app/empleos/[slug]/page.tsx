@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
 import { ApplyModal } from '@/components/jobs/ApplyModal'
 import { EditJobModal } from '@/components/jobs/EditJobModal'
+import { BookmarkIconButton } from '@/components/jobs/BookmarkIconButton'
 import { useAuth } from '@/lib/context/AuthContext'
 
 export default function JobDetailPage() {
@@ -185,23 +186,29 @@ export default function JobDetailPage() {
 
           {/* Action CTAs */}
           <div className="flex flex-col-reverse sm:flex-row md:flex-col lg:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto shrink-0">
-            <button
-              onClick={handleShare}
-              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
-              title="Copiar enlace"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span className="text-emerald-600">¡Copiado!</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-4 h-4 text-slate-500" />
-                  <span>Compartir</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleShare}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
+                title="Copiar enlace"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="text-emerald-600">¡Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4 text-slate-500" />
+                    <span>Compartir</span>
+                  </>
+                )}
+              </button>
+
+              <div className="h-10 px-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shadow-sm" title="Guardar empleo">
+                <BookmarkIconButton job={job} size="default" />
+              </div>
+            </div>
 
             {isOwner ? (
               <button

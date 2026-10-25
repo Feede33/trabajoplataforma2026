@@ -9,17 +9,20 @@ import {
   CheckCircle2,
   ArrowRight,
   ExternalLink,
-  Lock
+  Lock,
+  Bookmark
 } from 'lucide-react'
 import { fetchApplicationsForCandidate, fetchJobs } from '@/lib/data'
 import { ApplicationWithDetails, JobWithEmpresa } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
+import { useSavedJobs } from '@/lib/context/SavedJobsContext'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
 import { JobCard } from '@/components/jobs/JobCard'
 
 export default function CandidatoDashboard() {
   const { profile, isLoading } = useAuth()
+  const { savedJobs } = useSavedJobs()
   const [applications, setApplications] = useState<ApplicationWithDetails[]>([])
   const [recommendedJobs, setRecommendedJobs] = useState<JobWithEmpresa[]>([])
   const [loadingData, setLoadingData] = useState(true)
@@ -127,7 +130,7 @@ export default function CandidatoDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
             <Briefcase className="w-6 h-6" />
@@ -147,6 +150,19 @@ export default function CandidatoDashboard() {
             <p className="text-2xl font-extrabold text-slate-900 mt-0.5">{entrevistas}</p>
           </div>
         </div>
+
+        <Link
+          href="/candidato/guardados"
+          className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex items-center gap-4 hover:border-blue-300 hover:shadow-md transition-all group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <Bookmark className="w-6 h-6 fill-blue-500 text-blue-500" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 font-medium group-hover:text-blue-600 transition-colors">Empleos Guardados</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-0.5">{savedJobs.length}</p>
+          </div>
+        </Link>
 
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
@@ -225,6 +241,61 @@ export default function CandidatoDashboard() {
                   </Badge>
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Saved Jobs Section */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-8 space-y-6">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Bookmark className="w-5 h-5 text-blue-500 fill-blue-500" />
+              <h2 className="text-lg font-bold text-slate-900">Tus Empleos Guardados</h2>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                {savedJobs.length}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Vacantes que guardaste con el botón de bookmark para revisar o postularte más adelante
+            </p>
+          </div>
+          {savedJobs.length > 0 && (
+            <Link
+              href="/candidato/guardados"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 shrink-0 whitespace-nowrap"
+            >
+              <span>Ver todos ({savedJobs.length})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
+        </div>
+
+        {savedJobs.length === 0 ? (
+          <div className="py-8 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center mx-auto">
+              <Bookmark className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-semibold text-slate-700">Todavía no guardaste ningún empleo</p>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Hacé clic en el botón de guardar en cualquier vacante para tenerla a mano acá y postularte cuando quieras.
+            </p>
+            <Link
+              href="/empleos"
+              className="inline-block px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors shadow-sm"
+            >
+              Explorar empleos
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {savedJobs.slice(0, 3).map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                isApplied={applications.some((a) => a.job_id === job.id || a.job?.slug === job.slug)}
+              />
             ))}
           </div>
         )}

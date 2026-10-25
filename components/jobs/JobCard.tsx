@@ -4,6 +4,7 @@ import { MapPin, Building2, Clock, Banknote, ArrowRight, CheckCircle2 } from 'lu
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
+import { BookmarkIconButton } from '@/components/jobs/BookmarkIconButton'
 
 interface JobCardProps {
   job: JobWithEmpresa
@@ -60,10 +61,13 @@ export function JobCard({ job, featured = false, isApplied = false }: JobCardPro
             </div>
           </div>
 
-          <span className="text-[11px] sm:text-xs text-slate-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
-            <Clock className="w-3 h-3 shrink-0" />
-            {formatRelativeTime(job.created_at)}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] sm:text-xs text-slate-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
+              <Clock className="w-3 h-3 shrink-0" />
+              {formatRelativeTime(job.created_at)}
+            </span>
+            <BookmarkIconButton job={job} size="sm" />
+          </div>
         </div>
 
         {/* Job Title */}

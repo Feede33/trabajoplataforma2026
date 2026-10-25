@@ -1,8 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useId } from 'react'
 import { Search, MapPin, Filter, RotateCcw, X } from 'lucide-react'
 import { RUBROS, MODALIDADES, TIPOS_CONTRATO, DEPARTAMENTOS_UY } from '@/lib/utils'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export interface FilterState {
   q: string
@@ -21,6 +23,8 @@ interface JobFiltersProps {
 }
 
 export function JobFilters({ filters, onChange, onReset, totalCount, onClose }: JobFiltersProps) {
+  const baseId = useId()
+
   const hasActiveFilters =
     filters.q !== '' ||
     filters.rubro !== '' ||
@@ -131,68 +135,68 @@ export function JobFilters({ filters, onChange, onReset, totalCount, onClose }: 
 
       {/* Modalidad */}
       <div>
-        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-3">
           Modalidad de trabajo
         </label>
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-            <input
-              type="radio"
-              name="modalidad"
-              value=""
-              checked={filters.modalidad === ''}
-              onChange={() => handleChange('modalidad', '')}
-              className="text-indigo-600 focus:ring-indigo-500"
-            />
-            Todas
-          </label>
+        <RadioGroup
+          value={filters.modalidad || 'all'}
+          onValueChange={(val) => handleChange('modalidad', val === 'all' ? '' : val)}
+          className="gap-2.5"
+        >
+          <div className="flex items-center gap-2.5">
+            <RadioGroupItem value="all" id={`${baseId}-modalidad-all`} />
+            <Label
+              htmlFor={`${baseId}-modalidad-all`}
+              className="text-sm font-normal text-slate-700 cursor-pointer select-none"
+            >
+              Todas
+            </Label>
+          </div>
           {MODALIDADES.map((m) => (
-            <label key={m.value} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input
-                type="radio"
-                name="modalidad"
-                value={m.value}
-                checked={filters.modalidad === m.value}
-                onChange={() => handleChange('modalidad', m.value)}
-                className="text-indigo-600 focus:ring-indigo-500"
-              />
-              {m.label}
-            </label>
+            <div key={m.value} className="flex items-center gap-2.5">
+              <RadioGroupItem value={m.value} id={`${baseId}-modalidad-${m.value}`} />
+              <Label
+                htmlFor={`${baseId}-modalidad-${m.value}`}
+                className="text-sm font-normal text-slate-700 cursor-pointer select-none"
+              >
+                {m.label}
+              </Label>
+            </div>
           ))}
-        </div>
+        </RadioGroup>
       </div>
 
       {/* Tipo de Contrato */}
       <div>
-        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-3">
           Tipo de Contrato
         </label>
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-            <input
-              type="radio"
-              name="tipo_contrato"
-              value=""
-              checked={filters.tipo_contrato === ''}
-              onChange={() => handleChange('tipo_contrato', '')}
-              className="text-indigo-600 focus:ring-indigo-500"
-            />
-            Todos
-          </label>
+        <RadioGroup
+          value={filters.tipo_contrato || 'all'}
+          onValueChange={(val) => handleChange('tipo_contrato', val === 'all' ? '' : val)}
+          className="gap-2.5"
+        >
+          <div className="flex items-center gap-2.5">
+            <RadioGroupItem value="all" id={`${baseId}-tipo-all`} />
+            <Label
+              htmlFor={`${baseId}-tipo-all`}
+              className="text-sm font-normal text-slate-700 cursor-pointer select-none"
+            >
+              Todos
+            </Label>
+          </div>
           {TIPOS_CONTRATO.map((t) => (
-            <label key={t.value} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input
-                type="radio"
-                name="tipo_contrato"
-                value={t.value}
-                checked={filters.tipo_contrato === t.value}
-                onChange={() => handleChange('tipo_contrato', t.value)}
-                className="text-indigo-600 focus:ring-indigo-500"
-              />
-              {t.label}
-            </label>
+            <div key={t.value} className="flex items-center gap-2.5">
+              <RadioGroupItem value={t.value} id={`${baseId}-tipo-${t.value}`} />
+              <Label
+                htmlFor={`${baseId}-tipo-${t.value}`}
+                className="text-sm font-normal text-slate-700 cursor-pointer select-none"
+              >
+                {t.label}
+              </Label>
+            </div>
           ))}
-        </div>
+        </RadioGroup>
       </div>
 
       {/* Counter */}

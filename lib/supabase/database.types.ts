@@ -87,6 +87,17 @@ export type ApplicationWithDetails = Application & {
   candidato: Pick<Profile, 'nombre' | 'email' | 'cv_url' | 'bio' | 'ubicacion'>
 }
 
+export interface SavedJob {
+  id: string
+  job_id: string
+  candidato_id: string
+  created_at: string
+}
+
+export type SavedJobWithDetails = SavedJob & {
+  job: JobWithEmpresa
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -111,6 +122,14 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Omit<Application, 'id'>>
+      }
+      saved_jobs: {
+        Row: SavedJob
+        Insert: Omit<SavedJob, 'id' | 'created_at'> & {
+          id?: string
+          created_at?: string
+        }
+        Update: Partial<Omit<SavedJob, 'id'>>
       }
       informal_jobs: {
         Row: InformalJob

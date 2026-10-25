@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import { AuthProvider } from '@/lib/context/AuthContext'
+import { SavedJobsProvider } from '@/lib/context/SavedJobsContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -59,9 +60,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
+            <SavedJobsProvider>
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </SavedJobsProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

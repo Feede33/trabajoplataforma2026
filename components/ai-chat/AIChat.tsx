@@ -40,6 +40,8 @@ import { ChatMarkdown } from './ChatMarkdown'
 import { useTheme } from 'next-themes'
 import { ShinyButton } from '@/components/ui/shiny-button'
 import { LiquidMetalButton } from '@/components/ui/liquid-metal-button'
+import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker'
+import { Spinner } from '@/components/ui/spinner'
 
 // Proveedores principales para el selector superior (solo nombre de la empresa/marca)
 const MODELS = [
@@ -1111,14 +1113,15 @@ export function AIChat() {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
-  // El chat ocupa toda la pantalla: se bloquea el scroll de la página mientras está abierto
+  // El chat ocupa toda la pantalla: se bloquea el scroll de la página mientras está abierto si el usuario está autenticado
   useEffect(() => {
+    if (!profile) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prev
     }
-  }, [])
+  }, [profile])
 
   const hasAttachments = attachments.length > 0 || includeCv || deepSearch
   const hasNewLine = input.includes('\n')
@@ -2963,14 +2966,15 @@ export function AIChat() {
                   )
                 })}
                 {loading && (
-                  <div className="flex gap-1 py-2">
-                    {[0, 1, 2].map((i) => (
-                      <span
-                        key={i}
-                        className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
-                        style={{ animationDelay: `${i * 120}ms` }}
-                      />
-                    ))}
+                  <div className="flex justify-start py-2">
+                    <Marker role="status" className="w-auto inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-800/60 shadow-xs">
+                      <MarkerIcon>
+                        <Spinner className="size-4 text-indigo-600 dark:text-indigo-400" />
+                      </MarkerIcon>
+                      <MarkerContent className="shimmer text-xs sm:text-sm font-medium select-none">
+                        Pensando...
+                      </MarkerContent>
+                    </Marker>
                   </div>
                 )}
               </div>

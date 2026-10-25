@@ -60,6 +60,7 @@
   }
 
   html {
+    overflow-x: clip;
     /* Permitir scroll natural sin romper position: sticky */
   }
 
@@ -295,6 +296,11 @@
 }
 
 /* Custom scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) hsl(var(--background));
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -580,5 +586,34 @@
     opacity: 0;
   }
 }
+
+/* ==========================================================================
+   Shadcn AI Thinking / Shimmer Text Utility
+   ========================================================================== */
+@layer utilities {
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted-foreground)) 0%,
+      hsl(var(--foreground)) 50%,
+      hsl(var(--muted-foreground)) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: text-shimmer 2.2s linear infinite;
+  }
+}
+
+@keyframes text-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 
 

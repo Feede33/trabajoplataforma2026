@@ -1,12 +1,13 @@
 import { isSupabaseConfigured, createClient } from './supabase/client'
 import { MOCK_JOBS, MOCK_APPLICATIONS, MOCK_INFORMAL_JOBS } from './mock-data'
-import { JobWithEmpresa, ApplicationWithDetails, Job, JobEstado, ApplicationEstado, InformalJob, CompanyContact } from './supabase/database.types'
-export type { CompanyContact } from './supabase/database.types'
+import { JobWithEmpresa, ApplicationWithDetails, Job, JobEstado, ApplicationEstado, InformalJob, CompanyContact, SavedJob } from './supabase/database.types'
+export type { CompanyContact, SavedJob } from './supabase/database.types'
 
 const LOCAL_STORAGE_JOBS_KEY = 'empleos_custom_jobs'
 const LOCAL_STORAGE_APPS_KEY = 'empleos_custom_apps'
 const LOCAL_STORAGE_INFORMAL_KEY = 'empleos_custom_informal_jobs'
 const LOCAL_STORAGE_CONTACTS_KEY = 'empleos_custom_company_contacts'
+const LOCAL_STORAGE_SAVED_JOBS_KEY = 'empleos_saved_jobs'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -1085,5 +1086,179 @@ export function formatPhoneNumberDisplay(phone: string): string {
     return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
   }
   return phone
+}
+
+export interface StoredSavedJob {
+  jobId: string
+  candidatoId?: string
+  createdAt: string
+  job?: JobWithEmpresa
+}
+
+function getStoredSavedJobs(): StoredSavedJob[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_SAVED_JOBS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveStoredSavedJobs(items: StoredSavedJob[]) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(LOCAL_STORAGE_SAVED_JOBS_KEY, JSON.stringify(items))
+  } catch {}
+}
+
+export async function fetchSavedJobIds(candidatoId?: string): Promise<string[]> {
+  const localItems = getStoredSavedJobs()
+  const localIds = (candidatoId
+    ? localItems.filter((i) => !i.candidatoId || i.candidatoId === candidatoId)
+    : localItems
+  ).map((i) => i.jobId)
+
+  if (isSupabaseConfigured() && candidatoId && isValidUUID(candidatoId)) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('saved_jobs')
+        .select('job_id')
+        .eq('candidato_id', candidatoId)
+
+      if (!error && data) {
+        const dbIds = data.map((d: any) => d.job_id).filter(Boolean) as string[]
+        return Array.from(new Set([...dbIds, ...localIds]))
+      }
+    } catch (err) {
+      console.warn('Supabase fetchSavedJobIds failed, fallback to local', err)
+    }
+  }
+
+  return Array.from(new Set(localIds))
+}
+
+export async function fetchSavedJobs(candidatoId?: string): Promise<JobWithEmpresa[]> {
+  const localItems = getStoredSavedJobs()
+  const filteredLocal = candidatoId
+    ? localItems.filter((i) => !i.candidatoId || i.candidatoId === candidatoId)
+    : localItems
+
+  let dbJobs: JobWithEmpresa[] = []
+
+  if (isSupabaseConfigured() && candidatoId && isValidUUID(candidatoId)) {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('saved_jobs')
+        .select(`
+          job_id,
+          created_at,
+          job:jobs(
+            *,
+            empresa:profiles(nombre, avatar_url, website, ubicacion)
+          )
+        `)
+        .eq('candidato_id', candidatoId)
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        dbJobs = data
+          .map((d: any) => d.job)
+          .filter(Boolean) as JobWithEmpresa[]
+      }
+    } catch (err) {
+      console.warn('Supabase fetchSavedJobs failed, fallback to local', err)
+    }
+  }
+
+  // Also collect any jobs that were saved locally with full job objects or mock jobs
+  const allCurrentJobs = await fetchJobs()
+  const localSavedFullJobs = filteredLocal
+    .map((item) => item.job || allCurrentJobs.find((j) => j.id === item.jobId))
+    .filter(Boolean) as JobWithEmpresa[]
+
+  const seen = new Set<string>()
+  const merged: JobWithEmpresa[] = []
+
+  for (const j of [...dbJobs, ...localSavedFullJobs]) {
+    if (j && j.id && !seen.has(j.id)) {
+      seen.add(j.id)
+      merged.push(j)
+    }
+  }
+
+  return merged
+}
+
+export async function toggleSavedJob(
+  jobId: string,
+  candidatoId?: string,
+  jobData?: JobWithEmpresa
+): Promise<boolean> {
+  if (!jobId) return false
+
+  const localItems = getStoredSavedJobs()
+  const isAlreadyLocal = localItems.some(
+    (i) => i.jobId === jobId && (!candidatoId || !i.candidatoId || i.candidatoId === candidatoId)
+  )
+
+  let willBeSaved = !isAlreadyLocal
+
+  // Try Supabase if valid UUIDs
+  if (isSupabaseConfigured() && candidatoId && isValidUUID(candidatoId) && isValidUUID(jobId)) {
+    try {
+      const supabase = createClient()
+      const { data: existing, error: checkErr } = await supabase
+        .from('saved_jobs')
+        .select('id')
+        .eq('job_id', jobId)
+        .eq('candidato_id', candidatoId)
+        .maybeSingle()
+
+      if (!checkErr) {
+        if (existing) {
+          // Unsave
+          await supabase
+            .from('saved_jobs')
+            .delete()
+            .eq('id', existing.id)
+          willBeSaved = false
+        } else {
+          // Save
+          await supabase
+            .from('saved_jobs')
+            .insert([{ job_id: jobId, candidato_id: candidatoId }])
+          willBeSaved = true
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase toggleSavedJob failed, fallback to local', err)
+    }
+  }
+
+  // Update local storage
+  if (willBeSaved) {
+    const newEntry: StoredSavedJob = {
+      jobId,
+      candidatoId,
+      createdAt: new Date().toISOString(),
+      job: jobData,
+    }
+    const updated = [newEntry, ...localItems.filter((i) => i.jobId !== jobId)]
+    saveStoredSavedJobs(updated)
+  } else {
+    const updated = localItems.filter((i) => i.jobId !== jobId)
+    saveStoredSavedJobs(updated)
+  }
+
+  return willBeSaved
+}
+
+export async function isJobSaved(jobId: string, candidatoId?: string): Promise<boolean> {
+  if (!jobId) return false
+  const ids = await fetchSavedJobIds(candidatoId)
+  return ids.includes(jobId)
 }
 

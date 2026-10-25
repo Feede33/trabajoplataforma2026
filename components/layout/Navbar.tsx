@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/context/AuthContext'
+import { useSavedJobs } from '@/lib/context/SavedJobsContext'
 import { ModeToggle } from '@/components/mode-toggle'
 import {
   Briefcase,
@@ -17,11 +18,13 @@ import {
   LayoutDashboard,
   Search,
   Sparkles,
-  Zap
+  Zap,
+  Bookmark
 } from 'lucide-react'
 
 export function Navbar() {
   const { profile, role, isAdmin, logout } = useAuth()
+  const { savedJobs } = useSavedJobs()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -61,7 +64,7 @@ export function Navbar() {
       <div className="w-full px-3 sm:px-5 lg:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex-1 flex items-center justify-start gap-6">
+          <div className="flex items-center justify-start gap-4 xl:gap-6 shrink-0">
             <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-sky-500/20 group-hover:shadow-sky-500/35 group-hover:scale-105 transition-all border border-slate-200/60 dark:border-slate-800">
                 <Image
@@ -86,10 +89,10 @@ export function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center justify-center gap-1 shrink-0">
+          <nav className="hidden lg:flex flex-1 items-center justify-center gap-0.5 xl:gap-1 px-2 min-w-0">
             <Link
               href="/empleos"
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === '/empleos'
                   ? 'text-indigo-600 bg-indigo-50 font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -100,15 +103,15 @@ export function Navbar() {
 
             <Link
               href="/empleos-informales"
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                 pathname === '/empleos-informales'
                   ? 'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 font-semibold border border-amber-200 dark:border-amber-500/30'
                   : 'text-slate-600 dark:text-slate-300 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-500/15'
               }`}
             >
-              <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
               <span>Empleos Informales</span>
-              <span className="px-1.5 py-0.2 text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 rounded-full font-bold">
+              <span className="hidden xl:inline-block px-1.5 py-0.2 text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 rounded-full font-bold">
                 WhatsApp
               </span>
             </Link>
@@ -116,20 +119,20 @@ export function Navbar() {
             {!isEmpresa && (
               <Link
                 href="/ia-chat"
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                   pathname === '/ia-chat'
                     ? 'text-indigo-600 bg-indigo-50 font-semibold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5 text-sky-500" />
-                IA Chat
+                <Sparkles className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                <span>IA Chat</span>
               </Link>
             )}
 
             <Link
               href="/planes"
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === '/planes'
                   ? 'text-indigo-600 bg-indigo-50 font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -141,8 +144,24 @@ export function Navbar() {
             {isCandidato && (
               <>
                 <Link
+                  href="/candidato/guardados"
+                  className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                    pathname === '/candidato/guardados'
+                      ? 'text-indigo-600 bg-indigo-50 font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <Bookmark className="w-3.5 h-3.5 text-blue-500 fill-blue-500 shrink-0" />
+                  <span>Guardados</span>
+                  {savedJobs.length > 0 && (
+                    <span className="px-1.5 py-0.2 text-[10px] bg-blue-100 text-blue-700 font-bold rounded-full">
+                      {savedJobs.length}
+                    </span>
+                  )}
+                </Link>
+                <Link
                   href="/candidato/postulaciones"
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
                     pathname === '/candidato/postulaciones'
                       ? 'text-indigo-600 bg-indigo-50 font-semibold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -152,7 +171,7 @@ export function Navbar() {
                 </Link>
                 <Link
                   href="/candidato/perfil"
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
                     pathname === '/candidato/perfil'
                       ? 'text-indigo-600 bg-indigo-50 font-semibold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -165,7 +184,7 @@ export function Navbar() {
           </nav>
 
           {/* Action Buttons & User Menu */}
-          <div className="hidden md:flex flex-1 items-center justify-end gap-3">
+          <div className="hidden lg:flex items-center justify-end gap-2 xl:gap-3 shrink-0">
             <ModeToggle />
             {profile ? (
               <div ref={dropdownRef} className="relative">
@@ -245,6 +264,21 @@ export function Navbar() {
                           Mi Perfil y CV
                         </Link>
                         <Link
+                          href="/candidato/guardados"
+                          onClick={() => setDropdownOpen(false)}
+                          className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Bookmark className="w-4 h-4 text-blue-500 fill-blue-500" />
+                            <span>Empleos Guardados</span>
+                          </div>
+                          {savedJobs.length > 0 && (
+                            <span className="px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-700 font-bold rounded-full">
+                              {savedJobs.length}
+                            </span>
+                          )}
+                        </Link>
+                        <Link
                           href="/candidato/postulaciones"
                           onClick={() => setDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
@@ -271,34 +305,34 @@ export function Navbar() {
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-1.5 xl:gap-2.5">
                 <Link
                   href="/auth/login"
                   prefetch={false}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="px-2.5 py-1.5 xl:px-4 xl:py-2 text-xs xl:text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors whitespace-nowrap"
                 >
                   Iniciar Sesión
                 </Link>
                 <Link
                   href="/auth/registro"
                   prefetch={false}
-                  className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
+                  className="px-2.5 py-1.5 xl:px-4 xl:py-2 text-xs xl:text-sm font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl transition-colors whitespace-nowrap"
                 >
                   Registrarse
                 </Link>
                 <Link
                   href="/empresa/publicar"
-                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 xl:px-4 xl:py-2 text-xs xl:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all whitespace-nowrap"
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  Publicar Empleo
+                  <PlusCircle className="w-3.5 h-3.5 xl:w-4 xl:h-4 shrink-0" />
+                  <span>Publicar Empleo</span>
                 </Link>
               </div>
             )}
           </div>
 
           {/* Mobile hamburger button */}
-          <div className="flex md:hidden items-center gap-1.5 sm:gap-2">
+          <div className="flex lg:hidden items-center gap-1.5 sm:gap-2">
             <ModeToggle />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -315,11 +349,11 @@ export function Navbar() {
       {mobileMenuOpen && (
         <>
           <div
-            className="md:hidden fixed inset-0 top-16 bg-slate-900/40 dark:bg-black/60 backdrop-blur-xs z-30 animate-in fade-in duration-200"
+            className="lg:hidden fixed inset-0 top-16 bg-slate-900/40 dark:bg-black/60 backdrop-blur-xs z-30 animate-in fade-in duration-200"
             onClick={() => setMobileMenuOpen(false)}
             aria-hidden="true"
           />
-          <div className="md:hidden absolute top-full left-0 right-0 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl px-4 sm:px-5 pt-3 pb-6 space-y-4 shadow-2xl z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="lg:hidden absolute top-full left-0 right-0 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl px-4 sm:px-5 pt-3 pb-6 space-y-4 shadow-2xl z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="space-y-1">
             <Link
               href="/empleos"
@@ -366,6 +400,21 @@ export function Navbar() {
 
             {isCandidato && (
               <>
+                <Link
+                  href="/candidato/guardados"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <div className="flex items-center gap-3">
+                    <Bookmark className="w-4 h-4 text-blue-500 fill-blue-500" />
+                    <span>Empleos Guardados</span>
+                  </div>
+                  {savedJobs.length > 0 && (
+                    <span className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-bold rounded-full">
+                      {savedJobs.length}
+                    </span>
+                  )}
+                </Link>
                 <Link
                   href="/candidato/postulaciones"
                   onClick={() => setMobileMenuOpen(false)}
