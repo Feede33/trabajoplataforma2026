@@ -49,6 +49,7 @@ export default function CandidatoPostulacionesPage() {
     const map = {
       pendiente: { variant: 'warning', label: 'Pendiente de Revisión' },
       visto: { variant: 'primary', label: 'CV Visto por la Empresa' },
+      seleccionado: { variant: 'success', label: '¡Seleccionado!' },
       entrevista: { variant: 'success', label: 'Convocado a Entrevista' },
       rechazado: { variant: 'danger', label: 'Proceso Finalizado' },
     }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }
@@ -62,6 +63,8 @@ export default function CandidatoPostulacionesPage() {
         return 'Tu postulación fue enviada correctamente y está esperando ser revisada por el reclutador.'
       case 'visto':
         return 'La empresa ya abrió y revisó tu perfil y currículum vitae.'
+      case 'seleccionado':
+        return '¡Felicitaciones! La empresa preseleccionó tu perfil con IA para avanzar en el proceso.'
       case 'entrevista':
         return '¡Excelente! La empresa seleccionó tu perfil para coordinar una entrevista.'
       case 'rechazado':

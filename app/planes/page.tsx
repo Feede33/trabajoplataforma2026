@@ -149,9 +149,13 @@ function PlanesContent() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-12 sm:space-y-16">
       <div className="text-center max-w-2xl mx-auto space-y-3">
         <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Planes y precios</span>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">Buscar trabajo es gratis. Potencialo con IA.</h1>
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">
+          {isEmpresa ? 'Planes para Empresas' : 'Buscar trabajo es gratis. Potencialo con IA.'}
+        </h1>
         <p className="text-sm text-slate-600">
-          Elegí a tu medida: Asistente inteligente para candidatos, publicación de clasificados con IA o planes para empresas.
+          {isEmpresa
+            ? 'Elegí el plan ideal para tu empresa: publicaciones ilimitadas, mayor visibilidad y gestión de postulantes.'
+            : 'Elegí a tu medida: Asistente inteligente para candidatos, publicación de clasificados con IA o planes para empresas.'}
         </p>
       </div>
 
@@ -181,7 +185,8 @@ function PlanesContent() {
       )}
 
       {/* 1. SECCIÓN: Para candidatos · Asistente de IA (Gemini Gratis, Claude y ChatGPT) */}
-      <section className="space-y-6">
+      {!isEmpresa && (
+        <section className="space-y-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center shadow-sm">
             <Bot className="w-5 h-5" />
@@ -447,6 +452,7 @@ function PlanesContent() {
           })()}
         </div>
       </section>
+      )}
 
       {/* 2. SECCIÓN: Créditos de IA para publicar avisos informales con visión artificial */}
       <section>

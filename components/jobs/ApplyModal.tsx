@@ -173,6 +173,7 @@ export function ApplyModal({
     const map = {
       pendiente: { variant: 'warning', label: 'Pendiente de Revisión' },
       visto: { variant: 'primary', label: 'CV Visto por la Empresa' },
+      seleccionado: { variant: 'success', label: '¡Seleccionado!' },
       entrevista: { variant: 'success', label: 'Convocado a Entrevista' },
       rechazado: { variant: 'danger', label: 'Proceso Finalizado' },
     }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }

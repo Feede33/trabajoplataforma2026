@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowUp,
   Briefcase,
@@ -745,7 +746,15 @@ function RoundedPdfPreview({
 }
 
 export function AIChat() {
+  const router = useRouter()
   const { profile, isAdmin, isLoading, getAccessToken } = useAuth()
+
+  useEffect(() => {
+    if (!isLoading && profile?.role === 'empresa' && !isAdmin) {
+      router.replace('/empresa/dashboard')
+    }
+  }, [isLoading, profile?.role, isAdmin, router])
+
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -1188,6 +1197,15 @@ export function AIChat() {
     return () => document.removeEventListener('mousedown', onClick)
   }, [])
 
+  // Bloquear el scroll del body en la vista de chat para que el navbar permanezca siempre fijo y no scrollee en móvil
+  useEffect(() => {
+    const origOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = origOverflow
+    }
+  }, [])
+
   async function send(text: string) {
     const typed = text.trim()
     if ((!typed && attachments.length === 0) || loading) return
@@ -1391,6 +1409,10 @@ export function AIChat() {
     }
   }
 
+  if (!isLoading && profile?.role === 'empresa' && !isAdmin) {
+    return null
+  }
+
   if (!isLoading && !profile) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] gap-5 px-4 text-center font-google-sans">
@@ -1515,10 +1537,12 @@ export function AIChat() {
                 send(input)
               }
             }}
-            placeholder="Preguntale a la IA sobre empleos…"
+            placeholder="Preguntale a la IA..."
             className={cn(
-              'w-full block resize-none !bg-transparent border-0 text-sm sm:text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-0 leading-relaxed font-google-sans',
-              isExpanded ? 'px-1 py-1 max-h-[260px]' : 'px-2 py-2 h-[42px] max-h-[42px] overflow-hidden'
+              'w-full block resize-none !bg-transparent border-0 text-xs sm:text-base text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:ring-0 font-google-sans',
+              isExpanded
+                ? 'px-1 py-1 max-h-[260px] leading-relaxed whitespace-pre-wrap'
+                : 'px-1 sm:px-2 py-2 h-[38px] sm:h-[42px] max-h-[38px] sm:max-h-[42px] leading-normal whitespace-nowrap overflow-hidden text-ellipsis'
             )}
           />
         </div>
@@ -1587,7 +1611,7 @@ export function AIChat() {
         {/* Acciones de la derecha: Selector de versión de modelo + Switch Auto + Botón Enviar */}
         <div
           className={cn(
-            'flex items-center gap-2 sm:gap-2.5 shrink-0 select-none',
+            'flex items-center gap-1.5 sm:gap-2.5 shrink-0 select-none',
             isExpanded ? 'order-4 ml-auto' : 'order-3'
           )}
         >
@@ -1596,10 +1620,10 @@ export function AIChat() {
             <button
               type="button"
               onClick={() => setSubModelOpen((o) => !o)}
-              className="h-8 px-2 sm:px-3.5 rounded-full bg-slate-100 hover:bg-slate-200/90 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border border-slate-200/90 dark:border-slate-700/80 text-[12px] sm:text-[13px] font-medium transition-all flex items-center gap-1 sm:gap-1.5 shadow-2xs active:scale-95 cursor-pointer select-none font-google-sans max-w-[110px] sm:max-w-none"
+              className="h-8 px-2 sm:px-3.5 rounded-full bg-slate-100 hover:bg-slate-200/90 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border border-slate-200/90 dark:border-slate-700/80 text-[11px] sm:text-[13px] font-medium transition-all flex items-center gap-1 sm:gap-1.5 shadow-2xs active:scale-95 cursor-pointer select-none font-google-sans max-w-[85px] sm:max-w-none"
               title="Versión del modelo"
             >
-              <span className="truncate max-w-[75px] sm:max-w-none">{subModelButtonLabel}</span>
+              <span className="truncate max-w-[55px] sm:max-w-none">{subModelButtonLabel}</span>
               <ChevronUp
                 className={cn(
                   'w-3.5 h-3.5 text-slate-500 dark:text-slate-400 transition-transform duration-200 stroke-[2.2] shrink-0',
@@ -1658,12 +1682,12 @@ export function AIChat() {
           </div>
 
           <div
-            className="flex items-center gap-1.5 sm:gap-2"
+            className="flex items-center gap-1 sm:gap-2"
             title="Auto: la IA se postula automáticamente sin pedir confirmación previa"
           >
             <label
               htmlFor="auto-apply-switch"
-              className="text-xs sm:text-sm font-medium text-slate-700 dark:text-white cursor-pointer"
+              className="hidden sm:inline text-xs sm:text-sm font-medium text-slate-700 dark:text-white cursor-pointer"
             >
               Auto
             </label>
@@ -1674,6 +1698,7 @@ export function AIChat() {
                 setAutoApply(checked)
                 localStorage.setItem('ia-chat-auto', checked ? '1' : '0')
               }}
+              className="scale-90 sm:scale-100 origin-center"
               aria-label="Modo automático"
             />
           </div>

@@ -16,7 +16,9 @@ import {
   Filter,
   Eye,
   Mail,
-  CheckCheck
+  CheckCheck,
+  Sparkles,
+  Wand2
 } from 'lucide-react'
 import {
   fetchJobsByEmpresa,
@@ -32,6 +34,8 @@ import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
 import { CandidateCard } from '@/components/empresa/CandidateCard'
 import { CandidateDetailsModal } from '@/components/empresa/CandidateDetailsModal'
+import { AiCandidateSelectorModal } from '@/components/empresa/AiCandidateSelectorModal'
+import { EmpresaDashboardSkeleton } from '@/components/empresa/EmpresaDashboardSkeleton'
 
 export default function EmpresaDashboard() {
   const { profile, isLoading } = useAuth()
@@ -45,6 +49,7 @@ export default function EmpresaDashboard() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedModalApp, setSelectedModalApp] = useState<ApplicationWithDetails | null>(null)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
+  const [isAiSelectorOpen, setIsAiSelectorOpen] = useState(false)
 
   const postulacionesSectionRef = useRef<HTMLDivElement>(null)
   const publicacionesSectionRef = useRef<HTMLDivElement>(null)
@@ -126,6 +131,7 @@ export default function EmpresaDashboard() {
   const activeJobs = jobs.filter((j) => j.estado === 'activo')
   const pendingCount = applications.filter((a) => a.estado === 'pendiente').length
   const seenCount = applications.filter((a) => a.estado === 'visto').length
+  const selectedCount = applications.filter((a) => a.estado === 'seleccionado').length
   const inReviewCount = applications.filter((a) => a.estado === 'entrevista').length
 
   // Filtered applications list
@@ -150,23 +156,14 @@ export default function EmpresaDashboard() {
   const pendingInCurrentView = filteredApplications.filter((a) => a.estado === 'pendiente').length
 
   if (isLoading || loadingData) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-16 space-y-6">
-        <div className="h-8 w-48 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-3xl animate-pulse" />
-          <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-3xl animate-pulse" />
-          <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-3xl animate-pulse" />
-        </div>
-      </div>
-    )
+    return <EmpresaDashboardSkeleton />
   }
 
   if (!profile) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center space-y-6">
         <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto shadow-sm">
-          <Lock className="w-8 h-8" />
+          <Building2 className="w-8 h-8" />
         </div>
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Iniciá sesión como Empresa</h2>
@@ -254,8 +251,8 @@ export default function EmpresaDashboard() {
               <div className="flex items-center gap-2">
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Postulaciones Recibidas</p>
                 {pendingCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-extrabold text-[10px] animate-pulse">
-                    {pendingCount} sin abrir
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-extrabold text-[10px]">
+                    {pendingCount} {pendingCount === 1 ? 'nueva' : 'nuevas'}
                   </span>
                 )}
               </div>
@@ -303,42 +300,42 @@ export default function EmpresaDashboard() {
                 {applications.length}
               </span>
               {pendingCount > 0 && (
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-extrabold text-xs flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  {pendingCount} sin abrir
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-extrabold text-xs flex items-center gap-1 border border-indigo-200/50">
+                  <Mail className="w-3 h-3" />
+                  {pendingCount} {pendingCount === 1 ? 'nueva' : 'nuevas'}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Al abrir o desbloquear una carta de postulación, se registra automáticamente como <strong className="text-sky-600 dark:text-sky-400">CV Visto</strong> tanto para vos como para el candidato.
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Botón con varita: Seleccionar con IA */}
+            <button
+              type="button"
+              onClick={() => setIsAiSelectorOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white font-bold text-xs shadow-md shadow-indigo-200 dark:shadow-none hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+              title="Abrir asistente de selección rápida con IA estilo Tinder"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              <span>Seleccionar con IA</span>
+            </button>
+
             {pendingInCurrentView > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAllAsSeen}
                 disabled={isMarkingAll}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-300 dark:border-amber-800 font-bold text-xs shadow-sm transition-all"
-                title="Desbloquea y marca todas las postulaciones visibles como vistas sin necesidad de abrirlas una por una"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 font-bold text-xs shadow-sm transition-all"
+                title="Abre y marca todas las postulaciones visibles como vistas"
               >
-                <Unlock className="w-3.5 h-3.5 text-amber-600" />
+                <Eye className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>
                   {isMarkingAll
-                    ? 'Desbloqueando...'
-                    : `Desbloquear todas (${pendingInCurrentView})`}
+                    ? 'Abriendo...'
+                    : `Marcar todas como vistas (${pendingInCurrentView})`}
                 </span>
               </button>
             )}
-
-            <Link
-              href="/empresa/postulaciones"
-              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1 shrink-0"
-            >
-              <span>Ver pantalla completa</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </div>
 
@@ -374,7 +371,8 @@ export default function EmpresaDashboard() {
             <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none">
               {[
                 { id: 'todos', label: 'Todos', count: applications.length },
-                { id: 'pendiente', label: 'Sin abrir', count: pendingCount },
+                { id: 'seleccionado', label: 'Seleccionados', count: selectedCount },
+                { id: 'pendiente', label: 'Nuevas', count: pendingCount },
                 { id: 'visto', label: 'CV Visto', count: seenCount },
                 { id: 'entrevista', label: 'En Proceso', count: inReviewCount },
                 { id: 'rechazado', label: 'Descartados', count: applications.filter((a) => a.estado === 'rechazado').length }
@@ -425,7 +423,7 @@ export default function EmpresaDashboard() {
                 Aún no has recibido postulaciones
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                Cuando los postulantes envíen su currículum a tus avisos, aparecerán inmediatamente aquí en sobres sellados para que puedas abrirlos.
+                Cuando los postulantes envíen su currículum a tus avisos, aparecerán inmediatamente aquí para que puedas revisarlos y contactarlos.
               </p>
             </div>
           ) : filteredApplications.length === 0 ? (
@@ -699,6 +697,16 @@ export default function EmpresaDashboard() {
         application={selectedModalApp}
         isOpen={!!selectedModalApp}
         onClose={() => setSelectedModalApp(null)}
+        onStatusChange={handleStatusChange}
+      />
+
+      {/* AI Candidate Selector Modal (Tinder Mode) */}
+      <AiCandidateSelectorModal
+        isOpen={isAiSelectorOpen}
+        onClose={() => setIsAiSelectorOpen(false)}
+        jobs={jobs}
+        applications={applications}
+        initialJobId={selectedJobFilter}
         onStatusChange={handleStatusChange}
       />
     </div>

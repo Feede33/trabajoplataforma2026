@@ -60,6 +60,7 @@ export function CandidateDetailsModal({
     const map: Record<ApplicationEstado, { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }> = {
       pendiente: { variant: 'warning', label: 'Pendiente de revisión' },
       visto: { variant: 'primary', label: 'CV Visto' },
+      seleccionado: { variant: 'success', label: 'Seleccionado con IA' },
       entrevista: { variant: 'success', label: 'En Proceso / Entrevista' },
       rechazado: { variant: 'danger', label: 'Descartado' },
     }
@@ -158,6 +159,7 @@ export function CandidateDetailsModal({
               >
                 <option value="pendiente">Pendiente de revisión</option>
                 <option value="visto">CV Visto</option>
+                <option value="seleccionado">Seleccionado</option>
                 <option value="entrevista">En Proceso / Entrevista</option>
                 <option value="rechazado">Descartado</option>
               </select>

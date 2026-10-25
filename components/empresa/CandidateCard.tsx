@@ -16,6 +16,9 @@ import {
 import { ApplicationWithDetails, ApplicationEstado } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelativeTime } from '@/lib/utils'
+import { CandidateCardSkeleton } from './CandidateCardSkeleton'
+
+export { CandidateCardSkeleton }
 
 interface CandidateCardProps {
   application: ApplicationWithDetails
@@ -70,6 +73,13 @@ export function CandidateCard({
           <Badge variant="primary" size="sm" className="flex items-center gap-1 font-bold">
             <Eye className="w-3 h-3 text-sky-600 dark:text-sky-400" />
             <span>CV Visto</span>
+          </Badge>
+        )
+      case 'seleccionado':
+        return (
+          <Badge variant="success" size="sm" className="flex items-center gap-1 font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+            <Sparkles className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+            <span>Seleccionado</span>
           </Badge>
         )
       case 'entrevista':
@@ -271,6 +281,7 @@ export function CandidateCard({
             {/* Si ya fue abierta, no se puede volver atrás a 'pendiente' */}
             {isUnopened && <option value="pendiente">Nueva (Sin abrir)</option>}
             <option value="visto">CV Visto</option>
+            <option value="seleccionado">Seleccionado</option>
             <option value="entrevista">En Proceso / Entrevista</option>
             <option value="rechazado">Descartado</option>
           </select>

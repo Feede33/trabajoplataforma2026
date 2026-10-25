@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -15,7 +15,6 @@ import {
   X,
   FileText,
   LayoutDashboard,
-  Users,
   Search,
   Sparkles,
   Zap
@@ -26,6 +25,25 @@ export function Navbar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Cerrar menú móvil y dropdown al cambiar de ruta
+  useEffect(() => {
+    setMobileMenuOpen(false)
+    setDropdownOpen(false)
+  }, [pathname])
+
+  // Cerrar dropdown de usuario al hacer click afuera
+  useEffect(() => {
+    if (!dropdownOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [dropdownOpen])
 
   const isEmpresa = role === 'empresa'
   const isCandidato = role === 'candidato'
@@ -95,17 +113,19 @@ export function Navbar() {
               </span>
             </Link>
 
-            <Link
-              href="/ia-chat"
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                pathname === '/ia-chat'
-                  ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-sky-500" />
-              IA Chat
-            </Link>
+            {!isEmpresa && (
+              <Link
+                href="/ia-chat"
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  pathname === '/ia-chat'
+                    ? 'text-indigo-600 bg-indigo-50 font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-sky-500" />
+                IA Chat
+              </Link>
+            )}
 
             <Link
               href="/planes"
@@ -117,31 +137,6 @@ export function Navbar() {
             >
               Planes
             </Link>
-
-            {isEmpresa && (
-              <>
-                <Link
-                  href="/empresa/dashboard"
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    pathname === '/empresa/dashboard'
-                      ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Panel Empresa
-                </Link>
-                <Link
-                  href="/empresa/postulaciones"
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    pathname === '/empresa/postulaciones'
-                      ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Candidatos
-                </Link>
-              </>
-            )}
 
             {isCandidato && (
               <>
@@ -173,7 +168,7 @@ export function Navbar() {
           <div className="hidden md:flex flex-1 items-center justify-end gap-3">
             <ModeToggle />
             {profile ? (
-              <div className="relative">
+              <div ref={dropdownRef} className="relative">
                 <button
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2.5 p-1.5 pl-3 rounded-full border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all shadow-sm"
@@ -229,14 +224,6 @@ export function Navbar() {
                         >
                           <PlusCircle className="w-4 h-4 text-indigo-600" />
                           Publicar Empleo
-                        </Link>
-                        <Link
-                          href="/empresa/postulaciones"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <Users className="w-4 h-4 text-slate-400" />
-                          Postulaciones
                         </Link>
                       </>
                     ) : (
@@ -324,10 +311,16 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer Overlay (flotante para evitar saltos de layout al scrollear) */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-5 pt-3 pb-6 space-y-4 shadow-xl">
-          <div className="space-y-1">
+        <>
+          <div
+            className="md:hidden fixed inset-0 top-16 bg-slate-900/40 dark:bg-black/60 backdrop-blur-xs z-30 animate-in fade-in duration-200"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="md:hidden absolute top-full left-0 right-0 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl px-4 sm:px-5 pt-3 pb-6 space-y-4 shadow-2xl z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="space-y-1">
             <Link
               href="/empleos"
               onClick={() => setMobileMenuOpen(false)}
@@ -351,14 +344,16 @@ export function Navbar() {
               </span>
             </Link>
 
-            <Link
-              href="/ia-chat"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-            >
-              <Sparkles className="w-4 h-4 text-sky-500" />
-              IA Chat
-            </Link>
+            {!isEmpresa && (
+              <Link
+                href="/ia-chat"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <Sparkles className="w-4 h-4 text-sky-500" />
+                IA Chat
+              </Link>
+            )}
 
             <Link
               href="/planes"
@@ -368,27 +363,6 @@ export function Navbar() {
               <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               Planes
             </Link>
-
-            {isEmpresa && (
-              <>
-                <Link
-                  href="/empresa/dashboard"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <LayoutDashboard className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  Panel Empresa
-                </Link>
-                <Link
-                  href="/empresa/postulaciones"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  Ver Candidatos
-                </Link>
-              </>
-            )}
 
             {isCandidato && (
               <>
@@ -420,6 +394,16 @@ export function Navbar() {
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">{profile.nombre}</p>
                   <p className="text-xs text-indigo-600 dark:text-indigo-400 capitalize">{userRoleLabel}</p>
                 </div>
+                {isEmpresa && (
+                  <Link
+                    href="/empresa/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Panel de Control
+                  </Link>
+                )}
                 <button
                   onClick={async () => {
                     setMobileMenuOpen(false)
@@ -462,7 +446,8 @@ export function Navbar() {
               </>
             )}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </header>
   )

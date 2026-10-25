@@ -1,9 +1,15 @@
+'use client'
+
 import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { Briefcase, Heart, MapPin, Mail, ShieldCheck } from 'lucide-react'
 
 export function Footer() {
+  const pathname = usePathname()
+  if (pathname === '/ia-chat') return null
+
   return (
     <footer className="bg-slate-900 text-slate-300 border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
@@ -81,11 +87,6 @@ export function Footer() {
               <li>
                 <Link href="/empresa/dashboard" className="hover:text-white transition-colors">
                   Panel de Empresa
-                </Link>
-              </li>
-              <li>
-                <Link href="/empresa/postulaciones" className="hover:text-white transition-colors">
-                  Gestionar Candidatos
                 </Link>
               </li>
               <li>
