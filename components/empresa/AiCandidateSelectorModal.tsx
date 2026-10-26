@@ -1,37 +1,35 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
-  Sparkles,
-  Wand2,
   ArrowLeft,
   ArrowRight,
-  X,
+  Award,
+  BriefcaseBusiness,
   Check,
-  CheckCircle2,
-  RotateCcw,
-  Users,
-  Briefcase,
-  Mail,
-  FileText,
-  ExternalLink,
-  ChevronRight,
-  Copy,
   CheckCheck,
-  AlertCircle,
-  ThumbsUp,
-  ThumbsDown,
-  Building2,
-  Lock,
-  Eye
+  CheckCircle2,
+  ChevronDown,
+  CircleHelp,
+  Copy,
+  ExternalLink,
+  FileText,
+  Gauge,
+  Mail,
+  MapPin,
+  MoreHorizontal,
+  RotateCcw,
+  Sparkles,
+  Users,
+  X,
 } from 'lucide-react'
 import {
   JobWithEmpresa,
   ApplicationWithDetails,
-  ApplicationEstado
+  ApplicationEstado,
 } from '@/lib/supabase/database.types'
-import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, getAiBadgeDetails } from '@/lib/utils'
 
 export interface CandidateEvaluation {
   applicationId: string
@@ -58,6 +56,15 @@ interface AiCandidateSelectorModalProps {
   onStatusChange: (appId: string, newStatus: ApplicationEstado) => Promise<void>
 }
 
+function getInitials(name?: string | null) {
+  if (!name) return 'C'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+}
+
 export function AiCandidateSelectorModal({
   isOpen,
   onClose,
@@ -76,14 +83,14 @@ export function AiCandidateSelectorModal({
   const [evaluations, setEvaluations] = useState<Record<string, CandidateEvaluation>>({})
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
-  // Ordered candidate list for the active job
+  // Ordered candidate deck for active job
   const [deck, setDeck] = useState<ApplicationWithDetails[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  // History for Undo (Volver atrás)
+  // History for Undo
   const [history, setHistory] = useState<HistoryItem[]>([])
 
-  // Visual animation stamps: 'selected' | 'rejected' | null
+  // Visual animation stamps
   const [stamp, setStamp] = useState<'selected' | 'rejected' | null>(null)
   const [isAnimating, setIsAnimating] = useState(false)
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null)
@@ -92,6 +99,12 @@ export function AiCandidateSelectorModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
   const [copiedEmails, setCopiedEmails] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Pick default job when modal opens
   useEffect(() => {
@@ -106,7 +119,6 @@ export function AiCandidateSelectorModal({
     if (initialJobId && initialJobId !== 'todos') {
       setSelectedJobId(initialJobId)
     } else if (jobs.length > 0) {
-      // Prioritize the first job that has applications
       const jobWithApps = jobs.find((j) =>
         applications.some((a) => a.job_id === j.id || a.job?.slug === j.slug)
       )
@@ -133,44 +145,70 @@ export function AiCandidateSelectorModal({
     setIsAnalyzing(true)
 
     try {
-      const payload = {
-        job: {
-          id: selectedJob.id,
-          titulo: selectedJob.titulo,
-          descripcion: selectedJob.descripcion,
-          rubro: selectedJob.rubro,
-          zona: selectedJob.zona,
-          modalidad: selectedJob.modalidad,
-          tags: selectedJob.tags,
-        },
-        candidates: currentJobApplications.map((app) => ({
-          id: app.id,
-          candidatoNombre: app.candidato?.nombre || 'Candidato',
-          candidatoEmail: app.candidato?.email || '',
-          mensaje: app.mensaje,
-          hasCv: !!app.candidato?.cv_url,
-          created_at: app.created_at,
-        })),
-      }
-
-      const res = await fetch('/api/empresa/ai-screen', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
       const evalsMap: Record<string, CandidateEvaluation> = {}
 
-      if (data && Array.isArray(data.evaluations)) {
-        data.evaluations.forEach((ev: CandidateEvaluation) => {
-          evalsMap[ev.applicationId] = ev
-        })
+      // 1. Cargar evaluaciones pre-calculadas desde la base de datos
+      currentJobApplications.forEach((app) => {
+        if (typeof app.ai_match_score === 'number') {
+          const badgeDetails = getAiBadgeDetails(app.ai_match_score)
+          evalsMap[app.id] = {
+            applicationId: app.id,
+            matchScore: app.ai_match_score,
+            badgeLabel: badgeDetails.label,
+            summary: app.ai_summary || 'Postulación evaluada previamente con IA.',
+            strengths: app.ai_strengths && app.ai_strengths.length > 0 ? app.ai_strengths : ['Perfil verificado'],
+            recommendation: app.ai_match_score >= 75 ? 'recomendado' : app.ai_match_score < 40 ? 'descartar' : 'considerar',
+          }
+        }
+      })
+
+      // 2. Evaluar solo los candidatos que aún no tienen puntuación guardada
+      const pendingApps = currentJobApplications.filter((app) => !evalsMap[app.id])
+
+      if (pendingApps.length > 0) {
+        const CHUNK_SIZE = 15
+        for (let i = 0; i < pendingApps.length; i += CHUNK_SIZE) {
+          const chunk = pendingApps.slice(i, i + CHUNK_SIZE)
+          const payload = {
+            job: {
+              id: selectedJob.id,
+              titulo: selectedJob.titulo,
+              descripcion: selectedJob.descripcion,
+              rubro: selectedJob.rubro,
+              zona: selectedJob.zona,
+              modalidad: selectedJob.modalidad,
+              tags: selectedJob.tags,
+            },
+            candidates: chunk.map((app) => ({
+              id: app.id,
+              candidatoId: app.candidato_id,
+              candidatoNombre: app.candidato?.nombre || 'Candidato',
+              candidatoEmail: app.candidato?.email || '',
+              mensaje: app.mensaje,
+              hasCv: !!app.candidato?.cv_url,
+              cvUrl: app.candidato?.cv_url || null,
+              created_at: app.created_at,
+            })),
+          }
+
+          const res = await fetch('/api/empresa/ai-screen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+
+          const data = await res.json()
+          if (data && Array.isArray(data.evaluations)) {
+            data.evaluations.forEach((ev: CandidateEvaluation) => {
+              evalsMap[ev.applicationId] = ev
+            })
+          }
+        }
       }
 
       setEvaluations(evalsMap)
 
-      // Sort applicants by AI match score descending (best first)
+      // Ordenar por matchScore descendente
       const sorted = [...currentJobApplications].sort((a, b) => {
         const scoreA = evalsMap[a.id]?.matchScore ?? 70
         const scoreB = evalsMap[b.id]?.matchScore ?? 70
@@ -183,11 +221,10 @@ export function AiCandidateSelectorModal({
       setSelectedIds(new Set())
       setRejectedIds(new Set())
 
-      // Short delay for the nice analysis transition
       setTimeout(() => {
         setIsAnalyzing(false)
         setStep('tinder')
-      }, 700)
+      }, pendingApps.length === 0 ? 350 : 700)
     } catch (err) {
       console.warn('Error en análisis de IA, usando orden original:', err)
       setDeck(currentJobApplications)
@@ -197,7 +234,7 @@ export function AiCandidateSelectorModal({
     }
   }
 
-  // Handle Seleccionar (en vez de like)
+  // Handle Seleccionar (S / Space / Click)
   const handleSelect = useCallback(async () => {
     if (isAnimating || currentIndex >= deck.length) return
     const current = deck[currentIndex]
@@ -207,7 +244,6 @@ export function AiCandidateSelectorModal({
     setStamp('selected')
     setSwipeDirection('right')
 
-    // Save previous status for undo
     setHistory((prev) => [
       ...prev,
       {
@@ -224,7 +260,6 @@ export function AiCandidateSelectorModal({
       return next
     })
 
-    // Update status in backend / state
     await onStatusChange(current.id, 'seleccionado')
 
     setTimeout(() => {
@@ -237,10 +272,10 @@ export function AiCandidateSelectorModal({
       } else {
         setCurrentIndex(nextIndex)
       }
-    }, 380)
+    }, 320)
   }, [currentIndex, deck, isAnimating, onStatusChange])
 
-  // Handle Descartar (Arrow Right / Pass)
+  // Handle Descartar (D / ArrowRight / Click)
   const handleDiscard = useCallback(async () => {
     if (isAnimating || currentIndex >= deck.length) return
     const current = deck[currentIndex]
@@ -250,7 +285,6 @@ export function AiCandidateSelectorModal({
     setStamp('rejected')
     setSwipeDirection('left')
 
-    // Save previous status for undo
     setHistory((prev) => [
       ...prev,
       {
@@ -267,7 +301,6 @@ export function AiCandidateSelectorModal({
       return next
     })
 
-    // Update status in backend / state
     await onStatusChange(current.id, 'rechazado')
 
     setTimeout(() => {
@@ -280,10 +313,10 @@ export function AiCandidateSelectorModal({
       } else {
         setCurrentIndex(nextIndex)
       }
-    }, 380)
+    }, 320)
   }, [currentIndex, deck, isAnimating, onStatusChange])
 
-  // Handle Volver Atrás (Undo / Arrow Left)
+  // Handle Volver Atrás (Deshacer)
   const handleUndo = useCallback(async () => {
     if (isAnimating || history.length === 0) return
 
@@ -292,7 +325,6 @@ export function AiCandidateSelectorModal({
     const newHistory = history.slice(0, -1)
     setHistory(newHistory)
 
-    // Revert candidate status in database/state
     await onStatusChange(lastItem.appId, lastItem.prevStatus)
 
     if (lastItem.action === 'selected') {
@@ -309,7 +341,6 @@ export function AiCandidateSelectorModal({
       })
     }
 
-    // Step index backwards
     setCurrentIndex(lastItem.index)
     if (step === 'completed') {
       setStep('tinder')
@@ -317,30 +348,34 @@ export function AiCandidateSelectorModal({
 
     setTimeout(() => {
       setIsAnimating(false)
-    }, 200)
+    }, 180)
   }, [history, isAnimating, onStatusChange, step])
 
   // Keyboard navigation shortcuts
   useEffect(() => {
-    if (!isOpen || step !== 'tinder') return
+    if (!isOpen) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
         return
       }
 
-      if (e.key === 'ArrowRight') {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+
+      if (step !== 'tinder') return
+
+      if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
         e.preventDefault()
         handleDiscard()
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        handleUndo()
-      } else if (e.key === ' ' || e.key === 'Enter') {
+      } else if (e.key === 's' || e.key === 'S' || e.key === ' ' || e.key === 'Enter') {
         e.preventDefault()
         handleSelect()
-      } else if (e.key === 'Escape') {
-        onClose()
+      } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+        e.preventDefault()
+        handleUndo()
       }
     }
 
@@ -360,7 +395,7 @@ export function AiCandidateSelectorModal({
     }
   }, [isOpen])
 
-  if (!isOpen) return null
+  if (!mounted || !isOpen) return null
 
   const currentCandidate = deck[currentIndex] || null
   const currentEvaluation = currentCandidate ? evaluations[currentCandidate.id] : null
@@ -379,153 +414,221 @@ export function AiCandidateSelectorModal({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-200">
-      {/* Background click to dismiss */}
-      <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
+  const modalContent = (
+    <div className="fixed inset-0 !m-0 z-[100] bg-[#080b14] text-white selection:bg-[#b7ff68] selection:text-[#080b14] overflow-y-auto flex flex-col justify-between animate-in fade-in duration-200">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-4 sm:px-6 lg:px-10 lg:py-8">
+        {/* ============================================================== */}
+        {/* TOP BAR / HEADER (V0 STYLE)                                    */}
+        {/* ============================================================== */}
+        <header className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="flex items-center gap-3">
+            {step === 'select_job' ? (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Volver al panel"
+                className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                title="Volver al panel de empresa"
+              >
+                <ArrowLeft aria-hidden="true" className="size-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setStep('select_job')}
+                aria-label="Cambiar de anuncio"
+                className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                title="Cambiar anuncio de búsqueda"
+              >
+                <ArrowLeft aria-hidden="true" className="size-4" />
+              </button>
+            )}
 
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 flex flex-col max-h-[94vh]">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b7ff68]">
+                Postulaciones / {selectedJob?.rubro || 'Selección con IA'}
+              </p>
+              <h1 className="mt-1 text-sm font-semibold sm:text-base text-white">
+                {step === 'select_job' ? 'Seleccionar anuncio y postulantes' : 'Revisión de candidatos'}
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowHelpModal((prev) => !prev)}
+              aria-label="Ayuda de atajos"
+              className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer"
+              title="Atajos de teclado e información"
+            >
+              <CircleHelp aria-hidden="true" className="size-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar modal"
+              className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer"
+              title="Cerrar y volver al panel"
+            >
+              <X aria-hidden="true" className="size-4" />
+            </button>
+          </div>
+        </header>
+
+        {/* Modal informativo flotante de ayuda */}
+        {showHelpModal && (
+          <div className="mt-4 p-4 rounded-2xl border border-white/10 bg-[#111827] text-xs text-white/80 space-y-2 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center justify-between font-bold text-[#b7ff68]">
+              <span className="flex items-center gap-1.5"><Award className="size-4" /> Atajos de teclado</span>
+              <button onClick={() => setShowHelpModal(false)} className="text-white/40 hover:text-white"><X className="size-3.5" /></button>
+            </div>
+            <p className="text-white/60">
+              Podés evaluar rápidamente a tus candidatos usando el teclado:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono text-[11px]">
+              <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-[#b7ff68] font-bold">[S]</span> o <span className="text-[#b7ff68] font-bold">[Espacio]</span>: Seleccionar
+              </div>
+              <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-[#ff9ab0] font-bold">[D]</span> o <span className="text-[#ff9ab0] font-bold">[→]</span>: Descartar
+              </div>
+              <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-white/70 font-bold">[←]</span>: Volver / Deshacer
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ============================================================== */}
         {/* STEP 1: SELECT JOB / ANUNCIO                                   */}
         {/* ============================================================== */}
         {step === 'select_job' && (
-          <div className="flex flex-col h-full max-h-[90vh]">
-            {/* Header */}
-            <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white dark:from-purple-950/30 dark:via-indigo-950/20 dark:to-slate-900 flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200 dark:shadow-none shrink-0">
-                  <Sparkles className="w-6 h-6 animate-pulse" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
+          <div className="flex-1 flex flex-col justify-center items-center py-6 sm:py-10 px-2 sm:px-4">
+            <div className="w-full max-w-2xl rounded-[28px] border border-white/10 bg-[#111827] shadow-[0_30px_100px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col relative">
+              <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-[#b7ff68]/10 blur-3xl pointer-events-none" />
+
+              {/* Header inside card */}
+              <div className="p-5 sm:p-7 border-b border-white/10 flex items-center justify-between gap-4 relative">
+                <div className="flex items-center gap-3.5">
+                  <div className="grid size-12 place-items-center rounded-2xl bg-[#b7ff68] text-[#111827] font-bold shadow-[0_0_0_8px_rgba(183,255,104,0.08)]">
+                    <Sparkles className="size-6 text-[#111827]" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b7ff68]">
+                      Asistente de Selección
+                    </p>
+                    <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                       Seleccionar con IA
                     </h2>
-                    <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-[10px] uppercase tracking-wide">
-                      Tinder Mode
-                    </span>
+                    <p className="text-xs text-white/50 mt-0.5">
+                      Elegí un anuncio para evaluar y clasificar a sus postulantes.
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Elegí cuál de tus anuncios querés evaluar. La IA leerá todos los postulantes y los organizará de mayor a menor compatibilidad.
-                  </p>
                 </div>
               </div>
 
-              <button
-                onClick={onClose}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                title="Cerrar"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Job List Selector */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-3 flex-1">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                Tus Anuncios Publicados ({jobs.length})
-              </label>
-
-              {jobs.length === 0 ? (
-                <div className="py-12 text-center space-y-3">
-                  <Briefcase className="w-12 h-12 text-slate-300 mx-auto" />
-                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                    No tenés búsquedas publicadas todavía
+              {/* Jobs list */}
+              <div className="p-5 sm:p-7 space-y-3 max-h-[55vh] overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/40">
+                    Tus anuncios activos ({jobs.length})
                   </p>
-                  <p className="text-xs text-slate-500">
-                    Publicá un empleo para comenzar a recibir candidatos y evaluarlos con IA.
-                  </p>
+                  <span className="text-[11px] text-white/35">
+                    Seleccioná uno para comenzar
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {jobs.map((job) => {
-                    const jobApps = applications.filter(
-                      (a) => a.job_id === job.id || a.job?.slug === job.slug
-                    )
-                    const count = jobApps.length
-                    const isSelected = selectedJobId === job.id
-                    const hasPending = jobApps.some((a) => a.estado === 'pendiente')
 
-                    return (
-                      <div
-                        key={job.id}
-                        onClick={() => setSelectedJobId(job.id)}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4 ${
-                          isSelected
-                            ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 ring-2 ring-indigo-500/20 shadow-sm'
-                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900/60'
-                        }`}
-                      >
-                        <div className="min-w-0 flex items-center gap-3">
-                          <div
-                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                              isSelected
-                                ? 'border-indigo-600 bg-indigo-600 text-white'
-                                : 'border-slate-300 dark:border-slate-600'
-                            }`}
-                          >
-                            {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
-                          </div>
+                {jobs.length === 0 ? (
+                  <div className="py-14 text-center space-y-3 border border-dashed border-white/10 rounded-2xl p-6">
+                    <BriefcaseBusiness className="size-12 text-white/20 mx-auto" />
+                    <p className="text-sm font-semibold text-white/70">
+                      No tenés búsquedas publicadas todavía
+                    </p>
+                    <p className="text-xs text-white/40 max-w-sm mx-auto">
+                      Publicá un empleo para comenzar a recibir candidatos y evaluarlos con IA.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {jobs.map((job) => {
+                      const jobApps = applications.filter(
+                        (a) => a.job_id === job.id || a.job?.slug === job.slug
+                      )
+                      const count = jobApps.length
+                      const isSelected = selectedJobId === job.id
 
-                          <div className="min-w-0">
-                            <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                              {job.titulo}
-                            </h3>
-                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                              <span>{job.zona || 'Uruguay'}</span>
-                              <span>•</span>
-                              <span className="capitalize">{job.modalidad}</span>
-                              {job.rubro && (
-                                <>
-                                  <span>•</span>
-                                  <span>{job.rubro}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {count > 0 ? (
-                            <span
-                              className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
+                      return (
+                        <div
+                          key={job.id}
+                          onClick={() => setSelectedJobId(job.id)}
+                          className={`p-4 rounded-2xl border transition-all duration-150 cursor-pointer flex items-center justify-between gap-4 ${
+                            isSelected
+                              ? 'border-[#b7ff68] bg-[#b7ff68]/[0.08] shadow-[0_0_30px_rgba(183,255,104,0.12)]'
+                              : 'border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          <div className="min-w-0 flex items-center gap-3.5">
+                            <div
+                              className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                                 isSelected
-                                  ? 'bg-indigo-600 text-white shadow-sm'
-                                  : 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
+                                  ? 'border-[#b7ff68] bg-[#b7ff68]'
+                                  : 'border-white/30'
                               }`}
                             >
-                              <Users className="w-3.5 h-3.5" />
-                              <span>{count} {count === 1 ? 'postulante' : 'postulantes'}</span>
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-xl text-xs font-medium text-slate-400 bg-slate-100 dark:bg-slate-800">
-                              0 postulantes
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+                              {isSelected && <div className="size-1.5 rounded-full bg-[#111827]" />}
+                            </div>
 
-            {/* Footer with action button */}
-            <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400 text-center sm:text-left">
-                {selectedJob && (
-                  <span>
-                    Anuncio seleccionado: <strong className="text-slate-800 dark:text-slate-200">{selectedJob.titulo}</strong>
-                    {' '}({currentJobApplications.length} {currentJobApplications.length === 1 ? 'postulante' : 'postulantes'})
-                  </span>
+                            <div className="min-w-0">
+                              <h3 className="font-bold text-sm sm:text-base text-white truncate">
+                                {job.titulo}
+                              </h3>
+                              <div className="flex items-center gap-2 text-xs text-white/45 mt-0.5">
+                                <span>{job.zona || 'Uruguay'}</span>
+                                <span>·</span>
+                                <span className="capitalize">{job.modalidad}</span>
+                                {job.rubro && (
+                                  <>
+                                    <span>·</span>
+                                    <span>{job.rubro}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {count > 0 ? (
+                              <span
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
+                                  isSelected
+                                    ? 'bg-[#b7ff68] text-[#111827] shadow-[0_0_15px_rgba(183,255,104,0.3)]'
+                                    : 'bg-white/10 text-white/80'
+                                }`}
+                              >
+                                <Users className="size-3.5" />
+                                <span>{count} {count === 1 ? 'postulante' : 'postulantes'}</span>
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1.5 rounded-xl text-xs font-medium text-white/30 bg-white/5">
+                                0 postulantes
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Footer */}
+              <div className="p-5 sm:p-6 border-t border-white/10 bg-[#0c111e] flex items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-1/2 sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
+                  className="text-xs font-semibold text-white/50 hover:text-white transition-colors px-3 py-2 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -534,19 +637,19 @@ export function AiCandidateSelectorModal({
                   type="button"
                   onClick={handleStartAnalysis}
                   disabled={!selectedJob || currentJobApplications.length === 0}
-                  className={`w-1/2 sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white transition-all shadow-md ${
+                  className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                     !selectedJob || currentJobApplications.length === 0
-                      ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed shadow-none'
-                      : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 shadow-indigo-200 dark:shadow-none hover:shadow-lg transform hover:-translate-y-0.5'
+                      ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                      : 'bg-[#b7ff68] text-[#111827] hover:bg-[#c6ff85] shadow-[0_10px_30px_rgba(183,255,104,0.25)] hover:-translate-y-0.5 active:scale-98'
                   }`}
                 >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <Sparkles className="size-4 text-[#111827]" />
                   <span>
                     {currentJobApplications.length === 0
-                      ? 'Sin postulantes para evaluar'
-                      : `Comenzar Selección con IA (${currentJobApplications.length})`}
+                      ? 'Sin postulantes'
+                      : `Comenzar revisión (${currentJobApplications.length})`}
                   </span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="size-4" />
                 </button>
               </div>
             </div>
@@ -554,436 +657,509 @@ export function AiCandidateSelectorModal({
         )}
 
         {/* ============================================================== */}
-        {/* STEP 2: ANALYZING STATE (AI READING CANDIDATES)                 */}
+        {/* STEP 2: ANALYZING STATE                                        */}
         {/* ============================================================== */}
         {step === 'analyzing' && (
-          <div className="p-10 sm:p-14 text-center space-y-6 flex flex-col items-center justify-center min-h-[420px]">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center shadow-xl shadow-indigo-300/50 dark:shadow-none animate-bounce">
-                <Wand2 className="w-10 h-10 animate-pulse text-amber-300" />
-              </div>
-              <div className="absolute -inset-2 rounded-3xl bg-purple-500/20 blur-xl animate-pulse" />
-            </div>
+          <div className="flex-1 flex flex-col justify-center items-center py-10 px-4">
+            <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-[#111827] shadow-[0_30px_100px_rgba(0,0,0,0.5)] p-8 sm:p-12 text-center space-y-6 flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#b7ff68]/15 blur-3xl" />
 
-            <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                La IA está leyendo a todos los postulantes...
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Analizando cartas de presentación, perfiles y currículums para el puesto de{' '}
-                <strong className="text-indigo-600 dark:text-indigo-400">
-                  {selectedJob?.titulo}
-                </strong>
-                . Organizándolos por orden de compatibilidad.
-              </p>
-            </div>
-
-            {/* Animated Progress Steps */}
-            <div className="w-full max-w-sm space-y-2 text-left bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
-              <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold animate-pulse">
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                <span>Extrayendo cartas y aptitudes clave...</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-400">
-                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Evaluando {currentJobApplications.length} {currentJobApplications.length === 1 ? 'postulación' : 'postulaciones'} recibidas</span>
-              </div>
-              <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 font-semibold">
-                <div className="w-2 h-2 rounded-full bg-purple-600 animate-ping" />
-                <span>Preparando panel de selección estilo Tinder...</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* STEP 3: TINDER INTERACTIVE CARD DECK                           */}
-        {/* ============================================================== */}
-        {step === 'tinder' && currentCandidate && (
-          <div className="flex flex-col h-full max-h-[92vh]">
-            {/* Top Navigation & Progress */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <button
-                  onClick={() => setStep('select_job')}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
-                  title="Cambiar de anuncio"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 truncate">
-                      {selectedJob?.titulo}
-                    </span>
-                  </div>
-                  <p className="text-xs font-extrabold text-slate-900 dark:text-white">
-                    Postulante {currentIndex + 1} de {deck.length}
-                  </p>
+              <div className="relative">
+                <div className="size-20 rounded-3xl bg-[#b7ff68] text-[#111827] flex items-center justify-center shadow-[0_0_50px_rgba(183,255,104,0.35)] animate-pulse">
+                  <Sparkles className="size-10 text-[#111827] animate-spin" style={{ animationDuration: '6s' }} />
                 </div>
               </div>
 
-              {/* Counter Badges & Close */}
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
-                  <Check className="w-3 h-3" />
-                  <span>{selectedIds.size} seleccionados</span>
-                </span>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-800">
-                  <X className="w-3 h-3" />
-                  <span>{rejectedIds.size} descartados</span>
-                </span>
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b7ff68]">
+                  Inteligencia Artificial
+                </p>
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Analizando candidatos...
+                </h3>
+                <p className="text-xs text-white/50 max-w-sm">
+                  Evaluando afinidad para <span className="text-[#b7ff68] font-semibold">{selectedJob?.titulo}</span>
+                </p>
+              </div>
 
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  title="Cerrar selección"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+              <div className="w-full space-y-2.5 text-left bg-[#080b14]/60 p-4 rounded-2xl border border-white/10 text-xs">
+                <div className="flex items-center gap-2.5 text-[#d5ffa8] font-semibold">
+                  <Sparkles className="size-3.5 text-[#b7ff68] animate-pulse" />
+                  <span>Analizando aptitudes y perfiles...</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-white/50">
+                  <Check className="size-3.5 text-[#b7ff68]" />
+                  <span>Calculando nivel de compatibilidad...</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-white/40">
+                  <div className="size-2 rounded-full bg-[#b7ff68] animate-ping" />
+                  <span>Preparando tarjetas de revisión...</span>
+                </div>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Progress Bar */}
-            <div className="w-full bg-slate-100 dark:bg-slate-800 h-1">
-              <div
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 h-1 transition-all duration-300"
-                style={{ width: `${((currentIndex) / deck.length) * 100}%` }}
-              />
-            </div>
+        {/* ============================================================== */}
+        {/* STEP 3: TINDER REVISION CARD (V0 EXACT LAYOUT)                 */}
+        {/* ============================================================== */}
+        {step === 'tinder' && currentCandidate && (
+          <section className="grid flex-1 gap-6 py-6 lg:grid-cols-[220px_minmax(0,760px)_220px] lg:items-center lg:justify-center lg:gap-10">
+            {/* Left Column: Vacancy & Stepper */}
+            <aside className="hidden self-stretch lg:flex lg:flex-col lg:justify-between lg:py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/40">Vacante activa</p>
+                <div className="mt-4 border-l border-[#b7ff68] pl-4">
+                  <p className="text-lg font-semibold text-white">{selectedJob?.titulo}</p>
+                  <p className="mt-1 text-sm leading-6 text-white/45 capitalize">
+                    {selectedJob?.rubro || 'General'} · {selectedJob?.modalidad || 'Presencial'}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-5 text-sm text-white/45">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-8 place-items-center rounded-lg bg-white/5 text-[#b7ff68] font-bold">01</span>
+                  <span className="text-white/80 font-medium">Perfil actual</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="grid size-8 place-items-center rounded-lg bg-white/5">02</span>
+                  <span>Decisión</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="grid size-8 place-items-center rounded-lg bg-white/5">03</span>
+                  <span>Siguiente perfil</span>
+                </div>
+              </div>
+            </aside>
 
-            {/* Tinder Card Container */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col justify-start relative">
-              {/* STAMP: ¡SELECCIONADO! */}
+            {/* Center Column: The Candidate Card */}
+            <article className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#111827] shadow-[0_30px_100px_rgba(0,0,0,0.35)]">
+              <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#b7ff68]/10 blur-3xl pointer-events-none" />
+
+              {/* STAMPS: ¡SELECCIONADO! / DESCARTADO */}
               {stamp === 'selected' && (
-                <div className="absolute top-8 right-8 z-30 pointer-events-none transform rotate-12 animate-in zoom-in-75 duration-200">
-                  <div className="px-5 py-2 border-4 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-black text-2xl uppercase tracking-widest rounded-2xl bg-white/90 dark:bg-slate-900/90 shadow-2xl backdrop-blur-md flex items-center gap-2">
-                    <CheckCircle2 className="w-7 h-7" />
+                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-6 animate-in zoom-in-75 fade-in duration-150">
+                  <div className="px-6 py-3 border-4 border-[#b7ff68] text-[#b7ff68] font-black text-2xl sm:text-3xl uppercase tracking-widest rounded-3xl bg-[#080b14]/95 shadow-[0_0_50px_rgba(183,255,104,0.4)] backdrop-blur-md flex items-center gap-3 transform rotate-6 scale-105">
+                    <CheckCircle2 className="size-8 sm:size-9 text-[#b7ff68] shrink-0" />
                     <span>¡SELECCIONADO!</span>
                   </div>
                 </div>
               )}
 
-              {/* STAMP: DESCARTADO */}
               {stamp === 'rejected' && (
-                <div className="absolute top-8 left-8 z-30 pointer-events-none transform -rotate-12 animate-in zoom-in-75 duration-200">
-                  <div className="px-5 py-2 border-4 border-rose-500 text-rose-600 dark:text-rose-400 font-black text-2xl uppercase tracking-widest rounded-2xl bg-white/90 dark:bg-slate-900/90 shadow-2xl backdrop-blur-md flex items-center gap-2">
-                    <X className="w-7 h-7" />
+                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-6 animate-in zoom-in-75 fade-in duration-150">
+                  <div className="px-6 py-3 border-4 border-[#ff6b8a] text-[#ff6b8a] font-black text-2xl sm:text-3xl uppercase tracking-widest rounded-3xl bg-[#080b14]/95 shadow-[0_0_50px_rgba(255,107,138,0.4)] backdrop-blur-md flex items-center gap-3 transform -rotate-6 scale-105">
+                    <X className="size-8 sm:size-9 text-[#ff6b8a] shrink-0" />
                     <span>DESCARTADO</span>
                   </div>
                 </div>
               )}
 
-              {/* The Active Tinder Card */}
+              {/* Card Top Bar */}
+              <div className="relative border-b border-white/10 px-5 py-4 sm:px-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-medium text-white/50">
+                    <span className="size-2 rounded-full bg-[#b7ff68]" />
+                    <span>
+                      Perfil {String(currentIndex + 1).padStart(2, '0')} de {String(deck.length).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#b7ff68] bg-[#b7ff68]/10 px-2.5 py-0.5 rounded-full border border-[#b7ff68]/20">
+                      {selectedIds.size} seleccionados
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Body with Swipe Animation */}
               <div
-                className={`bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-5 sm:p-6 space-y-5 transition-all duration-300 ${
+                className={`relative space-y-7 px-5 py-6 sm:px-8 sm:py-8 transition-all duration-300 ease-out ${
                   swipeDirection === 'right'
-                    ? 'translate-x-28 rotate-6 opacity-0'
+                    ? 'translate-x-44 rotate-12 opacity-0 scale-95 pointer-events-none'
                     : swipeDirection === 'left'
-                    ? '-translate-x-28 -rotate-6 opacity-0'
-                    : 'translate-x-0 rotate-0 opacity-100'
+                    ? '-translate-x-44 -rotate-12 opacity-0 scale-95 pointer-events-none'
+                    : 'translate-x-0 rotate-0 opacity-100 scale-100'
                 }`}
               >
-                {/* Header: Candidate Info & AI Match Score */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-black text-xl flex items-center justify-center shrink-0 shadow-md shadow-indigo-200 dark:shadow-none">
-                      {currentCandidate.candidato?.nombre
-                        ? currentCandidate.candidato.nombre[0].toUpperCase()
-                        : 'C'}
+                {/* Header: Candidate Info & AI Match */}
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="grid size-16 place-items-center rounded-2xl bg-[#b7ff68] text-2xl font-bold text-[#111827] shadow-[0_0_0_8px_rgba(183,255,104,0.08)] shrink-0">
+                      {getInitials(currentCandidate.candidato?.nombre)}
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-extrabold text-slate-900 dark:text-white text-lg truncate">
-                        {currentCandidate.candidato?.nombre || 'Candidato'}
-                      </h3>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-2xl font-bold tracking-tight text-white">
+                          {currentCandidate.candidato?.nombre || 'Candidato'}
+                        </h2>
+                        <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                          {currentCandidate.estado === 'pendiente' ? 'Nuevo' : currentCandidate.estado}
+                        </span>
+                      </div>
                       {currentCandidate.candidato?.email ? (
                         <a
                           href={`mailto:${currentCandidate.candidato.email}`}
-                          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mt-0.5"
+                          className="mt-1 flex items-center gap-2 text-sm text-white/50 hover:text-[#b7ff68] transition-colors"
                         >
-                          <Mail className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{currentCandidate.candidato.email}</span>
+                          <Mail aria-hidden="true" className="size-4 text-white/40" />
+                          <span>{currentCandidate.candidato.email}</span>
                         </a>
                       ) : (
-                        <span className="text-xs text-slate-400">Sin email público</span>
+                        <p className="mt-1 flex items-center gap-2 text-sm text-white/40">
+                          <Mail aria-hidden="true" className="size-4" /> Sin email público
+                        </p>
                       )}
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Postulado {formatRelativeTime(currentCandidate.created_at)}
+                      <p className="mt-2 text-xs text-white/35">
+                        Postuló {formatRelativeTime(currentCandidate.created_at)}
                       </p>
                     </div>
                   </div>
 
                   {/* AI Match Badge */}
-                  <div className="flex flex-row sm:flex-col items-start sm:items-end gap-1.5 shrink-0">
-                    <div className="px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-purple-500/10 to-indigo-500/10 border border-emerald-300 dark:border-emerald-700/50 flex items-center gap-1.5 shadow-sm">
-                      <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-pulse" />
-                      <span className="text-sm font-black text-emerald-700 dark:text-emerald-300">
-                        {currentEvaluation?.matchScore ?? 85}% Coincidencia IA
-                      </span>
+                  {(() => {
+                    const score = currentEvaluation?.matchScore ?? 80
+                    const badgeLabel = currentEvaluation?.badgeLabel || getAiBadgeDetails(score).label
+                    return (
+                      <div className="rounded-2xl border border-[#b7ff68]/20 bg-[#b7ff68]/5 px-4 py-3 sm:min-w-44 shrink-0">
+                        <div className="flex items-center justify-between gap-4 text-xs font-semibold text-[#b7ff68]">
+                          <span className="flex items-center gap-1.5">
+                            <Sparkles aria-hidden="true" className="size-4" /> Match IA
+                          </span>
+                          <span>{score}%</span>
+                        </div>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-[#b7ff68] transition-all duration-500"
+                            style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                          {badgeLabel}
+                        </p>
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {/* 3-item Info Grid */}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                    <div className="flex items-center gap-2 text-xs text-white/35">
+                      <BriefcaseBusiness className="size-4" />
+                      <span>Experiencia</span>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
-                      {currentEvaluation?.badgeLabel || 'Perfil Compatible'}
-                    </span>
+                    <p className="mt-2 text-sm font-semibold text-white/85">
+                      {currentCandidate.candidato?.bio
+                        ? currentCandidate.candidato.bio.slice(0, 32)
+                        : 'Perfil verificado'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                    <div className="flex items-center gap-2 text-xs text-white/35">
+                      <MapPin className="size-4" />
+                      <span>Ubicación</span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-white/85">
+                      {currentCandidate.candidato?.ubicacion || selectedJob?.zona || 'Uruguay'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                    <div className="flex items-center gap-2 text-xs text-white/35">
+                      <Gauge className="size-4" />
+                      <span>Modalidad</span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-white/85 capitalize">
+                      {selectedJob?.modalidad || 'Inmediata'}
+                    </p>
                   </div>
                 </div>
 
-                {/* AI Review / Insight Box */}
-                <div className="bg-gradient-to-br from-purple-50/80 via-indigo-50/50 to-white dark:from-purple-950/40 dark:via-indigo-950/30 dark:to-slate-900 p-4 rounded-2xl border border-purple-200/80 dark:border-purple-800/40 space-y-2.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-purple-800 dark:text-purple-300">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                    <span>Veredicto de la Inteligencia Artificial:</span>
+                {/* AI Insights Box */}
+                <section className="rounded-2xl border border-[#b7ff68]/20 bg-[#b7ff68]/[0.045] p-5">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[#d5ffa8]">
+                    <Sparkles aria-hidden="true" className="size-4 text-[#b7ff68]" />
+                    <span>Lectura rápida de IA</span>
                   </div>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                  <p className="mt-3 text-sm leading-6 text-white/70">
                     {currentEvaluation?.summary ||
-                      'El postulante cumple con los criterios solicitados para la vacante y muestra buena predisposición.'}
+                      'El postulante cuenta con disponibilidad y aptitudes afines a la vacante solicitada.'}
                   </p>
-
-                  {/* Strengths list */}
                   {currentEvaluation?.strengths && currentEvaluation.strengths.length > 0 && (
-                    <div className="pt-1 flex flex-wrap gap-1.5">
+                    <div className="mt-4 flex flex-wrap gap-2">
                       {currentEvaluation.strengths.map((str, idx) => (
                         <span
                           key={idx}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white dark:bg-slate-800/90 text-[11px] font-semibold text-slate-700 dark:text-slate-300 border border-purple-100 dark:border-purple-900/50 shadow-2xs"
+                          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#111827] px-3 py-2 text-xs font-medium text-white/70"
                         >
-                          <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
-                          <span>{str}</span>
+                          <span className="size-1.5 rounded-full bg-[#b7ff68]" />
+                          {str}
                         </span>
                       ))}
                     </div>
                   )}
-                </div>
+                </section>
 
-                {/* Candidate Cover Letter */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    Carta de Presentación del Candidato
-                  </label>
+                {/* Cover Letter */}
+                <section>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/35">
+                      Carta de presentación
+                    </p>
+                  </div>
                   {currentCandidate.mensaje ? (
-                    <div className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 italic leading-relaxed">
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-[#080b14]/50 px-4 py-4 text-sm text-white/80 leading-relaxed italic">
                       "{currentCandidate.mensaje}"
                     </div>
                   ) : (
-                    <div className="text-xs text-slate-400 italic p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                    <div className="mt-3 rounded-2xl border border-dashed border-white/10 bg-[#080b14]/50 px-4 py-4 text-sm italic text-white/35">
                       El candidato no incluyó un mensaje escrito en su postulación.
                     </div>
                   )}
-                </div>
+                </section>
 
                 {/* CV PDF Button */}
-                <div>
-                  {currentCandidate.candidato?.cv_url ? (
-                    <a
-                      href={currentCandidate.candidato.cv_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center justify-between py-3 px-4 rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-colors group"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        <span>Ver Currículum Vitae (PDF original)</span>
-                      </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-indigo-500 group-hover:translate-x-0.5 transition-transform" />
-                    </a>
-                  ) : (
-                    <div className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Sin CV adjunto en archivo</span>
-                    </div>
-                  )}
-                </div>
+                {currentCandidate.candidato?.cv_url ? (
+                  <a
+                    href={currentCandidate.candidato.cv_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm font-semibold text-white/80 transition hover:border-[#b7ff68]/40 hover:bg-white/[0.07] group cursor-pointer"
+                  >
+                    <span className="flex items-center gap-3">
+                      <FileText aria-hidden="true" className="size-5 text-[#b7ff68]" /> Ver CV del candidato (PDF)
+                    </span>
+                    <ExternalLink aria-hidden="true" className="size-4 text-white/40 group-hover:text-[#b7ff68] transition-colors" />
+                  </a>
+                ) : (
+                  <div className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-3.5 text-xs text-white/35">
+                    <FileText className="size-4 text-white/30" />
+                    <span>Sin CV adjunto en archivo</span>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {/* ============================================================== */}
-            {/* TINDER CONTROLS DOCK (VOLVER ATRÁS, DESCARTAR, SELECCIONAR)   */}
-            {/* ============================================================== */}
-            <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center gap-3">
-              <div className="flex items-center justify-center gap-4 sm:gap-6 w-full max-w-md">
-                {/* BOTÓN VOLVER ATRÁS (Arrow Left / Undo) */}
+              {/* Card Footer: Action Controls */}
+              <footer className="flex flex-col gap-3 border-t border-white/10 bg-[#0c111e] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <button
                   type="button"
                   onClick={handleUndo}
                   disabled={isAnimating || history.length === 0}
-                  className={`flex flex-col items-center justify-center gap-1 w-14 h-14 rounded-2xl border transition-all ${
+                  className={`order-2 flex items-center justify-center gap-2 text-xs font-semibold transition sm:order-1 ${
                     history.length === 0 || isAnimating
-                      ? 'border-slate-200 dark:border-slate-800 text-slate-300 dark:text-slate-700 cursor-not-allowed'
-                      : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:scale-105 active:scale-95 shadow-sm'
+                      ? 'text-white/20 cursor-not-allowed'
+                      : 'text-white/40 hover:text-white cursor-pointer'
                   }`}
-                  title="Volver al postulante anterior (Tecla Flecha Izquierda ←)"
                 >
-                  <RotateCcw className="w-5 h-5" />
-                  <span className="text-[9px] font-bold uppercase tracking-tight">Atrás</span>
+                  <RotateCcw aria-hidden="true" className="size-4" /> Deshacer
                 </button>
 
-                {/* BOTÓN DESCARTAR (Arrow Right / Cross) */}
-                <button
-                  type="button"
-                  onClick={handleDiscard}
-                  disabled={isAnimating}
-                  className="flex-1 py-3.5 px-4 rounded-2xl border-2 border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/20 hover:bg-rose-100 text-rose-700 dark:text-rose-400 font-bold text-sm shadow-sm transition-all hover:scale-102 active:scale-98 flex items-center justify-center gap-2 group"
-                  title="Descartar candidato (Tecla Flecha Derecha →)"
-                >
-                  <X className="w-5 h-5 text-rose-600 dark:text-rose-400 group-hover:rotate-90 transition-transform" />
-                  <span>Descartar</span>
-                  <ArrowRight className="w-4 h-4 opacity-50 group-hover:translate-x-1 transition-transform" />
-                </button>
+                <div className="order-1 grid w-full grid-cols-2 gap-3 sm:order-2 sm:w-auto sm:min-w-[360px]">
+                  {/* BOTÓN DESCARTAR (D / ArrowRight) */}
+                  <button
+                    type="button"
+                    onClick={handleDiscard}
+                    disabled={isAnimating}
+                    aria-label="Descartar candidato"
+                    className="group relative flex min-h-14 items-center justify-center gap-2 overflow-hidden rounded-2xl border border-[#ff6b8a]/35 bg-[#ff6b8a]/[0.06] text-[#ff9ab0] hover:-translate-y-0.5 hover:border-[#ff6b8a]/70 hover:bg-[#ff6b8a]/[0.12] px-4 text-sm font-bold transition duration-200 active:scale-[0.98] cursor-pointer"
+                  >
+                    <span className="grid size-8 place-items-center rounded-xl bg-[#ff6b8a]/10 group-hover:bg-[#ff6b8a]/20 transition">
+                      <X aria-hidden="true" className="size-4 text-[#ff9ab0]" />
+                    </span>
+                    <span>Descartar</span>
+                    <kbd className="hidden rounded-md border border-current/20 bg-black/10 px-1.5 py-0.5 text-[10px] font-semibold opacity-70 sm:inline">
+                      D
+                    </kbd>
+                  </button>
 
-                {/* BOTÓN SELECCIONAR (En vez de like) */}
-                <button
-                  type="button"
-                  onClick={handleSelect}
-                  disabled={isAnimating}
-                  className="flex-1 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-black text-sm shadow-lg shadow-emerald-200/50 dark:shadow-none transition-all hover:scale-102 active:scale-98 flex items-center justify-center gap-2 group ring-2 ring-emerald-500/20"
-                  title="Seleccionar candidato (Tecla Espacio o Enter)"
-                >
-                  <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
-                  <span className="tracking-wide">Seleccionar</span>
-                  <Check className="w-4 h-4 text-emerald-200 group-hover:scale-125 transition-transform" />
-                </button>
+                  {/* BOTÓN SELECCIONAR (S / Space) */}
+                  <button
+                    type="button"
+                    onClick={handleSelect}
+                    disabled={isAnimating}
+                    aria-label="Seleccionar candidato"
+                    className="group relative flex min-h-14 items-center justify-center gap-2 overflow-hidden rounded-2xl border border-[#b7ff68]/40 bg-[#b7ff68]/[0.06] text-[#d5ffa8] hover:-translate-y-0.5 hover:border-[#b7ff68]/75 hover:bg-[#b7ff68]/[0.12] px-4 text-sm font-bold transition duration-200 active:scale-[0.98] cursor-pointer"
+                  >
+                    <span className="grid size-8 place-items-center rounded-xl bg-[#b7ff68]/10 group-hover:bg-[#b7ff68]/20 transition">
+                      <Check aria-hidden="true" className="size-4 text-[#b7ff68]" />
+                    </span>
+                    <span>Seleccionar</span>
+                    <kbd className="hidden rounded-md border border-current/20 bg-black/10 px-1.5 py-0.5 text-[10px] font-semibold opacity-70 sm:inline">
+                      S
+                    </kbd>
+                  </button>
+                </div>
+              </footer>
+            </article>
+
+            {/* Right Column: Progress & Tips */}
+            <aside className="hidden lg:block">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/35">Tu progreso</p>
+                <div className="mt-5 text-4xl font-bold tracking-tight text-white">
+                  {currentIndex}
+                  <span className="text-xl text-white/25"> / {deck.length}</span>
+                </div>
+                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-[#b7ff68] transition-all duration-300"
+                    style={{ width: `${(currentIndex / Math.max(1, deck.length)) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-white/40">
+                  Toma una decisión para avanzar al siguiente perfil.
+                </p>
               </div>
-
-              {/* Keyboard shortcuts tip */}
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center hidden sm:block">
-                💡 <span className="font-semibold text-slate-600 dark:text-slate-400">Atajos de teclado:</span> [←] Volver atrás • [→] Descartar • [Enter / Espacio] Seleccionar
-              </p>
-            </div>
-          </div>
+              <div className="mt-6 flex items-center gap-2 text-xs text-white/35">
+                <Award className="size-4 text-[#b7ff68]" /> Atajo: usa S o D
+              </div>
+            </aside>
+          </section>
         )}
 
         {/* ============================================================== */}
-        {/* STEP 4: COMPLETED SCREEN                                       */}
+        {/* STEP 4: COMPLETED SUMMARY                                      */}
         {/* ============================================================== */}
         {step === 'completed' && (
-          <div className="flex flex-col h-full max-h-[92vh]">
-            <div className="p-6 sm:p-8 text-center space-y-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-b from-emerald-50/50 to-white dark:from-emerald-950/20 dark:to-slate-900">
-              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-200 dark:shadow-none animate-in zoom-in">
-                <CheckCircle2 className="w-9 h-9" />
-              </div>
+          <div className="flex-1 flex flex-col justify-center items-center py-6 sm:py-10 px-2 sm:px-4">
+            <div className="w-full max-w-2xl rounded-[28px] border border-white/10 bg-[#111827] shadow-[0_30px_100px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col relative">
+              <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-[#b7ff68]/10 blur-3xl pointer-events-none" />
 
-              <div className="space-y-1">
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-                  ¡Selección completada!
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  Revisaste a todos los postulantes para <strong className="text-slate-800 dark:text-slate-200">{selectedJob?.titulo}</strong> con la asistencia de la IA.
-                </p>
-              </div>
+              {/* Header */}
+              <div className="p-6 sm:p-8 text-center space-y-4 border-b border-white/10 relative">
+                <div className="size-16 rounded-3xl bg-[#b7ff68] text-[#111827] flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(183,255,104,0.3)] animate-in zoom-in">
+                  <Check className="size-8 stroke-[3]" />
+                </div>
 
-              {/* Stats Counters */}
-              <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto pt-2">
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-center">
-                  <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
-                    {selectedIds.size}
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b7ff68]">
+                    Proceso Finalizado
                   </p>
-                  <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight">
-                    Seleccionados
+                  <h3 className="text-2xl font-bold text-white tracking-tight">
+                    ¡Selección completada!
+                  </h3>
+                  <p className="text-xs text-white/50 max-w-md mx-auto">
+                    Revisaste a todos los postulantes para <strong className="text-white">{selectedJob?.titulo}</strong>.
                   </p>
                 </div>
-                <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center">
-                  <p className="text-2xl font-black text-slate-700 dark:text-slate-300">
-                    {rejectedIds.size}
-                  </p>
-                  <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">
-                    Descartados
-                  </p>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto pt-2">
+                  <div className="p-3 bg-[#b7ff68]/[0.08] rounded-2xl border border-[#b7ff68]/30 text-center">
+                    <p className="text-2xl font-bold text-[#b7ff68]">{selectedIds.size}</p>
+                    <p className="text-[10px] font-bold text-[#d5ffa8] uppercase tracking-wider">
+                      Seleccionados
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white/[0.03] rounded-2xl border border-white/10 text-center">
+                    <p className="text-2xl font-bold text-white/60">{rejectedIds.size}</p>
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+                      Descartados
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* List of Selected Candidates */}
-            <div className="p-5 sm:p-6 overflow-y-auto space-y-3 flex-1">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Candidatos Seleccionados ({selectedIds.size})
-                </h4>
-                {selectedIds.size > 0 && (
-                  <button
-                    onClick={handleCopySelectedEmails}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
-                  >
-                    {copiedEmails ? (
-                      <>
-                        <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-600">¡Emails copiados!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copiar correos</span>
-                      </>
-                    )}
-                  </button>
+              {/* Selected candidates list */}
+              <div className="p-5 sm:p-7 space-y-3 max-h-[45vh] overflow-y-auto">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/40">
+                    Candidatos seleccionados ({selectedIds.size})
+                  </p>
+                  {selectedIds.size > 0 && (
+                    <button
+                      onClick={handleCopySelectedEmails}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[#b7ff68] hover:underline cursor-pointer"
+                    >
+                      {copiedEmails ? (
+                        <>
+                          <CheckCheck className="size-3.5 text-[#b7ff68]" />
+                          <span>¡Emails copiados!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3.5" />
+                          <span>Copiar correos</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {selectedIds.size === 0 ? (
+                  <div className="p-8 text-center text-xs text-white/35 bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
+                    No seleccionaste ningún candidato en esta ronda.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {deck
+                      .filter((c) => selectedIds.has(c.id))
+                      .map((c) => {
+                        const ev = evaluations[c.id]
+                        return (
+                          <div
+                            key={c.id}
+                            className="p-3.5 rounded-2xl border border-[#b7ff68]/30 bg-[#b7ff68]/[0.05] flex items-center justify-between gap-3"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="size-9 rounded-xl bg-[#b7ff68] text-[#111827] font-bold text-sm flex items-center justify-center shrink-0">
+                                {getInitials(c.candidato?.nombre)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-xs text-white truncate">
+                                  {c.candidato?.nombre}
+                                </p>
+                                <p className="text-[11px] text-white/45 truncate">
+                                  {c.candidato?.email || 'Sin email'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {ev && (
+                                <span className="text-[11px] font-bold text-[#b7ff68] bg-[#b7ff68]/15 px-2.5 py-0.5 rounded-lg border border-[#b7ff68]/20">
+                                  {ev.matchScore}% Match
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
                 )}
               </div>
 
-              {selectedIds.size === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
-                  No seleccionaste ningún candidato en esta ronda.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {deck
-                    .filter((c) => selectedIds.has(c.id))
-                    .map((c) => {
-                      const ev = evaluations[c.id]
-                      return (
-                        <div
-                          key={c.id}
-                          className="p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/20 flex items-center justify-between gap-3"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white font-black text-sm flex items-center justify-center shrink-0">
-                              {c.candidato?.nombre ? c.candidato.nombre[0].toUpperCase() : 'C'}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                                {c.candidato?.nombre}
-                              </p>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                {c.candidato?.email || 'Sin email'}
-                              </p>
-                            </div>
-                          </div>
+              {/* Footer */}
+              <div className="p-5 sm:p-6 border-t border-white/10 bg-[#0c111e] flex flex-col sm:flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep('select_job')}
+                  className="w-full sm:w-auto text-xs font-semibold text-white/50 hover:text-white transition px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 cursor-pointer"
+                >
+                  Evaluar otro anuncio
+                </button>
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            {ev && (
-                              <span className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2 py-0.5 rounded-lg">
-                                {ev.matchScore}%
-                              </span>
-                            )}
-                            <Badge variant="success" size="sm">
-                              Seleccionado
-                            </Badge>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-            </div>
-
-            {/* Footer Actions */}
-            <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 flex flex-col sm:flex-row items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setStep('select_job')}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
-              >
-                Evaluar otro anuncio
-              </button>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 dark:shadow-none transition-colors"
-              >
-                Ver postulaciones en el panel
-              </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[#b7ff68] text-[#111827] hover:bg-[#c6ff85] font-bold text-xs shadow-[0_10px_25px_rgba(183,255,104,0.25)] transition cursor-pointer"
+                >
+                  Ver postulaciones en el panel
+                </button>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Bottom footer hint */}
+        <div className="flex items-center justify-center gap-2 pb-1 text-[11px] text-white/25">
+          <ArrowLeft aria-hidden="true" className="size-3" /> Navegar <span>·</span> <ArrowRight aria-hidden="true" className="size-3" /> Decidir con teclado
+        </div>
       </div>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }

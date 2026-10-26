@@ -305,6 +305,7 @@ export const MOCK_APPLICATIONS: ApplicationWithDetails[] = [
     estado: 'entrevista',
     created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
     job: {
+      id: 'job-1',
       titulo: 'Desarrollador Full Stack Senior (React + Node.js)',
       slug: 'desarrollador-full-stack-senior-react-node',
     },
@@ -324,6 +325,7 @@ export const MOCK_APPLICATIONS: ApplicationWithDetails[] = [
     estado: 'pendiente',
     created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     job: {
+      id: 'job-3',
       titulo: 'Diseñador UI/UX & Product Designer',
       slug: 'disenador-ui-ux-product-designer',
     },

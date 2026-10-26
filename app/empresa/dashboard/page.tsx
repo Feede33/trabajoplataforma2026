@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Briefcase,
   Users,
@@ -26,6 +27,7 @@ import {
   toggleJobState,
   deleteJob,
   updateApplicationStatus,
+  selectCandidateAndRejectOthers,
   markApplicationsAsSeen
 } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails, JobEstado, ApplicationEstado } from '@/lib/supabase/database.types'
@@ -41,6 +43,7 @@ import { LiquidMetalButton } from '@/components/ui/liquid-metal-button'
 import { useTheme } from 'next-themes'
 
 export default function EmpresaDashboard() {
+  const router = useRouter()
   const { profile, isLoading } = useAuth()
   const [jobs, setJobs] = useState<JobWithEmpresa[]>([])
   const [applications, setApplications] = useState<ApplicationWithDetails[]>([])
@@ -53,6 +56,14 @@ export default function EmpresaDashboard() {
   const [selectedModalApp, setSelectedModalApp] = useState<ApplicationWithDetails | null>(null)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
   const [isAiSelectorOpen, setIsAiSelectorOpen] = useState(false)
+
+  const handleOpenAiSelector = () => {
+    if (selectedJobFilter && selectedJobFilter !== 'todos') {
+      router.push(`/empresa/seleccion-ia?jobId=${selectedJobFilter}`)
+    } else {
+      router.push('/empresa/seleccion-ia')
+    }
+  }
 
   const { resolvedTheme } = useTheme()
   const [isMounted, setIsMounted] = useState(false)
@@ -102,6 +113,32 @@ export default function EmpresaDashboard() {
   }
 
   const handleStatusChange = async (appId: string, newStatus: ApplicationEstado) => {
+    // Si la empresa seleccionó a un candidato: "Si la empresa seleccionó a otra persona te descartó"
+    if (newStatus === 'seleccionado') {
+      const targetApp = applications.find((a) => a.id === appId)
+      const jobId = targetApp?.job_id || targetApp?.job?.id || ''
+      if (jobId) {
+        const rejectedIds = await selectCandidateAndRejectOthers(appId, jobId)
+        const rejectedSet = new Set(rejectedIds)
+        setApplications((prev) =>
+          prev.map((a) => {
+            if (a.id === appId) return { ...a, estado: 'seleccionado' }
+            const matchesJob = a.job_id === jobId || a.job?.id === jobId || (targetApp?.job?.slug && a.job?.slug === targetApp.job.slug)
+            if (rejectedSet.has(a.id) || (matchesJob && a.id !== appId)) {
+              return { ...a, estado: 'rechazado' }
+            }
+            return a
+          })
+        )
+        if (selectedModalApp?.id === appId) {
+          setSelectedModalApp((prev) => (prev ? { ...prev, estado: 'seleccionado' } : null))
+        } else if (selectedModalApp && (selectedModalApp.job_id === jobId || selectedModalApp.job?.id === jobId)) {
+          setSelectedModalApp((prev) => (prev ? { ...prev, estado: 'rechazado' } : null))
+        }
+        return
+      }
+    }
+
     await updateApplicationStatus(appId, newStatus)
     setApplications((prev) =>
       prev.map((a) => (a.id === appId ? { ...a, estado: newStatus } : a))
@@ -322,7 +359,7 @@ export default function EmpresaDashboard() {
             {/* Botón Seleccionar con IA: LiquidMetalButton en modo claro, ShinyButton en modo oscuro */}
             {!isMounted || resolvedTheme === 'dark' ? (
               <ShinyButton
-                onClick={() => setIsAiSelectorOpen(true)}
+                onClick={handleOpenAiSelector}
                 size="sm"
                 className="shrink-0 shadow-md shadow-indigo-500/20"
                 title="Abrir asistente de selección rápida con IA estilo Tinder"
@@ -335,7 +372,7 @@ export default function EmpresaDashboard() {
                 label="Seleccionar con IA"
                 viewMode="both"
                 height={38}
-                onClick={() => setIsAiSelectorOpen(true)}
+                onClick={handleOpenAiSelector}
                 title="Abrir asistente de selección rápida con IA estilo Tinder"
                 className="shrink-0"
               />

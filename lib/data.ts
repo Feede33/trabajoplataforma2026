@@ -467,6 +467,7 @@ export async function submitApplication(data: {
     estado: 'pendiente',
     created_at: new Date().toISOString(),
     job: {
+      id: data.job_id,
       titulo: data.job_titulo,
       slug: data.job_slug,
     },
@@ -540,6 +541,53 @@ export async function updateApplicationStatus(appId: string, nuevoEstado: Applic
   const updated = existing.map((a) => (a.id === appId ? { ...a, estado: nuevoEstado } : a))
   saveStoredApplications(updated)
   return true
+}
+
+export async function selectCandidateAndRejectOthers(selectedAppId: string, jobId: string): Promise<string[]> {
+  const rejectedIds: string[] = []
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = createClient()
+      // 1. Marcar como seleccionado al candidato elegido
+      if (isValidUUID(selectedAppId)) {
+        await supabase.from('applications').update({ estado: 'seleccionado' }).eq('id', selectedAppId)
+      }
+      // 2. Descartar automáticamente a los demás postulantes del mismo empleo: "Si la empresa seleccionó a otra persona te descartó"
+      if (isValidUUID(jobId)) {
+        const { data: others } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('job_id', jobId)
+          .neq('id', selectedAppId)
+
+        if (others && others.length > 0) {
+          const ids = others.map((o) => o.id)
+          await supabase.from('applications').update({ estado: 'rechazado' }).in('id', ids)
+          rejectedIds.push(...ids)
+        }
+      }
+    } catch (err) {
+      console.warn('Error en selectCandidateAndRejectOthers Supabase:', err)
+    }
+  }
+
+  // Actualizar también en el almacenamiento local
+  const existing = getStoredApplications()
+  const updated = existing.map((a) => {
+    if (a.id === selectedAppId) {
+      return { ...a, estado: 'seleccionado' as ApplicationEstado }
+    }
+    const matchesJob = a.job_id === jobId || (a.job && (a.job.id === jobId || a.job.slug === jobId))
+    if (matchesJob && a.id !== selectedAppId) {
+      rejectedIds.push(a.id)
+      return { ...a, estado: 'rechazado' as ApplicationEstado }
+    }
+    return a
+  })
+  saveStoredApplications(updated)
+
+  return Array.from(new Set(rejectedIds))
 }
 
 export async function markApplicationsAsSeen(appIds: string[]): Promise<boolean> {

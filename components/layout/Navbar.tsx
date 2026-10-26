@@ -89,10 +89,10 @@ export function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex flex-1 items-center justify-center gap-0.5 xl:gap-1 px-2 min-w-0">
+          <nav className="hidden lg:flex flex-1 items-center justify-center gap-1 xl:gap-2 px-2 min-w-0">
             <Link
               href="/empleos"
-              className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === '/empleos'
                   ? 'text-indigo-600 bg-indigo-50 font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -103,7 +103,7 @@ export function Navbar() {
 
             <Link
               href="/empleos-informales"
-              className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                 pathname === '/empleos-informales'
                   ? 'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 font-semibold border border-amber-200 dark:border-amber-500/30'
                   : 'text-slate-600 dark:text-slate-300 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-500/15'
@@ -119,7 +119,7 @@ export function Navbar() {
             {!isEmpresa && (
               <Link
                 href="/ia-chat"
-                className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                   pathname === '/ia-chat'
                     ? 'text-indigo-600 bg-indigo-50 font-semibold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -132,7 +132,7 @@ export function Navbar() {
 
             <Link
               href="/planes"
-              className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === '/planes'
                   ? 'text-indigo-600 bg-indigo-50 font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -140,47 +140,6 @@ export function Navbar() {
             >
               Planes
             </Link>
-
-            {isCandidato && (
-              <>
-                <Link
-                  href="/candidato/guardados"
-                  className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                    pathname === '/candidato/guardados'
-                      ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <Bookmark className="w-3.5 h-3.5 text-blue-500 fill-blue-500 shrink-0" />
-                  <span>Guardados</span>
-                  {savedJobs.length > 0 && (
-                    <span className="px-1.5 py-0.2 text-[10px] bg-blue-100 text-blue-700 font-bold rounded-full">
-                      {savedJobs.length}
-                    </span>
-                  )}
-                </Link>
-                <Link
-                  href="/candidato/postulaciones"
-                  className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
-                    pathname === '/candidato/postulaciones'
-                      ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Mis Postulaciones
-                </Link>
-                <Link
-                  href="/candidato/perfil"
-                  className={`px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
-                    pathname === '/candidato/perfil'
-                      ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Mi Perfil & CV
-                </Link>
-              </>
-            )}
           </nav>
 
           {/* Action Buttons & User Menu */}
@@ -211,94 +170,100 @@ export function Navbar() {
 
                 {/* Dropdown */}
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                    <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-xs text-slate-400 uppercase tracking-wider">Conectado como</p>
-                      <p className="text-sm font-semibold text-slate-900 truncate">{profile.nombre}</p>
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-100 dark:border-slate-800/80 z-50 animate-in fade-in duration-100 overflow-hidden">
+                    <div className="px-4 py-3.5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-850/40">
+                      <p className="text-[10px] text-slate-400 dark:text-slate-400 uppercase tracking-wider font-bold">Conectado como</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white truncate mt-0.5">{profile.nombre}</p>
                       {isAdmin ? (
-                        <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-extrabold uppercase">
+                        <span className="inline-block mt-1.5 px-2.5 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 font-extrabold uppercase tracking-wide">
                           Administrador
                         </span>
                       ) : (
-                        <span className="inline-block mt-0.5 px-2 py-0.5 text-[10px] rounded-full bg-indigo-50 text-indigo-700 font-medium capitalize">
+                        <span className="inline-block mt-1.5 px-2.5 py-0.5 text-[10px] rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 font-semibold capitalize">
                           {userRoleLabel}
                         </span>
                       )}
                     </div>
 
-                    {isEmpresa ? (
-                      <>
-                        <Link
-                          href="/empresa/dashboard"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <LayoutDashboard className="w-4 h-4 text-slate-400" />
-                          Panel de Control
-                        </Link>
-                        <Link
-                          href="/empresa/publicar"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <PlusCircle className="w-4 h-4 text-indigo-600" />
-                          Publicar Empleo
-                        </Link>
-                      </>
-                    ) : (
-                      <>
-                        <Link
-                          href="/candidato/dashboard"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <LayoutDashboard className="w-4 h-4 text-slate-400" />
-                          Mi Dashboard
-                        </Link>
-                        <Link
-                          href="/candidato/perfil"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <FileText className="w-4 h-4 text-slate-400" />
-                          Mi Perfil y CV
-                        </Link>
-                        <Link
-                          href="/candidato/guardados"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Bookmark className="w-4 h-4 text-blue-500 fill-blue-500" />
-                            <span>Empleos Guardados</span>
-                          </div>
-                          {savedJobs.length > 0 && (
-                            <span className="px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-700 font-bold rounded-full">
-                              {savedJobs.length}
-                            </span>
-                          )}
-                        </Link>
-                        <Link
-                          href="/candidato/postulaciones"
-                          onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                        >
-                          <Briefcase className="w-4 h-4 text-slate-400" />
-                          Mis Postulaciones
-                        </Link>
-                      </>
-                    )}
+                    <div className="p-1.5 flex flex-col gap-0.5">
+                      {isEmpresa ? (
+                        <>
+                          <Link
+                            href="/empresa/dashboard"
+                            onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 transition-colors duration-150"
+                          >
+                            <LayoutDashboard className="w-4 h-4 text-slate-400 dark:text-slate-400 shrink-0" />
+                            <span>Panel de Control</span>
+                          </Link>
+                          <Link
+                            href="/empresa/publicar"
+                            onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 transition-colors duration-150"
+                          >
+                            <PlusCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                            <span>Publicar Empleo</span>
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link
+                            href="/candidato/dashboard"
+                            onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 transition-colors duration-150"
+                          >
+                            <LayoutDashboard className="w-4 h-4 text-slate-400 dark:text-slate-400 shrink-0" />
+                            <span>Mi Dashboard</span>
+                          </Link>
+                          <Link
+                            href="/candidato/perfil"
+                            onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 transition-colors duration-150"
+                          >
+                            <FileText className="w-4 h-4 text-slate-400 dark:text-slate-400 shrink-0" />
+                            <span>Mi Perfil y CV</span>
+                          </Link>
+                          <Link
+                            href="/candidato/guardados"
+                            onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 transition-colors duration-150 group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Bookmark className="w-4 h-4 text-blue-500 fill-blue-500 shrink-0" />
+                              <span className="truncate">Empleos Guardados</span>
+                            </div>
+                            {savedJobs.length > 0 && (
+                              <span
+                                className={`${
+                                  savedJobs.length > 9 ? 'min-w-[22px] h-[22px] px-1.5' : 'w-[22px] h-[22px]'
+                                } aspect-square rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-400/30 flex items-center justify-center text-[11px] font-extrabold leading-none shrink-0 tabular-nums ml-2`}
+                              >
+                                {savedJobs.length}
+                              </span>
+                            )}
+                          </Link>
+                          <Link
+                            href="/candidato/postulaciones"
+                            onClick={() => setDropdownOpen(false)}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-slate-800/70 transition-colors duration-150"
+                          >
+                            <Briefcase className="w-4 h-4 text-slate-400 dark:text-slate-400 shrink-0" />
+                            <span>Mis Postulaciones</span>
+                          </Link>
+                        </>
+                      )}
+                    </div>
 
-                    <div className="border-t border-slate-100 my-1 pt-1">
+                    <div className="p-1.5 border-t border-slate-100 dark:border-slate-800/80">
                       <button
                         onClick={async () => {
                           setDropdownOpen(false)
                           await logout()
                         }}
-                        className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors text-left font-medium"
+                        className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors duration-150 text-left"
                       >
-                        <LogOut className="w-4 h-4" />
-                        Cerrar Sesión
+                        <LogOut className="w-4 h-4 shrink-0" />
+                        <span>Cerrar Sesión</span>
                       </button>
                     </div>
                   </div>
@@ -397,42 +362,6 @@ export function Navbar() {
               <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               Planes
             </Link>
-
-            {isCandidato && (
-              <>
-                <Link
-                  href="/candidato/guardados"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <div className="flex items-center gap-3">
-                    <Bookmark className="w-4 h-4 text-blue-500 fill-blue-500" />
-                    <span>Empleos Guardados</span>
-                  </div>
-                  {savedJobs.length > 0 && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-bold rounded-full">
-                      {savedJobs.length}
-                    </span>
-                  )}
-                </Link>
-                <Link
-                  href="/candidato/postulaciones"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <Briefcase className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  Mis Postulaciones
-                </Link>
-                <Link
-                  href="/candidato/perfil"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                >
-                  <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  Mi Perfil y CV
-                </Link>
-              </>
-            )}
           </div>
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
@@ -443,6 +372,16 @@ export function Navbar() {
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">{profile.nombre}</p>
                   <p className="text-xs text-indigo-600 dark:text-indigo-400 capitalize">{userRoleLabel}</p>
                 </div>
+                {isCandidato && (
+                  <Link
+                    href="/candidato/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Mi Dashboard
+                  </Link>
+                )}
                 {isEmpresa && (
                   <Link
                     href="/empresa/dashboard"

@@ -11,11 +11,12 @@ import {
   MailOpen,
   Sparkles,
   CheckCircle2,
-  Clock
+  Clock,
+  X
 } from 'lucide-react'
 import { ApplicationWithDetails, ApplicationEstado } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, getAiBadgeDetails } from '@/lib/utils'
 import { CandidateCardSkeleton } from './CandidateCardSkeleton'
 
 export { CandidateCardSkeleton }
@@ -37,6 +38,7 @@ export function CandidateCard({
   const isUnopened = estado === 'pendiente'
   const [isOpening, setIsOpening] = useState(false)
 
+  // 1. "Si la empresa abrió la postulación por deducción estará en Visto"
   const handleOpenAndMarkSeen = async () => {
     setIsOpening(true)
     try {
@@ -46,15 +48,20 @@ export function CandidateCard({
     }
   }
 
+  // 2. "Si la empresa no te descartó ni seleccionó estarás en En proceso"
   const handleOpenCv = async () => {
     if (isUnopened) {
       await onStatusChange(id, 'visto')
+    } else if (estado === 'visto') {
+      await onStatusChange(id, 'entrevista')
     }
   }
 
   const handleOpenModal = () => {
     if (isUnopened) {
       onStatusChange(id, 'visto')
+    } else if (estado === 'visto') {
+      onStatusChange(id, 'entrevista')
     }
     onOpenModal(application)
   }
@@ -72,7 +79,14 @@ export function CandidateCard({
         return (
           <Badge variant="primary" size="sm" className="flex items-center gap-1 font-bold">
             <Eye className="w-3 h-3 text-sky-600 dark:text-sky-400" />
-            <span>CV Visto</span>
+            <span>Visto</span>
+          </Badge>
+        )
+      case 'entrevista':
+        return (
+          <Badge variant="purple" size="sm" className="flex items-center gap-1 font-bold">
+            <Clock className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+            <span>En Proceso</span>
           </Badge>
         )
       case 'seleccionado':
@@ -82,17 +96,11 @@ export function CandidateCard({
             <span>Seleccionado</span>
           </Badge>
         )
-      case 'entrevista':
-        return (
-          <Badge variant="success" size="sm" className="flex items-center gap-1 font-bold">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            <span>En Proceso</span>
-          </Badge>
-        )
       case 'rechazado':
         return (
-          <Badge variant="danger" size="sm" className="font-bold">
-            Descartado
+          <Badge variant="danger" size="sm" className="font-bold flex items-center gap-1">
+            <X className="w-3 h-3" />
+            <span>Descartado</span>
           </Badge>
         )
     }
@@ -127,18 +135,18 @@ export function CandidateCard({
                 {candidato?.nombre || 'Candidato'}
               </h3>
 
-              {!isUnopened ? (
+              {candidato?.email ? (
                 <a
-                  href={`mailto:${candidato?.email}`}
-                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate mt-0.5"
+                  href={`mailto:${candidato.email}`}
+                  className="text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 flex items-center gap-1 truncate mt-0.5 transition-colors"
                 >
-                  <Mail className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{candidato?.email || 'Sin correo'}</span>
+                  <Mail className="w-3 h-3 shrink-0 text-slate-400" />
+                  <span className="truncate">{candidato.email}</span>
                 </a>
               ) : (
-                <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 mt-0.5">
-                  <Mail className="w-3 h-3" />
-                  Nueva postulación recibida
+                <span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                  <Mail className="w-3 h-3 shrink-0" />
+                  <span>Sin correo registrado</span>
                 </span>
               )}
             </div>
@@ -174,6 +182,22 @@ export function CandidateCard({
             <ExternalLink className="w-3 h-3 shrink-0 text-slate-400" />
           </Link>
         </div>
+
+        {/* AI Score Pill if pre-evaluated */}
+        {typeof application.ai_match_score === 'number' && (() => {
+          const badgeInfo = getAiBadgeDetails(application.ai_match_score)
+          return (
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-purple-500/10 to-indigo-500/10 border border-emerald-200/80 dark:border-emerald-800/60 text-xs">
+              <div className={`flex items-center gap-1.5 font-bold ${badgeInfo.scoreColor}`}>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{application.ai_match_score}% Match IA</span>
+              </div>
+              <span className={`text-[10px] font-extrabold uppercase tracking-wide px-2.5 py-0.5 rounded-full border shadow-2xs ${badgeInfo.badgeClass}`}>
+                {badgeInfo.label}
+              </span>
+            </div>
+          )
+        })()}
 
         {/* Candidate Content: Blur card if unopened */}
         {isUnopened ? (
@@ -255,37 +279,19 @@ export function CandidateCard({
         )}
       </div>
 
-      {/* Footer: Date, Modal Trigger & Status Selector */}
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {formatRelativeTime(created_at)}
-          </span>
-          <button
-            onClick={handleOpenModal}
-            className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold flex items-center gap-1"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>Ver Ficha Completa</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 pt-1">
-          <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Estado:</span>
-          <select
-            value={estado}
-            onChange={(e) => onStatusChange(id, e.target.value as ApplicationEstado)}
-            className="flex-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-          >
-            {/* Si ya fue abierta, no se puede volver atrás a 'pendiente' */}
-            {isUnopened && <option value="pendiente">Nueva (Sin abrir)</option>}
-            <option value="visto">CV Visto</option>
-            <option value="seleccionado">Seleccionado</option>
-            <option value="entrevista">En Proceso / Entrevista</option>
-            <option value="rechazado">Descartado</option>
-          </select>
-        </div>
+      {/* Footer: Date & Modal Trigger */}
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <span className="flex items-center gap-1">
+          <Clock className="w-3 h-3" />
+          {formatRelativeTime(created_at)}
+        </span>
+        <button
+          onClick={handleOpenModal}
+          className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold flex items-center gap-1"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          <span>Ver Ficha Completa</span>
+        </button>
       </div>
     </div>
   )

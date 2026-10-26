@@ -6,16 +6,18 @@ import {
   Briefcase,
   ExternalLink,
   Clock,
+  Calendar,
   ArrowLeft,
   Search,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Info
 } from 'lucide-react'
 import { fetchApplicationsForCandidate } from '@/lib/data'
 import { ApplicationWithDetails, ApplicationEstado } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
 import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 
 export default function CandidatoPostulacionesPage() {
   const { profile, isLoading } = useAuth()
@@ -48,11 +50,46 @@ export default function CandidatoPostulacionesPage() {
   const getStatusBadge = (estado: ApplicationEstado) => {
     const map = {
       pendiente: { variant: 'warning', label: 'Pendiente de Revisión' },
-      visto: { variant: 'primary', label: 'CV Visto por la Empresa' },
+      visto: { variant: 'primary', label: 'Visto por la Empresa' },
       seleccionado: { variant: 'success', label: '¡Seleccionado!' },
-      entrevista: { variant: 'success', label: 'Convocado a Entrevista' },
-      rechazado: { variant: 'danger', label: 'Proceso Finalizado' },
-    }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }
+      entrevista: { variant: 'purple', label: 'En Proceso' },
+      rechazado: { variant: 'danger', label: 'No seleccionado' },
+    }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger' | 'purple'; label: string }
+
+    if (estado === 'seleccionado') {
+      return (
+        <div className="relative group inline-block">
+          <Badge
+            variant="success"
+            size="sm"
+            className="cursor-pointer font-semibold gap-1.5 shadow-sm hover:ring-2 hover:ring-emerald-400/40 transition-all select-none"
+            title="Si la empresa te seleccionó, en estos días deberías de estar recibiendo novedades."
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>¡Seleccionado!</span>
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold">
+              <Info className="w-2.5 h-2.5" />
+              Aviso
+            </span>
+          </Badge>
+
+          {/* Tooltip flotante al hacer hover */}
+          <div className="absolute right-0 bottom-full mb-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none w-72 max-w-[85vw] p-3 rounded-2xl bg-slate-900 text-white shadow-xl border border-slate-700/80 text-xs">
+            <div className="flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-bold text-emerald-400 text-xs">Aviso importante</p>
+                <p className="text-slate-200 text-[11px] leading-relaxed">
+                  Si la empresa te seleccionó, en estos días deberías de estar recibiendo novedades.
+                </p>
+              </div>
+            </div>
+            {/* Flecha del tooltip */}
+            <div className="absolute right-6 -bottom-1.5 w-3 h-3 bg-slate-900 border-r border-b border-slate-700/80 rotate-45" />
+          </div>
+        </div>
+      )
+    }
 
     return <Badge variant={map.variant} size="sm">{map.label}</Badge>
   }
@@ -60,15 +97,15 @@ export default function CandidatoPostulacionesPage() {
   const getStatusDescription = (estado: ApplicationEstado) => {
     switch (estado) {
       case 'pendiente':
-        return 'Tu postulación fue enviada correctamente y está esperando ser revisada por el reclutador.'
+        return 'Tu postulación fue recibida y está esperando ser abierta por la empresa.'
       case 'visto':
-        return 'La empresa ya abrió y revisó tu perfil y currículum vitae.'
-      case 'seleccionado':
-        return '¡Felicitaciones! La empresa preseleccionó tu perfil con IA para avanzar en el proceso.'
+        return 'La empresa ya abrió tu postulación y revisó tu presentación.'
       case 'entrevista':
-        return '¡Excelente! La empresa seleccionó tu perfil para coordinar una entrevista.'
+        return 'La empresa no te descartó y tu postulación se encuentra en evaluación activa.'
+      case 'seleccionado':
+        return '¡Felicitaciones! La empresa te seleccionó para cubrir esta vacante laboral.'
       case 'rechazado':
-        return 'La empresa optó por otros perfiles para esta vacante.'
+        return 'La empresa optó por seleccionar a otro postulante o descartó tu postulación.'
       default:
         return ''
     }
@@ -76,9 +113,33 @@ export default function CandidatoPostulacionesPage() {
 
   if (isLoading || loadingApps) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-16 space-y-4">
-        <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
-        <div className="h-48 bg-slate-200 rounded-3xl animate-pulse" />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+        <div className="h-4 w-32 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="h-3 w-28 bg-indigo-100 dark:bg-indigo-950/60 rounded animate-pulse" />
+            <div className="h-8 w-60 bg-slate-200 dark:bg-slate-800 rounded-xl animate-pulse" />
+            <div className="h-3.5 w-72 bg-slate-100 dark:bg-slate-800/60 rounded animate-pulse" />
+          </div>
+          <div className="h-9 w-64 bg-slate-100 dark:bg-slate-800 rounded-2xl animate-pulse" />
+        </div>
+        <div className="space-y-4 pt-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-sm space-y-4"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="h-5 w-52 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                  <div className="h-3 w-36 bg-slate-100 dark:bg-slate-800/60 rounded animate-pulse" />
+                </div>
+                <div className="h-6 w-28 bg-slate-200 dark:bg-slate-800 rounded-full animate-pulse" />
+              </div>
+              <div className="h-12 w-full bg-slate-50 dark:bg-slate-800/40 rounded-2xl animate-pulse" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -139,17 +200,24 @@ export default function CandidatoPostulacionesPage() {
 
         {/* Filter pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto max-w-full scrollbar-none bg-white p-1.5 rounded-2xl border border-slate-200">
-          {['todas', 'pendiente', 'visto', 'entrevista', 'rechazado'].map((status) => (
+          {[
+            { id: 'todas', label: 'Todas' },
+            { id: 'seleccionado', label: 'Seleccionados' },
+            { id: 'pendiente', label: 'Nuevas' },
+            { id: 'visto', label: 'Visto' },
+            { id: 'entrevista', label: 'En Proceso' },
+            { id: 'rechazado', label: 'No seleccionados' },
+          ].map((item) => (
             <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all shrink-0 ${
-                filter === status
+              key={item.id}
+              onClick={() => setFilter(item.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${
+                filter === item.id
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              {status}
+              {item.label}
             </button>
           ))}
         </div>
@@ -188,10 +256,26 @@ export default function CandidatoPostulacionesPage() {
                     {app.job?.titulo}
                     <ExternalLink className="w-4 h-4 text-slate-400" />
                   </Link>
-                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    Postulado {formatRelativeTime(app.created_at)}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 mt-1.5">
+                    {app.created_at ? (
+                      <>
+                        <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                          <span>Postulado el <strong className="font-semibold text-slate-800 dark:text-slate-200">{formatDateTime(app.created_at)}</strong></span>
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
+                        <span className="flex items-center gap-1 text-slate-400">
+                          <Clock className="w-3 h-3 shrink-0" />
+                          {formatRelativeTime(app.created_at)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="flex items-center gap-1 text-slate-400">
+                        <Clock className="w-3.5 h-3.5" />
+                        Fecha no disponible
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="shrink-0">{getStatusBadge(app.estado)}</div>
@@ -202,7 +286,36 @@ export default function CandidatoPostulacionesPage() {
                 <span className="font-semibold text-slate-800 block mb-0.5">
                   Estado actual del proceso:
                 </span>
-                {getStatusDescription(app.estado)}
+                <p>{getStatusDescription(app.estado)}</p>
+
+                {app.estado === 'seleccionado' && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center gap-2">
+                    <div
+                      className="relative group/aviso inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 font-semibold cursor-help text-[11px] hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50 transition-all select-none"
+                      tabIndex={0}
+                    >
+                      <Info className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Aviso sobre tu postulación</span>
+                      <span className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 underline decoration-dotted">
+                        (pasá el mouse)
+                      </span>
+
+                      {/* Tooltip con aviso al hacer hover */}
+                      <div className="absolute left-0 bottom-full mb-2 z-50 opacity-0 invisible group-hover/aviso:opacity-100 group-hover/aviso:visible group-focus-within/aviso:opacity-100 group-focus-within/aviso:visible transition-all duration-200 pointer-events-none w-72 max-w-[85vw] p-3 rounded-2xl bg-slate-900 text-white shadow-xl border border-slate-700/80 text-xs">
+                        <div className="flex items-start gap-2.5">
+                          <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-emerald-400 text-xs">Próximos pasos</p>
+                            <p className="text-slate-200 text-[11px] leading-relaxed">
+                              Si la empresa te seleccionó, en estos días deberías de estar recibiendo novedades.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="absolute left-6 -bottom-1.5 w-3 h-3 bg-slate-900 border-r border-b border-slate-700/80 rotate-45" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {app.mensaje && (

@@ -14,6 +14,7 @@ export interface Profile {
   bio: string | null
   ubicacion: string | null
   cv_url: string | null
+  cv_text?: string | null
   website: string | null
   created_at: string
   updated_at: string
@@ -42,6 +43,11 @@ export interface Application {
   candidato_id: string
   mensaje: string | null
   estado: ApplicationEstado
+  ai_match_score?: number | null
+  ai_badge_label?: string | null
+  ai_summary?: string | null
+  ai_strengths?: string[] | null
+  ai_evaluated_at?: string | null
   created_at: string
 }
 
@@ -83,7 +89,7 @@ export interface InformalJob {
 }
 
 export type ApplicationWithDetails = Application & {
-  job: Pick<Job, 'titulo' | 'slug'>
+  job: Pick<Job, 'titulo' | 'slug'> & { id?: string }
   candidato: Pick<Profile, 'nombre' | 'email' | 'cv_url' | 'bio' | 'ubicacion'>
 }
 

@@ -10,15 +10,17 @@ import {
   ArrowRight,
   ExternalLink,
   Lock,
-  Bookmark
+  Bookmark,
+  Info
 } from 'lucide-react'
 import { fetchApplicationsForCandidate, fetchJobs } from '@/lib/data'
 import { ApplicationWithDetails, JobWithEmpresa } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
 import { useSavedJobs } from '@/lib/context/SavedJobsContext'
 import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 import { JobCard } from '@/components/jobs/JobCard'
+import { CandidatoDashboardSkeleton } from '@/components/candidato/CandidatoDashboardSkeleton'
 
 export default function CandidatoDashboard() {
   const { profile, isLoading } = useAuth()
@@ -51,16 +53,7 @@ export default function CandidatoDashboard() {
   const entrevistas = applications.filter((a) => a.estado === 'entrevista').length
 
   if (isLoading || loadingData) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-16 space-y-6">
-        <div className="h-8 w-48 bg-slate-200 rounded animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
-          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
-          <div className="h-32 bg-slate-200 rounded-3xl animate-pulse" />
-        </div>
-      </div>
-    )
+    return <CandidatoDashboardSkeleton />
   }
 
   if (!profile) {
@@ -218,27 +211,66 @@ export default function CandidatoDashboard() {
                     {app.job?.titulo}
                     <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
                   </Link>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Postulado {formatRelativeTime(app.created_at)}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                    {app.created_at ? (
+                      <>
+                        <span>Postulado el <strong className="font-semibold text-slate-600 dark:text-slate-300">{formatDateTime(app.created_at)}</strong></span>
+                        <span className="text-slate-300 dark:text-slate-600">•</span>
+                        <span>{formatRelativeTime(app.created_at)}</span>
+                      </>
+                    ) : (
+                      <span>Fecha no disponible</span>
+                    )}
+                  </div>
                 </div>
 
                 <div>
-                  <Badge
-                    variant={
-                      app.estado === 'entrevista'
-                        ? 'success'
-                        : app.estado === 'visto'
-                        ? 'primary'
-                        : app.estado === 'rechazado'
-                        ? 'danger'
-                        : 'warning'
-                    }
-                    size="sm"
-                    className="capitalize font-semibold"
-                  >
-                    {app.estado === 'entrevista' ? 'En Entrevista' : app.estado}
-                  </Badge>
+                  {app.estado === 'seleccionado' ? (
+                    <div className="relative group inline-block">
+                      <Badge
+                        variant="success"
+                        size="sm"
+                        className="cursor-pointer font-semibold gap-1.5 shadow-sm hover:ring-2 hover:ring-emerald-400/40 transition-all select-none"
+                        title="Si la empresa te seleccionó, en estos días deberías de estar recibiendo novedades."
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>¡Seleccionado!</span>
+                        <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded-full bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold">
+                          <Info className="w-2.5 h-2.5" />
+                          Aviso
+                        </span>
+                      </Badge>
+
+                      <div className="absolute right-0 bottom-full mb-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none w-72 max-w-[85vw] p-3 rounded-2xl bg-slate-900 text-white shadow-xl border border-slate-700/80 text-xs">
+                        <div className="flex items-start gap-2.5">
+                          <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-emerald-400 text-xs">Aviso importante</p>
+                            <p className="text-slate-200 text-[11px] leading-relaxed">
+                              Si la empresa te seleccionó, en estos días deberías de estar recibiendo novedades.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="absolute right-6 -bottom-1.5 w-3 h-3 bg-slate-900 border-r border-b border-slate-700/80 rotate-45" />
+                      </div>
+                    </div>
+                  ) : (
+                    <Badge
+                      variant={
+                        app.estado === 'entrevista'
+                          ? 'success'
+                          : app.estado === 'visto'
+                          ? 'primary'
+                          : app.estado === 'rechazado'
+                          ? 'danger'
+                          : 'warning'
+                      }
+                      size="sm"
+                      className="capitalize font-semibold"
+                    >
+                      {app.estado === 'entrevista' ? 'En Entrevista' : app.estado}
+                    </Badge>
+                  )}
                 </div>
               </div>
             ))}

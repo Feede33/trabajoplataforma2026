@@ -72,6 +72,44 @@ export function formatRelativeTime(dateString: string): string {
   return years === 1 ? 'Hace 1 año' : `Hace ${years} años`
 }
 
+export function formatDateTime(dateString: string): string {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return ''
+
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+
+  return `${day}/${month}/${year} a las ${hours}:${minutes} hs`
+}
+
+export function formatDate(dateString: string): string {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return ''
+
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+
+  return `${day}/${month}/${year}`
+}
+
+export function formatTime(dateString: string): string {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return ''
+
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+
+  return `${hours}:${minutes} hs`
+}
+
+
 export const RUBROS = [
   'Tecnología', 'Marketing', 'Ventas', 'Administración', 'Finanzas',
   'Recursos Humanos', 'Diseño', 'Logística', 'Salud', 'Educación',
@@ -113,3 +151,53 @@ export const DEPARTAMENTOS_UY = [
   'Artigas',
   'Remoto',
 ]
+
+export interface AiBadgeInfo {
+  label: string
+  badgeClass: string
+  scoreColor: string
+}
+
+/**
+ * Retorna el estado y diseño visual de la afinidad IA según el puntaje de match (0 a 100%)
+ * - 90% a 100%: "Candidato Ideal"
+ * - 75% a 89%:  "Alta Afinidad"
+ * - 55% a 74%:  "Perfil Compatible"
+ * - 35% a 54%:  "Afinidad Media"
+ * - Menor a 35% (ej. 25%): "Afinidad Básica"
+ */
+export function getAiBadgeDetails(score: number): AiBadgeInfo {
+  if (score >= 90) {
+    return {
+      label: 'Candidato Ideal',
+      badgeClass: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700',
+      scoreColor: 'text-emerald-700 dark:text-emerald-300',
+    }
+  }
+  if (score >= 75) {
+    return {
+      label: 'Alta Afinidad',
+      badgeClass: 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+      scoreColor: 'text-indigo-700 dark:text-indigo-300',
+    }
+  }
+  if (score >= 55) {
+    return {
+      label: 'Perfil Compatible',
+      badgeClass: 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+      scoreColor: 'text-purple-700 dark:text-purple-300',
+    }
+  }
+  if (score >= 35) {
+    return {
+      label: 'Afinidad Media',
+      badgeClass: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+      scoreColor: 'text-amber-700 dark:text-amber-300',
+    }
+  }
+  return {
+    label: 'Afinidad Básica',
+    badgeClass: 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    scoreColor: 'text-rose-700 dark:text-rose-300',
+  }
+}

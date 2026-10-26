@@ -14,13 +14,16 @@ import {
   ArrowRight,
   Building2,
   Check,
-  Clock
+  Clock,
+  Calendar,
+  User,
+  Info
 } from 'lucide-react'
 import { JobWithEmpresa, ApplicationWithDetails, ApplicationEstado } from '@/lib/supabase/database.types'
 import { useAuth } from '@/lib/context/AuthContext'
 import { submitApplication, uploadCV, fetchCandidateApplicationForJob } from '@/lib/data'
 import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 
 interface ApplyModalProps {
   job: JobWithEmpresa
@@ -38,11 +41,10 @@ export function ApplyModal({
   onApplied,
 }: ApplyModalProps) {
   const { profile, updateProfile } = useAuth()
-  const [nombre, setNombre] = useState(profile?.nombre || '')
-  const [email, setEmail] = useState(profile?.email || '')
   const [mensaje, setMensaje] = useState('')
   const [cvFile, setCvFile] = useState<File | null>(null)
   const [cvFileName, setCvFileName] = useState('')
+  const [updateProfileCv, setUpdateProfileCv] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -56,6 +58,7 @@ export function ApplyModal({
       setErrorMessage('')
       setCvFile(null)
       setMensaje('')
+      setUpdateProfileCv(false)
     }
   }, [isOpen, job.id])
 
@@ -78,8 +81,6 @@ export function ApplyModal({
 
   useEffect(() => {
     if (profile) {
-      setNombre(profile.nombre || '')
-      setEmail(profile.email || '')
       if (!cvFile) {
         setCvFileName(profile.cv_url ? 'CV guardado en tu perfil' : '')
       }
@@ -116,11 +117,6 @@ export function ApplyModal({
       return
     }
 
-    if (!nombre.trim() || !email.trim()) {
-      setErrorMessage('Por favor completá tu nombre y correo electrónico.')
-      return
-    }
-
     if (!cvFile && !profile.cv_url) {
       setErrorMessage('Por favor adjuntá tu currículum vitae en formato PDF o Word.')
       return
@@ -136,25 +132,28 @@ export function ApplyModal({
         currentCvUrl = await uploadCV(cvFile, profile.id)
       }
 
-      // Guardamos el CV actualizado (y el nombre si cambió) en su perfil para futuras postulaciones
-      if (cvFile || (nombre.trim() && nombre.trim() !== profile.nombre)) {
+      // Solo si el usuario explícitamente marcó la opción, actualizamos su CV predeterminado en el perfil.
+      // El nombre y datos de la cuenta NUNCA se sobreescriben desde una postulación.
+      if (cvFile && updateProfileCv && currentCvUrl) {
         try {
           await updateProfile({
-            cv_url: currentCvUrl || profile.cv_url,
-            nombre: nombre.trim(),
+            cv_url: currentCvUrl,
           })
         } catch (profileErr) {
-          console.warn('No se pudo actualizar el perfil automáticamente:', profileErr)
+          console.warn('No se pudo actualizar el CV en el perfil automáticamente:', profileErr)
         }
       }
+
+      const candidateName = profile.nombre?.trim() || 'Candidato'
+      const candidateEmail = profile.email?.trim() || ''
 
       const createdApp = await submitApplication({
         job_id: job.id,
         job_titulo: job.titulo,
         job_slug: job.slug,
         candidato_id: profile.id,
-        candidato_nombre: nombre.trim(),
-        candidato_email: email.trim(),
+        candidato_nombre: candidateName,
+        candidato_email: candidateEmail,
         mensaje: mensaje.trim(),
         cv_url: currentCvUrl,
       })
@@ -162,6 +161,37 @@ export function ApplyModal({
       setDetectedApplication(createdApp)
       onApplied?.(createdApp)
       setIsSuccess(true)
+
+      // Pre-cálculo en segundo plano con IA (Opción C): evalúa y guarda el match_score en la BD
+      if (createdApp?.id) {
+        fetch('/api/empresa/ai-screen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            job: {
+              id: job.id,
+              titulo: job.titulo,
+              descripcion: job.descripcion,
+              rubro: job.rubro,
+              zona: job.zona,
+              modalidad: job.modalidad,
+              tags: job.tags,
+            },
+            candidates: [
+              {
+                id: createdApp.id,
+                candidatoId: profile.id,
+                candidatoNombre: candidateName,
+                candidatoEmail: candidateEmail,
+                mensaje: mensaje.trim(),
+                hasCv: !!currentCvUrl,
+                cvUrl: currentCvUrl || null,
+                created_at: createdApp.created_at,
+              },
+            ],
+          }),
+        }).catch((bgErr) => console.warn('Background AI evaluation error:', bgErr))
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Ocurrió un error al enviar tu postulación.')
     } finally {
@@ -172,11 +202,44 @@ export function ApplyModal({
   const getStatusBadge = (estado: ApplicationEstado) => {
     const map = {
       pendiente: { variant: 'warning', label: 'Pendiente de Revisión' },
-      visto: { variant: 'primary', label: 'CV Visto por la Empresa' },
+      visto: { variant: 'primary', label: 'Visto por la Empresa' },
       seleccionado: { variant: 'success', label: '¡Seleccionado!' },
-      entrevista: { variant: 'success', label: 'Convocado a Entrevista' },
-      rechazado: { variant: 'danger', label: 'Proceso Finalizado' },
-    }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger'; label: string }
+      entrevista: { variant: 'purple', label: 'En Proceso' },
+      rechazado: { variant: 'danger', label: 'No seleccionado' },
+    }[estado] as { variant: 'warning' | 'primary' | 'success' | 'danger' | 'purple'; label: string }
+
+    if (estado === 'seleccionado') {
+      return (
+        <div className="relative group inline-block">
+          <Badge
+            variant="success"
+            size="sm"
+            className="cursor-pointer font-semibold gap-1.5 shadow-sm hover:ring-2 hover:ring-emerald-400/40 transition-all select-none"
+            title="Si la empresa te seleccionó, en estos días deberías de estar recibiendo novedades."
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>¡Seleccionado!</span>
+            <span className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded-full bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold">
+              <Info className="w-2.5 h-2.5" />
+              Aviso
+            </span>
+          </Badge>
+
+          <div className="absolute right-0 bottom-full mb-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none w-72 max-w-[85vw] p-3 rounded-2xl bg-slate-900 text-white shadow-xl border border-slate-700/80 text-xs">
+            <div className="flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-bold text-emerald-400 text-xs">Aviso importante</p>
+                <p className="text-slate-200 text-[11px] leading-relaxed">
+                  Si la empresa te seleccionó, en estos días deberías de estar recibiendo novedades.
+                </p>
+              </div>
+            </div>
+            <div className="absolute right-6 -bottom-1.5 w-3 h-3 bg-slate-900 border-r border-b border-slate-700/80 rotate-45" />
+          </div>
+        </div>
+      )
+    }
 
     return <Badge variant={map.variant} size="sm">{map.label}</Badge>
   }
@@ -296,11 +359,12 @@ export function ApplyModal({
                 <span className="text-xs font-semibold text-slate-500">Estado actual:</span>
                 {getStatusBadge(activeExistingApp.estado)}
               </div>
-              <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
-                <span>Fecha de envío:</span>
-                <span className="font-medium text-slate-700 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  {formatRelativeTime(activeExistingApp.created_at)}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-slate-500">
+                <span>Fecha y hora de envío:</span>
+                <span className="font-medium text-slate-700 flex items-center gap-1.5 flex-wrap">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>{formatDateTime(activeExistingApp.created_at)}</span>
+                  <span className="text-slate-400 font-normal">({formatRelativeTime(activeExistingApp.created_at)})</span>
                 </span>
               </div>
               {activeExistingApp.mensaje && (
@@ -345,47 +409,47 @@ export function ApplyModal({
             )}
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Nombre Completo *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ej: Juan Pérez"
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Correo Electrónico *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ejemplo@correo.com"
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400"
-                />
+              {/* Resumen de Identidad del Candidato */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-sm flex items-center justify-center shrink-0">
+                    {profile.nombre ? profile.nombre[0].toUpperCase() : <User className="w-5 h-5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider block">
+                      Postulándote como
+                    </span>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                      {profile.nombre || 'Candidato'}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {profile.email}
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/candidato/perfil"
+                  target="_blank"
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline shrink-0 whitespace-nowrap"
+                  title="Modificar los datos de tu cuenta en tu perfil"
+                >
+                  Editar perfil ↗
+                </Link>
               </div>
 
               {/* Upload CV */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                   Currículum Vitae (PDF o Word) *
                 </label>
-                <label className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50 hover:bg-indigo-50/30 cursor-pointer transition-colors group">
-                  <div className="flex items-center gap-2.5 text-xs text-slate-600 min-w-0">
-                    <FileText className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform shrink-0" />
+                <label className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 bg-slate-50 dark:bg-slate-800/40 hover:bg-indigo-50/30 cursor-pointer transition-colors group">
+                  <div className="flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300 min-w-0">
+                    <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform shrink-0" />
                     <span className="font-medium truncate max-w-[180px] sm:max-w-[240px]">
                       {cvFileName || 'Hacé clic para adjuntar tu CV'}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-indigo-600 group-hover:underline flex items-center gap-1 shrink-0 ml-auto">
+                  <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 group-hover:underline flex items-center gap-1 shrink-0 ml-auto">
                     <Upload className="w-3.5 h-3.5" />
                     {profile.cv_url && !cvFile ? 'Reemplazar' : 'Examinar'}
                   </span>
@@ -397,24 +461,41 @@ export function ApplyModal({
                   />
                 </label>
                 {profile.cv_url && !cvFile && (
-                  <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-medium">
-                    <Check className="w-3 h-3" /> Se utilizará el CV adjunto en tu perfil. Podés hacer clic arriba para cambiarlo.
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1 font-medium">
+                    <Check className="w-3 h-3" /> Se utilizará el CV guardado en tu perfil. Podés hacer clic arriba para cambiarlo.
                   </p>
+                )}
+                {cvFile && (
+                  <label className="flex items-center gap-2 mt-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={updateProfileCv}
+                      onChange={(e) => setUpdateProfileCv(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Actualizar también este archivo como mi CV predeterminado en mi perfil</span>
+                  </label>
                 )}
               </div>
 
-              {/* Mensaje */}
+              {/* Mensaje / Carta de Presentación Personalizada */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Carta de Presentación o Mensaje (Opcional)
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Carta de Presentación o Mensaje Personalizado
+                  </label>
+                  <span className="text-[11px] text-slate-400">Opcional</span>
+                </div>
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={mensaje}
                   onChange={(e) => setMensaje(e.target.value)}
-                  placeholder="Contale a la empresa por qué sos el candidato ideal..."
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 placeholder-slate-400 resize-none"
+                  placeholder="Personalizá tu postulación: contale a la empresa por qué te interesa este puesto, qué experiencia relevante tenés o qué podés aportar..."
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 dark:text-slate-100 placeholder-slate-400 resize-none"
                 />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Este mensaje es específico para este aviso y será leído directamente por el equipo de selección.
+                </p>
               </div>
             </div>
 

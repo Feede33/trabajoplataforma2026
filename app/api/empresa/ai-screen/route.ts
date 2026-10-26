@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { callGemini } from '@/lib/gemini'
-import { getAuthedContext } from '@/lib/server/auth'
+import { getServiceClient } from '@/lib/server/auth'
+import { extractText } from 'unpdf'
 
 export const maxDuration = 60
 
@@ -13,19 +14,95 @@ export interface CandidateEvaluationResult {
   recommendation: 'recomendado' | 'considerar' | 'descartar'
 }
 
+/**
+ * Descarga y extrae el texto plano de un CV (PDF) alojado en Supabase Storage o URL pública.
+ * Tiene un timeout de 8 segundos para no demorar la evaluación si un archivo tarda en responder.
+ */
+async function extractTextFromCv(cvUrl: string | null | undefined): Promise<string | null> {
+  if (!cvUrl || typeof cvUrl !== 'string' || !cvUrl.startsWith('http')) {
+    return null
+  }
+
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 8000)
+
+    if (process.env.NODE_ENV === 'development') {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    }
+
+    const res = await fetch(cvUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'PostulaUY-AI-Screen/1.0',
+      },
+    })
+    clearTimeout(timer)
+
+    if (!res.ok) {
+      console.warn(`[AI-Screen] No se pudo descargar el CV (${res.status}): ${cvUrl}`)
+      return null
+    }
+
+    const buffer = await res.arrayBuffer()
+    if (!buffer || buffer.byteLength === 0) return null
+
+    const uint8Array = new Uint8Array(buffer)
+    const { text } = await extractText(uint8Array)
+
+    if (Array.isArray(text) && text.length > 0) {
+      const cleanText = text
+        .join('\n')
+        .replace(/\r?\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+      if (cleanText.length > 20) {
+        // Limitar a los primeros 3000 caracteres (suficiente para experiencia, aptitudes, educación)
+        return cleanText.slice(0, 3000)
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[AI-Screen] No se pudo extraer texto del CV (${cvUrl}):`, err?.message)
+  }
+
+  return null
+}
+
 function computeFallbackEvaluations(
   job: { titulo: string; descripcion?: string; tags?: string[] },
-  candidates: Array<{ id: string; candidatoNombre: string; mensaje: string | null; hasCv?: boolean }>
+  candidates: Array<{
+    id: string
+    candidatoNombre: string
+    mensaje: string | null
+    hasCv?: boolean
+    cvText?: string | null
+  }>
 ): CandidateEvaluationResult[] {
   const jobText = `${job.titulo} ${job.descripcion || ''} ${(job.tags || []).join(' ')}`.toLowerCase()
 
+  const keywords = jobText
+    .replace(/[^a-záéíóúñ0-9\s]/gi, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 4)
+
   return candidates.map((c, index) => {
-    let score = 70
+    let score = 55
     const strengths: string[] = []
 
-    if (c.hasCv) {
-      score += 12
-      strengths.push('Adjuntó Currículum Vitae en formato PDF')
+    if (c.cvText) {
+      score += 20
+      const cvLower = c.cvText.toLowerCase()
+      const matchesInCv = keywords.filter((k) => cvLower.includes(k))
+      if (matchesInCv.length > 0) {
+        score += Math.min(20, matchesInCv.length * 5)
+        strengths.push(`CV con experiencia en ${matchesInCv.slice(0, 2).join(' y ')}`)
+      } else {
+        strengths.push('Currículum Vitae analizado con éxito')
+      }
+    } else if (c.hasCv) {
+      score += 15
+      strengths.push('Currículum Vitae adjunto en PDF')
     } else {
       strengths.push('Postulación con datos de contacto verificados')
     }
@@ -33,40 +110,46 @@ function computeFallbackEvaluations(
     const msg = (c.mensaje || '').toLowerCase()
     if (msg.length > 50) {
       score += 8
-      strengths.push('Carta de presentación clara y personalizada')
+      strengths.push('Carta de presentación detallada')
     } else if (msg.length > 10) {
       score += 4
-      strengths.push('Mensaje inicial de postulación recibido')
+      strengths.push('Mensaje inicial recibido')
     }
 
-    // Keyword matching
-    const keywords = jobText
-      .replace(/[^a-záéíóúñ0-9\s]/gi, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length >= 4)
-    const matches = keywords.filter((k) => msg.includes(k))
-    if (matches.length > 0) {
-      score += Math.min(10, matches.length * 4)
-      strengths.push(`Menciona afinidad con el puesto y tareas clave`)
+    // Keyword matching en el mensaje
+    const matchesInMsg = keywords.filter((k) => msg.includes(k))
+    if (matchesInMsg.length > 0) {
+      score += Math.min(10, matchesInMsg.length * 4)
+      strengths.push(`Afinidad con tareas clave del puesto`)
     }
 
-    // Small deterministic variation based on name
     const hash = c.candidatoNombre.split('').reduce((acc, char) => acc + char.charCodeAt(0), index * 7)
-    score = Math.min(96, Math.max(55, score + (hash % 10) - 4))
+    score = Math.min(97, Math.max(40, score + (hash % 10) - 3))
 
     let recommendation: 'recomendado' | 'considerar' | 'descartar' = 'considerar'
     let badgeLabel = 'Perfil Compatible'
-    if (score >= 85) {
+    if (score >= 90) {
       recommendation = 'recomendado'
-      badgeLabel = 'Altamente Recomendado'
-    } else if (score < 65) {
+      badgeLabel = 'Candidato Ideal'
+    } else if (score >= 75) {
+      recommendation = 'recomendado'
+      badgeLabel = 'Alta Afinidad'
+    } else if (score >= 55) {
+      recommendation = 'considerar'
+      badgeLabel = 'Perfil Compatible'
+    } else if (score >= 35) {
+      recommendation = 'considerar'
+      badgeLabel = 'Afinidad Media'
+    } else {
       recommendation = 'descartar'
       badgeLabel = 'Afinidad Básica'
     }
 
-    const summary = c.mensaje?.trim()
-      ? `${c.candidatoNombre} demostró gran interés en la vacante de ${job.titulo}: "${c.mensaje.slice(0, 100)}${c.mensaje.length > 100 ? '...' : ''}". Perfil listo para evaluar.`
-      : `${c.candidatoNombre} se postuló a la vacante de ${job.titulo}. Cumple con los requisitos para avanzar a la siguiente etapa de revisión.`
+    const summary = c.cvText
+      ? `${c.candidatoNombre} presenta un perfil con experiencia analizada directamente de su currículum. Se detectaron competencias afines para ${job.titulo}.`
+      : c.mensaje?.trim()
+      ? `${c.candidatoNombre} demostró interés en la vacante de ${job.titulo}: "${c.mensaje.slice(0, 80)}...".`
+      : `${c.candidatoNombre} se postuló a la vacante de ${job.titulo}. Cumple con los requisitos para avanzar.`
 
     return {
       applicationId: c.id,
@@ -95,16 +178,72 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, evaluations: [] })
     }
 
-    // Si no hay API key de Gemini configurada, usamos el motor heurístico local inmediatamente
+    // 1. Obtener cliente de servicio para consultar caché de cv_text (Opción C)
+    let cachedCvMap: Record<string, string> = {}
+    const serviceClient = getServiceClient()
+    if (serviceClient) {
+      try {
+        const candidateIds = candidates
+          .map((c: any) => c.candidatoId)
+          .filter((id: any) => typeof id === 'string' && id.length > 0)
+
+        if (candidateIds.length > 0) {
+          const { data: profilesData } = await serviceClient
+            .from('profiles')
+            .select('id, cv_text')
+            .in('id', candidateIds)
+
+          if (Array.isArray(profilesData)) {
+            profilesData.forEach((p: any) => {
+              if (p.cv_text && typeof p.cv_text === 'string' && p.cv_text.trim().length > 20) {
+                cachedCvMap[p.id] = p.cv_text.trim()
+              }
+            })
+          }
+        }
+      } catch {
+        // Si la columna cv_text aún no existe en Supabase, continuamos sin fallar
+      }
+    }
+
+    // 2. Extraer texto en paralelo para todos los candidatos (Opción A + lazy caching C)
+    const enrichedCandidates = await Promise.all(
+      candidates.map(async (c: any) => {
+        let cvText = c.candidatoId ? cachedCvMap[c.candidatoId] : null
+
+        if (!cvText && c.cvUrl) {
+          cvText = await extractTextFromCv(c.cvUrl)
+
+          // Guardar en la base de datos para que futuras evaluaciones sean instantáneas
+          if (cvText && c.candidatoId && serviceClient) {
+            try {
+              await serviceClient
+                .from('profiles')
+                .update({ cv_text: cvText })
+                .eq('id', c.candidatoId)
+            } catch {
+              // Silencioso si la columna no existe aún
+            }
+          }
+        }
+
+        return {
+          ...c,
+          cvText: cvText || null,
+        }
+      })
+    )
+
+    // Si no hay API key de Gemini configurada, usamos el motor heurístico local con el texto extraído
     if (!process.env.GEMINI_API_KEY) {
-      const fallback = computeFallbackEvaluations(job, candidates)
+      const fallback = computeFallbackEvaluations(job, enrichedCandidates)
       return NextResponse.json({ success: true, evaluations: fallback, source: 'heuristic' })
     }
 
-    // Prompt para evaluación con IA Gemini
+    // 3. Prompt para evaluación con IA Gemini incluyendo experiencia del CV
     const prompt = `
 Eres un asistente de Recursos Humanos de alto nivel para PostulaUY en Uruguay.
-Tu objetivo es analizar los postulantes para una búsqueda laboral y organizarlos según su afinidad y compatibilidad con el puesto.
+Tu objetivo es analizar minuciosamente a los postulantes para una búsqueda laboral evaluando su EXPERIENCIA, HABILIDADES Y FORMACIÓN extraídas de sus currículums vitae y organizarlos según su afinidad real con el puesto.
 
 OFERTA DE EMPLEO:
 - Puesto: ${job.titulo}
@@ -115,24 +254,37 @@ OFERTA DE EMPLEO:
 
 CANDIDATOS POSTULADOS:
 ${JSON.stringify(
-  candidates.map((c: any) => ({
+  enrichedCandidates.map((c: any) => ({
     applicationId: c.id,
     nombre: c.candidatoNombre,
     mensaje: c.mensaje || 'Sin carta de presentación',
     tieneCv: !!c.hasCv,
+    contenidoCurriculum: c.cvText
+      ? c.cvText
+      : c.hasCv
+      ? 'CV adjunto en archivo (no fue posible extraer texto plano indexable)'
+      : 'Sin currículum vitae adjunto',
     fecha: c.created_at,
   })),
   null,
   2
 )}
 
-INSTRUCCIONES:
-1. Para cada candidato, analiza su carta de presentación y datos respecto a la búsqueda "${job.titulo}".
-2. Asigna un "matchScore" entero entre 40 y 98 basado en qué tan bien su mensaje o disposición se ajusta a lo buscado.
-3. Asigna "recommendation": "recomendado" (score >= 82), "considerar" (score entre 65 y 81), o "descartar" (score < 65).
-4. Asigna "badgeLabel": una frase muy corta y profesional (ej: "Altamente Recomendado", "Perfil Sólido", "Potencial Interesante", "Afinidad Básica").
-5. Redacta un "summary" de 2 oraciones concisas y amables justificando la evaluación para que el reclutador decida rápido.
-6. Incluye "strengths": un array de 2 a 3 puntos fuertes concretos destacados.
+INSTRUCCIONES DE EVALUACIÓN:
+1. Analiza el "contenidoCurriculum" de cada candidato (trayectoria laboral previa, herramientas, tecnologías, estudios) comparándolo directamente con las tareas y requisitos del puesto "${job.titulo}".
+2. Asigna un "matchScore" entero entre 30 y 98:
+   - 85-98 (Muy Alto / Recomendado): Su CV demuestra experiencia directamente aplicable, formación adecuada y dominio de herramientas solicitadas.
+   - 70-84 (Medio / Considerar): Tiene habilidades transferibles o experiencia general en el rubro, pero le falta profundizar en algún requisito clave o su CV es breve.
+   - 35-69 (Bajo / Descartar): Su experiencia previa o perfil no guardan relación con la vacante.
+3. Asigna "recommendation": "recomendado" (score >= 75), "considerar" (score entre 40 y 74), o "descartar" (score < 40).
+4. Asigna "badgeLabel" según el matchScore:
+   - score >= 90: "Candidato Ideal"
+   - score 75 a 89: "Alta Afinidad"
+   - score 55 a 74: "Perfil Compatible"
+   - score 35 a 54: "Afinidad Media"
+   - score < 35 (ej: 25%): "Afinidad Básica"
+5. Redacta un "summary" de 2 oraciones concisas y amables justificando la evaluación en base a lo que leíste en su CV (ej: "Cuenta con sólida experiencia en puestos similares y formación técnica adecuada...").
+6. Incluye "strengths": un array de 2 a 3 puntos fuertes concretos destacados que encontraste en su CV o postulación (ej: "3 años en puestos similares", "Conocimientos en [Herramienta clave]", "Formación técnica alineada").
 
 Devuelve EXCLUSIVAMENTE un array JSON válido con la siguiente estructura exacta:
 [
@@ -147,6 +299,30 @@ Devuelve EXCLUSIVAMENTE un array JSON válido con la siguiente estructura exacta
 ]
 `
 
+    const persistEvaluations = async (evals: CandidateEvaluationResult[]) => {
+      if (!serviceClient) return
+      try {
+        await Promise.all(
+          evals.map(async (ev) => {
+            if (ev.applicationId) {
+              await serviceClient
+                .from('applications')
+                .update({
+                  ai_match_score: ev.matchScore,
+                  ai_badge_label: ev.badgeLabel,
+                  ai_summary: ev.summary,
+                  ai_strengths: ev.strengths,
+                  ai_evaluated_at: new Date().toISOString(),
+                })
+                .eq('id', ev.applicationId)
+            }
+          })
+        )
+      } catch (err: any) {
+        console.warn('[AI-Screen] No se pudo persistir evaluación en applications:', err?.message)
+      }
+    }
+
     try {
       const contents = [
         {
@@ -157,8 +333,7 @@ Devuelve EXCLUSIVAMENTE un array JSON válido con la siguiente estructura exacta
       const geminiResult = await callGemini(contents)
 
       if (Array.isArray(geminiResult) && geminiResult.length > 0) {
-        // Validar que coincidan con los candidatos
-        const validated: CandidateEvaluationResult[] = candidates.map((cand: any) => {
+        const validated: CandidateEvaluationResult[] = enrichedCandidates.map((cand: any) => {
           const found = geminiResult.find((r: any) => r.applicationId === cand.id)
           if (found && typeof found.matchScore === 'number') {
             return {
@@ -170,18 +345,18 @@ Devuelve EXCLUSIVAMENTE un array JSON válido con la siguiente estructura exacta
               recommendation: found.recommendation || 'considerar',
             }
           }
-          // Fallback individual si faltó alguno
           return computeFallbackEvaluations(job, [cand])[0]
         })
 
+        await persistEvaluations(validated)
         return NextResponse.json({ success: true, evaluations: validated, source: 'gemini' })
       }
     } catch (geminiError: any) {
       console.warn('Fallo llamada a Gemini en ai-screen, usando fallback inteligente:', geminiError?.message)
     }
 
-    // Fallback heurístico en caso de error en Gemini
-    const fallback = computeFallbackEvaluations(job, candidates)
+    const fallback = computeFallbackEvaluations(job, enrichedCandidates)
+    await persistEvaluations(fallback)
     return NextResponse.json({ success: true, evaluations: fallback, source: 'fallback' })
   } catch (err: any) {
     console.error('Error in ai-screen API:', err)

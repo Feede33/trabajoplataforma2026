@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { fetchJobs, fetchApplicationsForCandidate } from '@/lib/data'
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { JobCard } from '@/components/jobs/JobCard'
+import { JobCardSkeleton } from '@/components/jobs/JobCardSkeleton'
 import { JobFilters, FilterState } from '@/components/jobs/JobFilters'
 import { Briefcase, SlidersHorizontal, ArrowUpDown } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
@@ -190,7 +191,7 @@ function EmpleosContent() {
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-64 rounded-2xl bg-slate-200/60 animate-pulse" />
+                <JobCardSkeleton key={i} />
               ))}
             </div>
           ) : sortedJobs.length === 0 ? (

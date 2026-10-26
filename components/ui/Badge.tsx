@@ -1,14 +1,14 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 
-interface BadgeProps {
+interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'purple' | 'outline'
   size?: 'sm' | 'md'
   className?: string
 }
 
-export function Badge({ children, variant = 'default', size = 'sm', className }: BadgeProps) {
+export function Badge({ children, variant = 'default', size = 'sm', className, ...props }: BadgeProps) {
   const variantStyles = {
     default: 'bg-slate-100 text-slate-700 border-slate-200',
     primary: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -32,6 +32,7 @@ export function Badge({ children, variant = 'default', size = 'sm', className }:
         sizeStyles[size],
         className
       )}
+      {...props}
     >
       {children}
     </span>

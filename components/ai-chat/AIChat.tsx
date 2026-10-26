@@ -1282,10 +1282,15 @@ export function AIChat() {
           whatsappContacts: whatsappContacts.length > 0 ? whatsappContacts : undefined,
         },
       ]
+      setLoading(false)
+      // Pausa mínima para que la animación de Thinking se retire completamente antes de montar el texto
+      await new Promise((r) => setTimeout(r, 70))
       setMessages(withReply)
       const savedId = await saveConversation(withReply, convId)
       if (savedId) setConvId(savedId)
     } catch (e: any) {
+      setLoading(false)
+      await new Promise((r) => setTimeout(r, 70))
       setMessages([
         ...next,
         { id: crypto.randomUUID(), role: 'assistant', content: e?.message || 'Ocurrió un error. Intentá de nuevo.' },
@@ -2239,7 +2244,7 @@ export function AIChat() {
                 {messages.map((m) => {
                   const isEditingProfile = !!editingProfileIds[m.id]
                   return (
-                    <div key={m.id} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                    <div key={m.id} className={cn('flex animate-in fade-in duration-200', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                       {m.role === 'user' ? (
                         <div className="flex flex-col items-end gap-2 max-w-[85%]">
                           {/* Previsualización de archivos / imágenes enviadas (por encima de la burbuja) */}
@@ -2966,16 +2971,14 @@ export function AIChat() {
                   )
                 })}
                 {loading && (
-                  <div className="flex justify-start py-2">
-                    <Marker role="status" className="w-auto inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-800/60 shadow-xs">
-                      <MarkerIcon>
-                        <Spinner className="size-4 text-indigo-600 dark:text-indigo-400" />
-                      </MarkerIcon>
-                      <MarkerContent className="shimmer text-xs sm:text-sm font-medium select-none">
-                        Pensando...
-                      </MarkerContent>
-                    </Marker>
-                  </div>
+                  <Marker role="status" className="animate-in fade-in duration-150">
+                    <MarkerIcon>
+                      <Spinner />
+                    </MarkerIcon>
+                    <MarkerContent className="shimmer">
+                      Thinking...
+                    </MarkerContent>
+                  </Marker>
                 )}
               </div>
             </div>

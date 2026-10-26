@@ -21,7 +21,7 @@ import {
 import { fetchJobBySlug, fetchCandidateApplicationForJob } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 import { ApplyModal } from '@/components/jobs/ApplyModal'
 import { EditJobModal } from '@/components/jobs/EditJobModal'
 import { BookmarkIconButton } from '@/components/jobs/BookmarkIconButton'
@@ -337,7 +337,7 @@ export default function JobDetailPage() {
                     <span>Ya estás postulado a esta vacante</span>
                   </div>
                   <p className="text-[11px] text-emerald-700 pl-5">
-                    Enviada {formatRelativeTime(existingApplication.created_at)} • Estado:{' '}
+                    Enviada el {formatDateTime(existingApplication.created_at)} ({formatRelativeTime(existingApplication.created_at)}) • Estado:{' '}
                     <span className="font-semibold capitalize">{existingApplication.estado}</span>
                   </p>
                 </div>
