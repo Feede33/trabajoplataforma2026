@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
@@ -86,6 +86,9 @@ export function AiCandidateSelectorModal({
   // Ordered candidate deck for active job
   const [deck, setDeck] = useState<ApplicationWithDetails[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
+
+  // Touch swipe support for mobile
+  const touchStartXRef = useRef<number | null>(null)
 
   // History for Undo
   const [history, setHistory] = useState<HistoryItem[]>([])
@@ -421,13 +424,13 @@ export function AiCandidateSelectorModal({
         {/* TOP BAR / HEADER (V0 STYLE)                                    */}
         {/* ============================================================== */}
         <header className="flex items-center justify-between border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             {step === 'select_job' ? (
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Volver al panel"
-                className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer shrink-0"
                 title="Volver al panel de empresa"
               >
                 <ArrowLeft aria-hidden="true" className="size-4" />
@@ -437,18 +440,18 @@ export function AiCandidateSelectorModal({
                 type="button"
                 onClick={() => setStep('select_job')}
                 aria-label="Cambiar de anuncio"
-                className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                className="grid size-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white cursor-pointer shrink-0"
                 title="Cambiar anuncio de búsqueda"
               >
                 <ArrowLeft aria-hidden="true" className="size-4" />
               </button>
             )}
 
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b7ff68]">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#b7ff68] truncate">
                 Postulaciones / {selectedJob?.rubro || 'Selección con IA'}
               </p>
-              <h1 className="mt-1 text-sm font-semibold sm:text-base text-white">
+              <h1 className="mt-1 text-sm font-semibold sm:text-base text-white truncate">
                 {step === 'select_job' ? 'Seleccionar anuncio y postulantes' : 'Revisión de candidatos'}
               </h1>
             </div>
@@ -624,11 +627,11 @@ export function AiCandidateSelectorModal({
               </div>
 
               {/* Footer */}
-              <div className="p-5 sm:p-6 border-t border-white/10 bg-[#0c111e] flex items-center justify-between gap-3">
+              <div className="p-5 sm:p-6 border-t border-white/10 bg-[#0c111e] flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="text-xs font-semibold text-white/50 hover:text-white transition-colors px-3 py-2 cursor-pointer"
+                  className="w-full sm:w-auto text-center text-xs font-semibold text-white/50 hover:text-white transition-colors px-3 py-2 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -637,7 +640,7 @@ export function AiCandidateSelectorModal({
                   type="button"
                   onClick={handleStartAnalysis}
                   disabled={!selectedJob || currentJobApplications.length === 0}
-                  className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
+                  className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold text-sm transition-all duration-200 cursor-pointer ${
                     !selectedJob || currentJobApplications.length === 0
                       ? 'bg-white/10 text-white/30 cursor-not-allowed'
                       : 'bg-[#b7ff68] text-[#111827] hover:bg-[#c6ff85] shadow-[0_10px_30px_rgba(183,255,104,0.25)] hover:-translate-y-0.5 active:scale-98'
@@ -733,23 +736,38 @@ export function AiCandidateSelectorModal({
             </aside>
 
             {/* Center Column: The Candidate Card */}
-            <article className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#111827] shadow-[0_30px_100px_rgba(0,0,0,0.35)]">
+            <article
+              onTouchStart={(e) => {
+                touchStartXRef.current = e.touches[0].clientX
+              }}
+              onTouchEnd={(e) => {
+                if (touchStartXRef.current === null) return
+                const diff = e.changedTouches[0].clientX - touchStartXRef.current
+                touchStartXRef.current = null
+                if (diff > 55) {
+                  handleSelect()
+                } else if (diff < -55) {
+                  handleDiscard()
+                }
+              }}
+              className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#111827] shadow-[0_30px_100px_rgba(0,0,0,0.35)]"
+            >
               <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[#b7ff68]/10 blur-3xl pointer-events-none" />
 
               {/* STAMPS: ¡SELECCIONADO! / DESCARTADO */}
               {stamp === 'selected' && (
-                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-6 animate-in zoom-in-75 fade-in duration-150">
-                  <div className="px-6 py-3 border-4 border-[#b7ff68] text-[#b7ff68] font-black text-2xl sm:text-3xl uppercase tracking-widest rounded-3xl bg-[#080b14]/95 shadow-[0_0_50px_rgba(183,255,104,0.4)] backdrop-blur-md flex items-center gap-3 transform rotate-6 scale-105">
-                    <CheckCircle2 className="size-8 sm:size-9 text-[#b7ff68] shrink-0" />
+                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-3 sm:p-6 animate-in zoom-in-75 fade-in duration-150">
+                  <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-4 border-[#b7ff68] text-[#b7ff68] font-black text-xl sm:text-3xl uppercase tracking-wider sm:tracking-widest rounded-2xl sm:rounded-3xl bg-[#080b14]/95 shadow-[0_0_50px_rgba(183,255,104,0.4)] backdrop-blur-md flex items-center gap-2 sm:gap-3 transform rotate-6 scale-105">
+                    <CheckCircle2 className="size-6 sm:size-9 text-[#b7ff68] shrink-0" />
                     <span>¡SELECCIONADO!</span>
                   </div>
                 </div>
               )}
 
               {stamp === 'rejected' && (
-                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-6 animate-in zoom-in-75 fade-in duration-150">
-                  <div className="px-6 py-3 border-4 border-[#ff6b8a] text-[#ff6b8a] font-black text-2xl sm:text-3xl uppercase tracking-widest rounded-3xl bg-[#080b14]/95 shadow-[0_0_50px_rgba(255,107,138,0.4)] backdrop-blur-md flex items-center gap-3 transform -rotate-6 scale-105">
-                    <X className="size-8 sm:size-9 text-[#ff6b8a] shrink-0" />
+                <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-3 sm:p-6 animate-in zoom-in-75 fade-in duration-150">
+                  <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-4 border-[#ff6b8a] text-[#ff6b8a] font-black text-xl sm:text-3xl uppercase tracking-wider sm:tracking-widest rounded-2xl sm:rounded-3xl bg-[#080b14]/95 shadow-[0_0_50px_rgba(255,107,138,0.4)] backdrop-blur-md flex items-center gap-2 sm:gap-3 transform -rotate-6 scale-105">
+                    <X className="size-6 sm:size-9 text-[#ff6b8a] shrink-0" />
                     <span>DESCARTADO</span>
                   </div>
                 </div>
@@ -788,12 +806,12 @@ export function AiCandidateSelectorModal({
                     <div className="grid size-16 place-items-center rounded-2xl bg-[#b7ff68] text-2xl font-bold text-[#111827] shadow-[0_0_0_8px_rgba(183,255,104,0.08)] shrink-0">
                       {getInitials(currentCandidate.candidato?.nombre)}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-2xl font-bold tracking-tight text-white">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white break-words">
                           {currentCandidate.candidato?.nombre || 'Candidato'}
                         </h2>
-                        <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/50">
                           {currentCandidate.estado === 'pendiente' ? 'Nuevo' : currentCandidate.estado}
                         </span>
                       </div>

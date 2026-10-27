@@ -175,7 +175,7 @@ export function CandidateDetailsModal({
 
               <div className="flex flex-wrap items-center gap-2">
                 {estado === 'seleccionado' ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold text-xs border border-emerald-300 dark:border-emerald-700">
                       <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Seleccionado</span>
@@ -189,7 +189,7 @@ export function CandidateDetailsModal({
                     </button>
                   </div>
                 ) : estado === 'rechazado' ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-xs border border-rose-200 dark:border-rose-800">
                       <X className="w-3.5 h-3.5 text-rose-600" />
                       <span>Descartado</span>
@@ -235,7 +235,7 @@ export function CandidateDetailsModal({
                   <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
                   <span>Análisis de IA para esta vacante</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {(() => {
                     const badgeInfo = getAiBadgeDetails(application.ai_match_score)
                     return (

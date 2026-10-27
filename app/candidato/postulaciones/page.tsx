@@ -297,7 +297,7 @@ export default function CandidatoPostulacionesPage() {
                       <Info className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span>Aviso sobre tu postulación</span>
                       <span className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 underline decoration-dotted">
-                        (pasá el mouse)
+                        (tocar o pasar el cursor)
                       </span>
 
                       {/* Tooltip con aviso al hacer hover */}

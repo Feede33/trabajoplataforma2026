@@ -355,13 +355,13 @@ export default function EmpresaDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
             {/* Botón Seleccionar con IA: LiquidMetalButton en modo claro, ShinyButton en modo oscuro */}
             {!isMounted || resolvedTheme === 'dark' ? (
               <ShinyButton
                 onClick={handleOpenAiSelector}
                 size="sm"
-                className="shrink-0 shadow-md shadow-indigo-500/20"
+                className="shrink-0 w-[168px] h-9 inline-flex items-center justify-center shadow-md shadow-indigo-500/20"
                 title="Abrir asistente de selección rápida con IA estilo Tinder"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
@@ -371,7 +371,8 @@ export default function EmpresaDashboard() {
               <LiquidMetalButton
                 label="Seleccionar con IA"
                 viewMode="both"
-                height={38}
+                width={168}
+                height={36}
                 onClick={handleOpenAiSelector}
                 title="Abrir asistente de selección rápida con IA estilo Tinder"
                 className="shrink-0"

@@ -373,24 +373,75 @@ export function Navbar() {
                   <p className="text-xs text-indigo-600 dark:text-indigo-400 capitalize">{userRoleLabel}</p>
                 </div>
                 {isCandidato && (
-                  <Link
-                    href="/candidato/dashboard"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors"
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    Mi Dashboard
-                  </Link>
+                  <div className="flex flex-col gap-1">
+                    <Link
+                      href="/candidato/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <span>Mi Dashboard</span>
+                    </Link>
+                    <Link
+                      href="/candidato/perfil"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Mi Perfil y CV</span>
+                    </Link>
+                    <Link
+                      href="/candidato/guardados"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center justify-between px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Bookmark className="w-4 h-4 text-blue-500 fill-blue-500 shrink-0" />
+                        <span>Empleos Guardados</span>
+                      </div>
+                      {savedJobs.length > 0 && (
+                        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                          {savedJobs.length}
+                        </span>
+                      )}
+                    </Link>
+                    <Link
+                      href="/candidato/postulaciones"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                    >
+                      <Briefcase className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Mis Postulaciones</span>
+                    </Link>
+                  </div>
                 )}
                 {isEmpresa && (
-                  <Link
-                    href="/empresa/dashboard"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-xl transition-colors"
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    Panel de Control
-                  </Link>
+                  <div className="flex flex-col gap-1">
+                    <Link
+                      href="/empresa/dashboard"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <span>Panel de Control</span>
+                    </Link>
+                    <Link
+                      href="/empresa/publicar"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                    >
+                      <PlusCircle className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <span>Publicar Empleo</span>
+                    </Link>
+                    <Link
+                      href="/empresa/seleccion-ia"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Selección con IA</span>
+                    </Link>
+                  </div>
                 )}
                 <button
                   onClick={async () => {
