@@ -1,0 +1,17 @@
+name: Daily Job Sync
+
+on:
+  schedule:
+    # Todos los días a las 10:00 UTC (07:00 AM hora de Uruguay)
+    - cron: '0 10 * * *'
+  workflow_dispatch: # Permite dispararlo manualmente desde GitHub si se desea
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger PostulaUY Job Sync
+        run: |
+          curl -s -X POST "${{ secrets.APP_URL || 'https://postulauy.com' }}/api/cron/sync-jobs" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"

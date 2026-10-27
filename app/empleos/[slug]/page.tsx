@@ -16,7 +16,8 @@ import {
   Briefcase,
   ShieldCheck,
   Sparkles,
-  Pencil
+  Pencil,
+  ExternalLink
 } from 'lucide-react'
 import { fetchJobBySlug, fetchCandidateApplicationForJob } from '@/lib/data'
 import { JobWithEmpresa, ApplicationWithDetails } from '@/lib/supabase/database.types'
@@ -347,6 +348,27 @@ export default function JobDetailPage() {
                 >
                   Ver Detalle de Mi Postulación
                 </button>
+              </div>
+            ) : job.es_externo ? (
+              <div className="space-y-2.5 pt-1">
+                <div className="p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 text-xs text-sky-800 dark:text-sky-300 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-sky-900 dark:text-sky-200">
+                    <ExternalLink className="w-4 h-4 text-sky-600 shrink-0" />
+                    <span>Convocatoria Externa Verificada</span>
+                  </div>
+                  <p className="text-[11px] text-sky-700 dark:text-sky-400 pl-5 leading-relaxed">
+                    Esta vacante pertenece a <span className="font-semibold">{job.empresa?.nombre || 'la empresa'}</span>. La postulación se realiza directamente en su portal oficial.
+                  </p>
+                </div>
+                <a
+                  href={job.url_postulacion_externa || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-sky-500/20 flex items-center justify-center gap-2 group"
+                >
+                  <span>Postularme en la Web de {job.empresa?.nombre || 'la Empresa'}</span>
+                  <ExternalLink className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+                </a>
               </div>
             ) : (
               <button

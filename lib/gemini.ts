@@ -1,3 +1,7 @@
+if (typeof process !== 'undefined' && process.env) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+}
+
 import https from 'node:https'
 
 export interface ExtractedInformalJob {
@@ -18,10 +22,9 @@ export interface ExtractedInformalJob {
 }
 
 export const CANDIDATE_MODELS = [
-  'gemini-3.5-flash-lite',
-  'gemini-3.8-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.6-flash',
   'gemini-3.5-flash',
-  'gemini-flash-latest',
 ]
 
 const SYSTEM_EXTRACTION_PROMPT = `
@@ -82,7 +85,7 @@ export function makeHttpsPost(urlStr: string, payload: any): Promise<{ statusCod
           'Content-Length': Buffer.byteLength(postData),
         },
         rejectUnauthorized: false, // Evita conflictos con certificados de antivirus/proxies en Windows
-        timeout: 60000,
+        timeout: 35000,
       },
       (res) => {
         let responseBody = ''
@@ -103,7 +106,7 @@ export function makeHttpsPost(urlStr: string, payload: any): Promise<{ statusCod
 
     req.on('timeout', () => {
       req.destroy()
-      reject(new Error('Tiempo de espera agotado al conectar con Google Gemini (timeout 60s)'))
+      reject(new Error('Tiempo de espera agotado al conectar con Google Gemini (timeout 35s)'))
     })
 
     req.on('error', (err) => {
@@ -330,4 +333,118 @@ export async function extractCompanyContactsFromText(text: string): Promise<Extr
   const result = await callGemini(contents)
   return Array.isArray(result) ? result : [result]
 }
+export interface ExtractedExternalJob {
+  titulo: string
+  empresa_nombre: string
+  empresa_logo?: string | null
+  descripcion: string
+  rubro: string
+  zona: string
+  modalidad: 'presencial' | 'remoto' | 'hibrido'
+  tipo_contrato: 'full-time' | 'part-time' | 'freelance' | 'pasantia'
+  salario_rango?: string | null
+  tags: string[]
+  url_postulacion_externa: string
+  fuente?: string | null
+}
 
+
+function cleanJobContent(raw: string): string {
+  if (!raw) return ''
+  return raw
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
+    .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+    .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+    .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+const EXTERNAL_JOBS_EXTRACTION_PROMPT = `
+Eres un asistente experto en recopilación, estructuración y normalización de ofertas de empleo formales para Uruguay (Montevideo e Interior).
+Tu tarea es analizar el texto, contenido Markdown o HTML extraído de una página web corporativa, portal de empleo o aviso clasificado y estructurar cada vacante de trabajo válida.
+
+REGLAS DE EXTRACCIÓN Y NORMALIZACIÓN:
+1. Extrae únicamente ofertas reales de empleo donde una empresa u organización esté buscando personal.
+2. Descarta contenido no relacionado (menús de navegación, políticas de privacidad, enlaces genéricos, promociones o testimonios).
+3. Si en el contenido hay más de una vacante, extrae CADA UNA como un elemento independiente del array. Si no hay ofertas de empleo reales, devuelve un array vacío [].
+4. "titulo": Título claro, prolijo y conciso del puesto (ej: "Desarrollador Full Stack Node/React", "Analista Contable Senior", "Cajero / Repositor", "Ejecutivo de Ventas").
+5. "empresa_nombre": Nombre exacto de la empresa empleadora (ej: "Mercado Libre", "Tienda Inglesa", "Ta-Ta", "PedidosYa", "Banco Santander", "dLocal", "Globant", "Zonamerica"). Si no se menciona explícitamente pero se deduce claramente del contexto o de la URL, indícalo.
+6. "empresa_logo": URL del logo si aparece en el texto o null.
+7. "rubro": Debe ser uno de los rubros oficiales de PostulaUY:
+   - "Tecnología", "Administración", "Comercio", "Gastronomía", "Logística", "Salud", "Educación", "Construcción", "Atención al Cliente", "Marketing", "Recursos Humanos", o "General".
+8. "zona": Departamento o barrio de Uruguay (ej: "Montevideo", "Pocitos", "Aguada", "Canelones", "Maldonado", "Punta del Este", "Interior"). Si la modalidad es remota y no especifica zona, usa "Uruguay (Remoto)".
+9. "modalidad": Debe ser estrictamente uno de: "presencial", "remoto", "hibrido".
+10. "tipo_contrato": Debe ser estrictamente uno de: "full-time", "part-time", "freelance", "pasantia".
+11. "descripcion": Descripción prolija, atractiva y completa en formato Markdown con subtítulos como ## Responsabilidades y ## Requisitos, usando viñetas con guiones (-).
+12. "salario_rango": Rango o monto salarial si se menciona (ej: "$50.000 - $70.000 líquidos", "A convenir"). Si no se especifica, null.
+13. "tags": Array con 3 a 5 palabras clave representativas (ej: ["React", "TypeScript", "Node.js"] o ["Excel", "Facturación", "Conciliaciones"]).
+14. "url_postulacion_externa": La URL directa donde el candidato puede postularse (debe comenzar con http:// o https://). Si se proporcionó una URL de origen y no hay enlace específico, usa la URL de origen.
+15. "fuente": Nombre del portal o portal origen (ej: "Web de la empresa", "SmartTalent", "LinkedIn", "Computrabajo", etc.).
+
+Devuelve EXCLUSIVAMENTE un array JSON válido sin ningún texto explicativo adicional:
+[
+  {
+    "titulo": "string",
+    "empresa_nombre": "string",
+    "empresa_logo": null,
+    "descripcion": "string (en markdown prolijo)",
+    "rubro": "string",
+    "zona": "string",
+    "modalidad": "presencial" | "remoto" | "hibrido",
+    "tipo_contrato": "full-time" | "part-time" | "freelance" | "pasantia",
+    "salario_rango": "string" | null,
+    "tags": ["tag1", "tag2"],
+    "url_postulacion_externa": "string",
+    "fuente": "string"
+  }
+]
+`
+
+/**
+ * Analiza texto/markdown extraído de una web externa y extrae ofertas de empleo estructuradas
+ */
+export async function extractExternalJobsFromContent(
+  content: string,
+  sourceUrl?: string,
+  companyHint?: string
+): Promise<ExtractedExternalJob[]> {
+  const promptContext = [
+    EXTERNAL_JOBS_EXTRACTION_PROMPT,
+    sourceUrl ? `URL de origen de la página: ${sourceUrl}` : '',
+    companyHint ? `Empresa sugerida o contexto: ${companyHint}` : '',
+    `\nCONTENIDO A ANALIZAR:\n\n${cleanJobContent(content).slice(0, 12000)}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const contents = [
+    {
+      parts: [{ text: promptContext }],
+    },
+  ]
+
+  const result = await callGemini(contents)
+  const items = Array.isArray(result) ? result : [result]
+
+  return items.map((item: any) => ({
+    titulo: String(item.titulo || 'Vacante de Empleo').trim(),
+    empresa_nombre: String(item.empresa_nombre || companyHint || 'Empresa').trim(),
+    empresa_logo: item.empresa_logo || null,
+    descripcion: String(item.descripcion || '').trim(),
+    rubro: String(item.rubro || 'General').trim(),
+    zona: String(item.zona || 'Montevideo').trim(),
+    modalidad: ['presencial', 'remoto', 'hibrido'].includes(item.modalidad) ? item.modalidad : 'presencial',
+    tipo_contrato: ['full-time', 'part-time', 'freelance', 'pasantia'].includes(item.tipo_contrato) ? item.tipo_contrato : 'full-time',
+    salario_rango: item.salario_rango || null,
+    tags: Array.isArray(item.tags) ? item.tags.map((t: any) => String(t).trim()).filter(Boolean) : [],
+    url_postulacion_externa: String(item.url_postulacion_externa || sourceUrl || '').trim(),
+    fuente: item.fuente || (sourceUrl ? new URL(sourceUrl).hostname : 'Web Externa'),
+  }))
+}

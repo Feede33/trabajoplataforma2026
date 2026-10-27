@@ -22,7 +22,7 @@ export interface Profile {
 
 export interface Job {
   id: string
-  empresa_id: string
+  empresa_id: string | null
   titulo: string
   descripcion: string
   rubro: string
@@ -33,6 +33,11 @@ export interface Job {
   estado: JobEstado
   slug: string
   tags: string[]
+  es_externo?: boolean
+  url_postulacion_externa?: string | null
+  empresa_nombre?: string | null
+  empresa_logo?: string | null
+  fuente?: string | null
   created_at: string
   updated_at: string
 }
@@ -52,7 +57,7 @@ export interface Application {
 }
 
 export type JobWithEmpresa = Job & {
-  empresa: Pick<Profile, 'nombre' | 'avatar_url' | 'website' | 'ubicacion'>
+  empresa?: Pick<Profile, 'nombre' | 'avatar_url' | 'website' | 'ubicacion'> | null
 }
 
 export interface CompanyContact {
@@ -100,6 +105,20 @@ export interface SavedJob {
   created_at: string
 }
 
+export interface CrawlerSource {
+  id: string
+  nombre: string
+  url: string
+  empresa_hint?: string | null
+  rubro_default?: string | null
+  activo: boolean
+  max_jobs_per_run: number
+  ultima_ejecucion?: string | null
+  total_publicadas: number
+  created_at: string
+  updated_at: string
+}
+
 export type SavedJobWithDetails = SavedJob & {
   job: JobWithEmpresa
 }
@@ -145,6 +164,15 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Omit<InformalJob, 'id'>>
+      }
+      crawler_sources: {
+        Row: CrawlerSource
+        Insert: Omit<CrawlerSource, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Omit<CrawlerSource, 'id'>>
       }
     }
   }

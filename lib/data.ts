@@ -80,7 +80,15 @@ export async function fetchJobs(): Promise<JobWithEmpresa[]> {
         .order('created_at', { ascending: false })
 
       if (!error && data && data.length > 0) {
-        return data as unknown as JobWithEmpresa[]
+        return data.map((j: any) => ({
+          ...j,
+          empresa: j.empresa || {
+            nombre: j.empresa_nombre || 'Empresa Externa',
+            avatar_url: j.empresa_logo || null,
+            website: j.url_postulacion_externa || null,
+            ubicacion: j.zona || null,
+          },
+        })) as unknown as JobWithEmpresa[]
       }
     } catch (err) {
       console.warn('Supabase fetch failed, falling back to local data', err)
@@ -135,7 +143,16 @@ export async function fetchJobBySlug(slug: string): Promise<JobWithEmpresa | nul
         .single()
 
       if (!error && data) {
-        return data as unknown as JobWithEmpresa
+        const j = data as any
+        return {
+          ...j,
+          empresa: j.empresa || {
+            nombre: j.empresa_nombre || 'Empresa Externa',
+            avatar_url: j.empresa_logo || null,
+            website: j.url_postulacion_externa || null,
+            ubicacion: j.zona || null,
+          },
+        } as unknown as JobWithEmpresa
       }
     } catch (err) {
       console.warn('Supabase fetch by slug failed, checking mock data', err)

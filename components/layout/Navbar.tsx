@@ -185,6 +185,19 @@ export function Navbar() {
                       )}
                     </div>
 
+                    {isAdmin && (
+                      <div className="p-1.5 border-b border-slate-100 dark:border-slate-800/80">
+                        <Link
+                          href="/admin/agregador"
+                          onClick={() => setDropdownOpen(false)}
+                          className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200/60 dark:border-amber-800/50 transition-colors"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span>Agregador IA de Empleos</span>
+                        </Link>
+                      </div>
+                    )}
+
                     <div className="p-1.5 flex flex-col gap-0.5">
                       {isEmpresa ? (
                         <>
@@ -442,6 +455,16 @@ export function Navbar() {
                       <span>Selección con IA</span>
                     </Link>
                   </div>
+                )}
+                {isAdmin && (
+                  <Link
+                    href="/admin/agregador"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full flex items-center gap-3 px-3.5 py-2.5 text-sm font-bold text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Agregador IA de Empleos</span>
+                  </Link>
                 )}
                 <button
                   onClick={async () => {

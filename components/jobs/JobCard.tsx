@@ -79,6 +79,11 @@ export function JobCard({ job, featured = false, isApplied = false }: JobCardPro
 
         {/* Badges: Rubro, Modalidad, Contrato */}
         <div className="flex flex-wrap items-center gap-2 mt-3">
+          {job.es_externo && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60">
+              Oferta Externa
+            </span>
+          )}
           {isApplied && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
