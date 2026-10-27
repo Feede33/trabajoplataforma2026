@@ -62,9 +62,9 @@ export function Navbar() {
   return (
     <header className={`sticky top-0 z-40 w-full bg-white/90 dark:bg-background/90 backdrop-blur-md transition-colors ${pathname === '/ia-chat' ? 'border-b-0' : 'border-b border-slate-200/80 dark:border-slate-800/80'}`}>
       <div className="w-full px-3 sm:px-5 lg:px-6">
-        <div className="flex items-center justify-between h-16">
+        <div className="relative flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center justify-start gap-4 xl:gap-6 shrink-0">
+          <div className="flex items-center justify-start gap-4 xl:gap-6 shrink-0 z-10">
             <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-md shadow-sky-500/20 group-hover:shadow-sky-500/35 group-hover:scale-105 transition-all border border-slate-200/60 dark:border-slate-800">
                 <Image
@@ -88,14 +88,14 @@ export function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex flex-1 items-center justify-center gap-1 xl:gap-2 px-2 min-w-0">
+          {/* Desktop Navigation - Centrado real */}
+          <nav className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 px-2 z-10">
             <Link
               href="/empleos"
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`px-2.5 xl:px-3 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === '/empleos'
-                  ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60'
               }`}
             >
               Explorar Empleos
@@ -103,7 +103,7 @@ export function Navbar() {
 
             <Link
               href="/empleos-informales"
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+              className={`px-2.5 xl:px-3 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                 pathname === '/empleos-informales'
                   ? 'text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 font-semibold border border-amber-200 dark:border-amber-500/30'
                   : 'text-slate-600 dark:text-slate-300 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-500/15'
@@ -119,10 +119,10 @@ export function Navbar() {
             {!isEmpresa && (
               <Link
                 href="/ia-chat"
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-2.5 xl:px-3 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                   pathname === '/ia-chat'
-                    ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60'
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5 text-sky-500 shrink-0" />
@@ -132,10 +132,10 @@ export function Navbar() {
 
             <Link
               href="/planes"
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`px-2.5 xl:px-3 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === '/planes'
-                  ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60'
               }`}
             >
               Planes
@@ -143,7 +143,7 @@ export function Navbar() {
           </nav>
 
           {/* Action Buttons & User Menu */}
-          <div className="hidden lg:flex items-center justify-end gap-2 xl:gap-3 shrink-0">
+          <div className="hidden lg:flex items-center justify-end gap-2 xl:gap-3 shrink-0 z-10">
             <ModeToggle />
             {profile ? (
               <div ref={dropdownRef} className="relative">
@@ -297,7 +297,7 @@ export function Navbar() {
           </div>
 
           {/* Mobile hamburger button */}
-          <div className="flex lg:hidden items-center gap-1.5 sm:gap-2">
+          <div className="flex lg:hidden items-center gap-1.5 sm:gap-2 z-10">
             <ModeToggle />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
