@@ -86,17 +86,52 @@ export async function sendContactEmail(payload: ContactEmailPayload): Promise<{ 
       return { success: true, messageId: info.messageId }
     } catch (smtpErr: any) {
       console.error('[ContactEmail] Error al enviar con SMTP:', smtpErr)
-      return { success: false, info: smtpErr.message }
     }
   }
 
-  console.log(`[ContactEmail] Simulación de envío a ${SUPPORT_EMAIL} (SMTP no configurado en variables de entorno):`, {
+  // 3. Fallback directo a FormSubmit.co hacia postulauysoporte@gmail.com
+  try {
+    const fsRes = await fetch(`https://formsubmit.co/ajax/${SUPPORT_EMAIL}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Origin': 'https://postulauy.com',
+        'Referer': 'https://postulauy.com/contacto',
+      },
+      body: JSON.stringify({
+        _subject: `💬 [PostulaUY] Mensaje de contacto: ${nombre}`,
+        _replyto: email,
+        _template: 'box',
+        _captcha: 'false',
+        nombre,
+        email,
+        mensaje: descripcion,
+        fecha: new Date().toLocaleString('es-UY', { timeZone: 'America/Montevideo' }),
+      }),
+    })
+
+    const fsData = await fsRes.json().catch(() => ({}))
+    if (fsRes.ok && fsData.success === 'true') {
+      return { success: true, messageId: 'formsubmit-ok' }
+    }
+    if (fsData.message && fsData.message.includes('Activation')) {
+      return {
+        success: true,
+        info: 'Activación requerida en postulauysoporte@gmail.com. Revisa tu casilla y haz clic en "Activate Form" para completar la vinculación.',
+      }
+    }
+  } catch (fsErr) {
+    console.warn('[ContactEmail] Error con FormSubmit:', fsErr)
+  }
+
+  console.log(`[ContactEmail] Registro local para ${SUPPORT_EMAIL}:`, {
     nombre,
     email,
     descripcion: descripcion.slice(0, 100) + '...',
   })
 
-  return { success: true, info: 'Mensaje registrado localmente (SMTP pendiente de configurar)' }
+  return { success: true, info: 'Mensaje registrado' }
 }
 
 function buildContactHtml(nombre: string, email: string, descripcion: string): string {

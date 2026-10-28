@@ -184,6 +184,17 @@ export default function ContactoPage() {
                     </div>
                   )}
 
+                  {/* Sugerencia de envío directo en Gmail */}
+                  <div className="max-w-lg mx-auto p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-xs text-sky-900 dark:text-sky-200 text-left flex items-start gap-2.5">
+                    <Mail className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-sky-950 dark:text-sky-100">¿Querés tener una copia en tus Enviados de Gmail?</p>
+                      <p className="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                        Hacé clic en el botón rojo <strong>&ldquo;Abrir en Gmail&rdquo;</strong> para abrir tu cuenta de Gmail con el destinatario y mensaje listos para enviar.
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Acciones */}
                   <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
                     <a
