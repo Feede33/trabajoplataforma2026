@@ -34,13 +34,16 @@ export function Footer() {
             <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
               La plataforma que conecta a las empresas líderes con el mejor talento del país. Fletes, tecnología, logística, diseño, administración y más.
             </p>
-            <div className="flex items-center gap-4 text-xs text-slate-400 pt-2">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 pt-2">
               <span className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-indigo-400" /> Uruguay
               </span>
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" /> Empleos Verificados
               </span>
+              <Link href="/contacto" className="flex items-center gap-1.5 text-sky-400 hover:text-sky-300 transition-colors font-semibold">
+                <Mail className="w-4 h-4" /> postulauysoporte@gmail.com
+              </Link>
             </div>
           </div>
 
@@ -70,6 +73,11 @@ export function Footer() {
                   Mis Postulaciones
                 </Link>
               </li>
+              <li>
+                <Link href="/contacto" className="text-sky-400 hover:text-sky-300 transition-colors font-medium">
+                  Contacto y Ayuda
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -92,6 +100,11 @@ export function Footer() {
               <li>
                 <Link href="/auth/registro?tipo=empresa" prefetch={false} className="hover:text-white transition-colors">
                   Crear Cuenta Empresa
+                </Link>
+              </li>
+              <li>
+                <Link href="/contacto" className="hover:text-white transition-colors">
+                  Contacto Comercial
                 </Link>
               </li>
             </ul>
@@ -131,6 +144,11 @@ export function Footer() {
         <div className="border-t border-slate-800 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4 text-center sm:text-left">
           <p>© {new Date().getFullYear()} Postulauy.com. Todos los derechos reservados.</p>
           <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-4">
+            <Link href="/contacto" className="text-sky-400 hover:text-sky-300 font-semibold transition-colors underline-offset-4 hover:underline flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5" />
+              Contacto
+            </Link>
+            <span className="text-slate-700">•</span>
             <Link href="/terms-of-service" className="hover:text-white transition-colors underline-offset-4 hover:underline">
               Términos del Servicio
             </Link>
