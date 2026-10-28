@@ -53,10 +53,20 @@ async function fetchPageMarkdown(targetUrl: string): Promise<string> {
   }
 
   const html = await directRes.text()
-  // Limpieza básica de scripts y tags
+  // Preservar enlaces HTML como markdown antes de limpiar tags
   const text = html
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis, (_, href, inner) => {
+      let cleanHref = String(href).trim()
+      if (!cleanHref.startsWith('http://') && !cleanHref.startsWith('https://')) {
+        try {
+          cleanHref = new URL(cleanHref, cleanUrl).href
+        } catch {}
+      }
+      const cleanInner = String(inner).replace(/<[^>]+>/g, '').trim()
+      return cleanInner ? ` [${cleanInner}](${cleanHref}) ` : ' '
+    })
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

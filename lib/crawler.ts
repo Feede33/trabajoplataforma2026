@@ -7,28 +7,33 @@ import { extractExternalJobsFromContent, ExtractedExternalJob } from '@/lib/gemi
 import { getServiceClient } from '@/lib/server/auth'
 
 const JOB_PATH_PATTERNS = [
-  /\/jobs?\//i,
-  /\/empleos?\//i,
-  /\/vacantes?\//i,
-  /\/posic(?:ion|iones)\//i,
-  /\/carreras?\//i,
-  /\/careers?\//i,
-  /\/puestos?\//i,
-  /\/oportunidad(?:es)?\//i,
-  /\/trabaja-con-nosotros/i,
+  /\/ofertas?[-_a-z0-9]*\//i,
+  /\/oferta-de-trabajo/i,
+  /\/jobs?[-_a-z0-9]*\//i,
+  /\/empleos?[-_a-z0-9]*\//i,
+  /\/vacantes?[-_a-z0-9]*\//i,
+  /\/posic(?:ion|iones)[-_a-z0-9]*\//i,
+  /\/carreras?[-_a-z0-9]*\//i,
+  /\/careers?[-_a-z0-9]*\//i,
+  /\/puestos?[-_a-z0-9]*\//i,
+  /\/oportunidad(?:es)?[-_a-z0-9]*\//i,
+  /\/trabaja[-_]con[-_]nosotros/i,
   /\/trabaja_con_nosotros/i,
-  /\/postulac(?:ion|iones)\//i,
-  /\/ofertas?\//i,
-  /\/busquedas?\//i,
+  /\/postulac(?:ion|iones)[-_a-z0-9]*\//i,
+  /\/busquedas?[-_a-z0-9]*\//i,
   /\/detalle\//i,
   /\/detail\//i,
   /\/view\//i,
   /\/v\/\d+/i,
   /\/p\/\d+/i,
   /\/aviso\//i,
+  /\/avisos?[-_a-z0-9]*\//i,
+  /\/trabajo\//i,
+  /\/viewjob/i,
   /id=\d+/i,
   /job_id=/i,
   /posting/i,
+  /[a-f0-9]{32}/i, // Identificadores hash de vacantes (Computrabajo, etc.)
 ]
 
 const SOCIAL_OR_JUNK_PATTERNS = [
@@ -46,13 +51,36 @@ const SOCIAL_OR_JUNK_PATTERNS = [
   /terms/i,
   /contacto/i,
   /contact-us/i,
+  /acceso/i,
+  /ingreso/i,
   /login/i,
   /register/i,
   /signup/i,
+  /signin/i,
+  /mi-cuenta/i,
+  /cuenta/i,
   /cookies/i,
+  /\/empresas\//i, // Perfiles de empresas en portales, no la vacante
+  /\/avisolegal\/?/i,
+  /aviso[-_]?legal/i,
   /\.pdf$/i,
   /\.jpg$/i,
   /\.png$/i,
+]
+
+// Páginas de listados, catálogos o filtros generales de portales que NO son una vacante individual
+const LISTING_PAGE_PATTERNS = [
+  /\/empleos-en-/i,
+  /\/ofertas-en-/i,
+  /\/trabajo-en-/i,
+  /\/trabajos-en-/i,
+  /\/salarios-en-/i,
+  /\/ofertas-de-trabajo\/?$/i,
+  /\/empleos\/?$/i,
+  /\/vacantes\/?$/i,
+  /\/jobs\/?$/i,
+  /\/careers\/?$/i,
+  /[?&]p=\d+/i,
 ]
 
 export function cleanUrl(rawUrl: string): string {
@@ -68,8 +96,7 @@ export function cleanUrl(rawUrl: string): string {
   }
 }
 
-export function discoverJobLinksFromHtml(rootUrl: string, html: string): string[] {
-  const $ = cheerio.load(html)
+export function discoverJobLinksFromHtml(rootUrl: string, content: string): string[] {
   const discovered = new Set<string>()
 
   let baseParsed: URL
@@ -79,29 +106,64 @@ export function discoverJobLinksFromHtml(rootUrl: string, html: string): string[
     return []
   }
 
-  $('a[href]').each((_, el) => {
-    const rawHref = $(el).attr('href')?.trim()
-    const anchorText = $(el).text().toLowerCase().trim()
+  const rawCandidates: Array<{ href: string; text: string }> = []
 
-    if (!rawHref || rawHref.startsWith('javascript:') || rawHref.startsWith('mailto:') || rawHref.startsWith('tel:') || rawHref === '#') {
-      return
+  // 1. Extraer enlaces HTML (vía Cheerio)
+  try {
+    const $ = cheerio.load(content)
+    $('a[href]').each((_, el) => {
+      const rawHref = $(el).attr('href')?.trim()
+      const anchorText = $(el).text().toLowerCase().trim()
+      if (rawHref) {
+        rawCandidates.push({ href: rawHref, text: anchorText })
+      }
+    })
+  } catch {
+    // Si no es HTML válido, continúa con Markdown
+  }
+
+  // 2. Extraer enlaces Markdown [texto](url) en caso de que Jina Reader haya devuelto Markdown
+  const mdRegex = /\[([^\]]*)\]\((https?:\/\/[^\s\)\"\']+|[^\s\)\"\']+)\)/g
+  let mdMatch: RegExpExecArray | null
+  while ((mdMatch = mdRegex.exec(content)) !== null) {
+    rawCandidates.push({
+      href: mdMatch[2].trim(),
+      text: mdMatch[1].toLowerCase().trim(),
+    })
+  }
+
+  for (const { href: rawHref, text: anchorText } of rawCandidates) {
+    if (
+      !rawHref ||
+      rawHref.startsWith('javascript:') ||
+      rawHref.startsWith('mailto:') ||
+      rawHref.startsWith('tel:') ||
+      rawHref === '#'
+    ) {
+      continue
     }
 
     let absoluteUrl: string
     try {
       absoluteUrl = new URL(rawHref, rootUrl).href
     } catch {
-      return
+      continue
     }
 
-    // Filtrar enlaces de redes sociales o páginas basura
+    // Filtrar enlaces de redes sociales, auth o páginas basura
     if (SOCIAL_OR_JUNK_PATTERNS.some((p) => p.test(absoluteUrl))) {
-      return
+      continue
     }
 
-    // Mismo dominio o subdominios de empleo comunes (ej. jobs.lever.co, etc.)
+    // Filtrar páginas de listado/búsqueda general (para no confundirlas con una vacante individual)
+    if (LISTING_PAGE_PATTERNS.some((p) => p.test(absoluteUrl))) {
+      continue
+    }
+
+    // Mismo dominio o subdominios de empleo comunes (ej. jobs.lever.co, computrabajo, etc.)
     const linkParsed = new URL(absoluteUrl)
-    const isSameHost = linkParsed.hostname === baseParsed.hostname || linkParsed.hostname.endsWith('.' + baseParsed.hostname)
+    const isSameHost =
+      linkParsed.hostname === baseParsed.hostname || linkParsed.hostname.endsWith('.' + baseParsed.hostname)
     const isKnownAts = [
       'lever.co',
       'greenhouse.io',
@@ -115,12 +177,12 @@ export function discoverJobLinksFromHtml(rootUrl: string, html: string): string[
     ].some((ats) => linkParsed.hostname.includes(ats))
 
     if (!isSameHost && !isKnownAts) {
-      return
+      continue
     }
 
     // No queremos el root URL en sí
     if (cleanUrl(absoluteUrl) === cleanUrl(rootUrl)) {
-      return
+      continue
     }
 
     // Coincidencia por patrón de URL o por texto del enlace
@@ -142,7 +204,7 @@ export function discoverJobLinksFromHtml(rootUrl: string, html: string): string[
     if (matchesPath || matchesText) {
       discovered.add(cleanUrl(absoluteUrl))
     }
-  })
+  }
 
   return Array.from(discovered)
 }

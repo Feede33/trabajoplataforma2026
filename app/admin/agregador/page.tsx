@@ -1212,17 +1212,35 @@ export default function AdminAgregadorPage() {
                     {job.descripcion.replace(/[*#_`-]/g, '')}
                   </p>
 
-                  {job.url_postulacion_externa && (
-                    <a
-                      href={job.url_postulacion_externa}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline pt-1 truncate max-w-full"
-                    >
-                      <ExternalLink className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{job.url_postulacion_externa}</span>
-                    </a>
-                  )}
+                  <div className="pt-1 space-y-1 border-t border-slate-100 dark:border-slate-800">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      URL directa de postulación:
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        value={job.url_postulacion_externa || ''}
+                        onChange={(e) => {
+                          const updated = [...extractedJobs]
+                          updated[idx] = { ...updated[idx], url_postulacion_externa: e.target.value }
+                          setExtractedJobs(updated)
+                        }}
+                        className="flex-1 px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        placeholder="https://..."
+                      />
+                      {job.url_postulacion_externa && (
+                        <a
+                          href={job.url_postulacion_externa}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400 shrink-0 transition-colors"
+                          title="Probar y abrir enlace en nueva pestaña"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )
             })}

@@ -227,6 +227,16 @@ export default function JobDetailPage() {
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Ya te postulaste • Ver estado</span>
               </button>
+            ) : job.es_externo && job.url_postulacion_externa ? (
+              <a
+                href={job.url_postulacion_externa}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3 rounded-2xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold text-sm transition-all shadow-md shadow-sky-500/20 hover:shadow-lg hover:scale-[1.02] group"
+              >
+                <span>Postularme Ahora</span>
+                <ExternalLink className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+              </a>
             ) : (
               <button
                 onClick={() => setIsApplyModalOpen(true)}

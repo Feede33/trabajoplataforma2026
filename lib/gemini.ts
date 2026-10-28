@@ -349,9 +349,21 @@ export interface ExtractedExternalJob {
 }
 
 
-function cleanJobContent(raw: string): string {
+function cleanJobContent(raw: string, baseUrl?: string): string {
   if (!raw) return ''
-  return raw
+  // Preservar hipervínculos HTML convirtiéndolos a sintaxis Markdown antes de borrar las etiquetas
+  const processed = raw.replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis, (_, href, text) => {
+    let cleanHref = String(href).trim()
+    if (baseUrl && !cleanHref.startsWith('http://') && !cleanHref.startsWith('https://')) {
+      try {
+        cleanHref = new URL(cleanHref, baseUrl).href
+      } catch {}
+    }
+    const cleanText = String(text).replace(/<[^>]+>/g, '').trim()
+    return cleanText ? ` [${cleanText}](${cleanHref}) ` : ' '
+  })
+
+  return processed
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
     .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
@@ -364,6 +376,101 @@ function cleanJobContent(raw: string): string {
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
+}
+
+export function isGenericListingUrl(url: string): boolean {
+  if (!url) return true
+  return [
+    /\/empleos-en-/i,
+    /\/ofertas-en-/i,
+    /\/trabajo-en-/i,
+    /\/trabajos-en-/i,
+    /\/empleos\/?$/i,
+    /\/ofertas-de-trabajo\/?$/i,
+    /\/vacantes\/?$/i,
+    /\/jobs\/?$/i,
+    /\/careers\/?$/i,
+    /[?&]p=\d+/i,
+  ].some((pattern) => pattern.test(url))
+}
+
+export function resolveSpecificJobUrl(
+  title: string,
+  currentUrl: string,
+  rawContent: string,
+  sourceUrl?: string
+): string {
+  // Si currentUrl ya es una URL específica de vacante (no es listing y no es igual al source listing), la dejamos
+  if (currentUrl && !isGenericListingUrl(currentUrl)) {
+    if (!sourceUrl || !isGenericListingUrl(sourceUrl) || currentUrl !== sourceUrl) {
+      return currentUrl
+    }
+  }
+
+  // Extraer todos los enlaces markdown del contenido
+  const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^\s\)\"\']+|[^\s\)\"\']+)\)/g
+  const candidates: Array<{ text: string; href: string }> = []
+  let match: RegExpExecArray | null
+  while ((match = mdRegex.exec(rawContent)) !== null) {
+    const text = match[1].trim().toLowerCase()
+    let href = match[2].trim()
+    if (sourceUrl && !href.startsWith('http://') && !href.startsWith('https://')) {
+      try {
+        href = new URL(href, sourceUrl).href
+      } catch {}
+    }
+    // Descartar hash de tracking (#lc=...)
+    try {
+      const u = new URL(href)
+      u.hash = ''
+      href = u.href
+    } catch {}
+
+    if (
+      !isGenericListingUrl(href) &&
+      (href.includes('/oferta') ||
+        href.includes('/job') ||
+        href.includes('/vacante') ||
+        href.includes('/aviso') ||
+        href.includes('/posicion') ||
+        href.includes('/detail') ||
+        href.includes('/view') ||
+        /[a-f0-9]{32}/i.test(href))
+    ) {
+      candidates.push({ text, href })
+    }
+  }
+
+  if (candidates.length === 0) {
+    return currentUrl || sourceUrl || ''
+  }
+
+  const cleanTitle = title.toLowerCase().trim()
+
+  // 1. Coincidencia exacta
+  const exact = candidates.find((c) => c.text === cleanTitle)
+  if (exact) return exact.href
+
+  // 2. Coincidencia por contención
+  const sub = candidates.find((c) => cleanTitle.includes(c.text) || c.text.includes(cleanTitle))
+  if (sub) return sub.href
+
+  // 3. Coincidencia por solapamiento de palabras
+  const titleWords = cleanTitle.split(/\s+/).filter((w) => w.length > 3)
+  let bestHref: string | null = null
+  let maxMatches = 0
+  for (const c of candidates) {
+    let matches = 0
+    for (const w of titleWords) {
+      if (c.text.includes(w)) matches++
+    }
+    if (matches > maxMatches && matches >= 2) {
+      maxMatches = matches
+      bestHref = c.href
+    }
+  }
+
+  return bestHref || currentUrl || sourceUrl || ''
 }
 
 const EXTERNAL_JOBS_EXTRACTION_PROMPT = `
@@ -385,7 +492,10 @@ REGLAS DE EXTRACCIÓN Y NORMALIZACIÓN:
 11. "descripcion": Descripción prolija, atractiva y completa en formato Markdown con subtítulos como ## Responsabilidades y ## Requisitos, usando viñetas con guiones (-).
 12. "salario_rango": Rango o monto salarial si se menciona (ej: "$50.000 - $70.000 líquidos", "A convenir"). Si no se especifica, null.
 13. "tags": Array con 3 a 5 palabras clave representativas (ej: ["React", "TypeScript", "Node.js"] o ["Excel", "Facturación", "Conciliaciones"]).
-14. "url_postulacion_externa": La URL directa donde el candidato puede postularse (debe comenzar con http:// o https://). Si se proporcionó una URL de origen y no hay enlace específico, usa la URL de origen.
+14. "url_postulacion_externa": La URL directa y específica de la vacante donde el candidato puede postularse (debe comenzar con http:// o https://).
+   - Extrae el enlace individual correspondiente a cada puesto (ej: los enlaces en formato Markdown [Título](URL) o los que contienen el identificador o slug de la oferta).
+   - NUNCA uses la URL de un listado general de búsqueda o catálogo (ej: "https://uy.computrabajo.com/empleos-en-montevideo") si dentro del contenido aparece el enlace directo individual de la vacante.
+   - Si no hay ningún enlace individual específico disponible en el texto, usa la URL de origen proporcionada.
 15. "fuente": Nombre del portal o portal origen (ej: "Web de la empresa", "SmartTalent", "LinkedIn", "Computrabajo", etc.).
 
 Devuelve EXCLUSIVAMENTE un array JSON válido sin ningún texto explicativo adicional:
@@ -415,11 +525,12 @@ export async function extractExternalJobsFromContent(
   sourceUrl?: string,
   companyHint?: string
 ): Promise<ExtractedExternalJob[]> {
+  const cleanedText = cleanJobContent(content, sourceUrl)
   const promptContext = [
     EXTERNAL_JOBS_EXTRACTION_PROMPT,
     sourceUrl ? `URL de origen de la página: ${sourceUrl}` : '',
     companyHint ? `Empresa sugerida o contexto: ${companyHint}` : '',
-    `\nCONTENIDO A ANALIZAR:\n\n${cleanJobContent(content).slice(0, 12000)}`,
+    `\nCONTENIDO A ANALIZAR:\n\n${cleanedText.slice(0, 14000)}`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -433,18 +544,41 @@ export async function extractExternalJobsFromContent(
   const result = await callGemini(contents)
   const items = Array.isArray(result) ? result : [result]
 
-  return items.map((item: any) => ({
-    titulo: String(item.titulo || 'Vacante de Empleo').trim(),
-    empresa_nombre: String(item.empresa_nombre || companyHint || 'Empresa').trim(),
-    empresa_logo: item.empresa_logo || null,
-    descripcion: String(item.descripcion || '').trim(),
-    rubro: String(item.rubro || 'General').trim(),
-    zona: String(item.zona || 'Montevideo').trim(),
-    modalidad: ['presencial', 'remoto', 'hibrido'].includes(item.modalidad) ? item.modalidad : 'presencial',
-    tipo_contrato: ['full-time', 'part-time', 'freelance', 'pasantia'].includes(item.tipo_contrato) ? item.tipo_contrato : 'full-time',
-    salario_rango: item.salario_rango || null,
-    tags: Array.isArray(item.tags) ? item.tags.map((t: any) => String(t).trim()).filter(Boolean) : [],
-    url_postulacion_externa: String(item.url_postulacion_externa || sourceUrl || '').trim(),
-    fuente: item.fuente || (sourceUrl ? new URL(sourceUrl).hostname : 'Web Externa'),
-  }))
+  return items.map((item: any) => {
+    const rawJobUrl = String(item.url_postulacion_externa || '').trim()
+    const finalUrl = resolveSpecificJobUrl(
+      item.titulo || '',
+      rawJobUrl,
+      content,
+      sourceUrl
+    )
+
+    let parsedFuente = item.fuente
+    if (!parsedFuente && sourceUrl) {
+      try {
+        const host = new URL(sourceUrl).hostname.replace(/^www\./, '')
+        if (host.includes('computrabajo')) parsedFuente = 'Computrabajo'
+        else if (host.includes('buscojobs')) parsedFuente = 'BuscoJobs'
+        else if (host.includes('smarttalent')) parsedFuente = 'SmartTalent'
+        else parsedFuente = host
+      } catch {
+        parsedFuente = 'Web Externa'
+      }
+    }
+
+    return {
+      titulo: String(item.titulo || 'Vacante de Empleo').trim(),
+      empresa_nombre: String(item.empresa_nombre || companyHint || 'Empresa').trim(),
+      empresa_logo: item.empresa_logo || null,
+      descripcion: String(item.descripcion || '').trim(),
+      rubro: String(item.rubro || 'General').trim(),
+      zona: String(item.zona || 'Montevideo').trim(),
+      modalidad: ['presencial', 'remoto', 'hibrido'].includes(item.modalidad) ? item.modalidad : 'presencial',
+      tipo_contrato: ['full-time', 'part-time', 'freelance', 'pasantia'].includes(item.tipo_contrato) ? item.tipo_contrato : 'full-time',
+      salario_rango: item.salario_rango || null,
+      tags: Array.isArray(item.tags) ? item.tags.map((t: any) => String(t).trim()).filter(Boolean) : [],
+      url_postulacion_externa: finalUrl || sourceUrl || '',
+      fuente: parsedFuente || 'Web Externa',
+    }
+  })
 }
