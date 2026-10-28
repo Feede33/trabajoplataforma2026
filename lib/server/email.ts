@@ -112,7 +112,9 @@ export async function sendContactEmail(payload: ContactEmailPayload): Promise<{ 
     })
 
     const fsData = await fsRes.json().catch(() => ({}))
-    if (fsRes.ok && fsData.success === 'true') {
+    console.log('[ContactEmail] FormSubmit response:', fsRes.status, fsData)
+
+    if (fsRes.ok && (fsData.success === 'true' || fsData.success === true || (fsData.message && fsData.message.includes('successfully')))) {
       return { success: true, messageId: 'formsubmit-ok' }
     }
     if (fsData.message && fsData.message.includes('Activation')) {
