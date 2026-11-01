@@ -7,6 +7,8 @@ import { extractExternalJobsFromContent, ExtractedExternalJob } from '@/lib/gemi
 import { getServiceClient } from '@/lib/server/auth'
 
 const JOB_PATH_PATTERNS = [
+  /-ID-\d+\/?$/i, // Vacantes individuales de BuscoJobs (ej: /analista-en-montevideo-ID-278210)
+  /\/ofertas-de-trabajo\/oferta-de-trabajo-/i, // Vacantes individuales de Computrabajo
   /\/ofertas?[-_a-z0-9]*\//i,
   /\/oferta-de-trabajo/i,
   /\/jobs?[-_a-z0-9]*\//i,
@@ -45,6 +47,9 @@ const SOCIAL_OR_JUNK_PATTERNS = [
   /tiktok\.com/i,
   /linkedin\.com\/company/i,
   /linkedin\.com\/in/i,
+  /linkedin\.com\/shareArticle/i,
+  /api\.whatsapp\.com\/send/i,
+  /wa\.me\//i,
   /policies/i,
   /privacy/i,
   /terminos/i,
@@ -61,11 +66,16 @@ const SOCIAL_OR_JUNK_PATTERNS = [
   /cuenta/i,
   /cookies/i,
   /\/empresas\//i, // Perfiles de empresas en portales, no la vacante
+  /\/paginas\//i,
   /\/avisolegal\/?/i,
   /aviso[-_]?legal/i,
+  /\/_next\/static\//i,
+  /\/static\/img\//i,
   /\.pdf$/i,
   /\.jpg$/i,
   /\.png$/i,
+  /\.svg$/i,
+  /\.webp$/i,
 ]
 
 // Páginas de listados, catálogos o filtros generales de portales que NO son una vacante individual
@@ -76,11 +86,15 @@ const LISTING_PAGE_PATTERNS = [
   /\/trabajos-en-/i,
   /\/salarios-en-/i,
   /\/ofertas-de-trabajo\/?$/i,
+  /\/ofertas\/_/i, // Listados por departamento/filtro en BuscoJobs (ej: /ofertas/_montevideo)
+  /\/ofertas\/[a-z0-9-]+_\/?$/i, // Categorías en BuscoJobs (ej: /ofertas/confiteria_)
+  /\/ofertas\/[a-z0-9-]+\/trabajo-/i, // Subfiltros en BuscoJobs (ej: /ofertas/mt/trabajo-teletrabajo/_montevideo)
   /\/empleos\/?$/i,
   /\/vacantes\/?$/i,
   /\/jobs\/?$/i,
   /\/careers\/?$/i,
-  /[?&]p=\d+/i,
+  /\/buscar\/?$/i,
+  /[?&](p|page|pagina|jornada|fechainicio)=/i,
 ]
 
 export function cleanUrl(rawUrl: string): string {
@@ -212,6 +226,19 @@ export function discoverJobLinksFromHtml(rootUrl: string, content: string): stri
 export async function fetchCleanPageContent(targetUrl: string): Promise<string> {
   const cleaned = cleanUrl(targetUrl)
 
+  const isBlockedOrChallengeText = (text: string) => {
+    const trimmed = text.trim()
+    if (trimmed.length <= 150) return true
+    if (
+      /Target URL returned error (403|401|503)/i.test(trimmed) ||
+      (/Title:\s*Just a moment/i.test(trimmed) && trimmed.length < 1500) ||
+      (/Enable JavaScript and cookies to continue/i.test(trimmed) && trimmed.length < 1500)
+    ) {
+      return true
+    }
+    return false
+  }
+
   // 1. Jina Reader
   try {
     const jinaUrl = `https://r.jina.ai/${cleaned}`
@@ -220,12 +247,12 @@ export async function fetchCleanPageContent(targetUrl: string): Promise<string> 
         Accept: 'text/plain',
         'User-Agent': 'PostulaUY-DeepCrawler/1.0',
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(6500),
     })
 
     if (res.ok) {
       const text = await res.text()
-      if (text && text.trim().length > 100) {
+      if (text && !isBlockedOrChallengeText(text)) {
         return text
       }
     }
@@ -265,6 +292,7 @@ export async function deepCrawlCompany(
     maxJobs?: number
     companyHint?: string
     skipExisting?: boolean
+    deadlineMs?: number
   } = {}
 ): Promise<{
   discoveredUrls: string[]
@@ -272,7 +300,7 @@ export async function deepCrawlCompany(
   skippedUrls: string[]
   mode: 'multi_page' | 'single_page'
 }> {
-  const { maxJobs = 10, companyHint, skipExisting = true } = options
+  const { maxJobs = 10, companyHint, skipExisting = true, deadlineMs } = options
 
   // 1. Obtener HTML de la página raíz
   const rootHtml = await fetchCleanPageContent(rootUrl)
@@ -316,9 +344,14 @@ export async function deepCrawlCompany(
   if (targetUrls.length > 0) {
     const collectedJobs: ExtractedExternalJob[] = []
 
-    // Procesar en chunks de 2 en 2 para garantizar velocidad y confiabilidad
-    const CHUNK_SIZE = 2
+    // Procesar en chunks de 3 en 3 para mayor velocidad dentro de la ventana de Vercel
+    const CHUNK_SIZE = 3
     for (let i = 0; i < targetUrls.length; i += CHUNK_SIZE) {
+      if (deadlineMs && Date.now() > deadlineMs) {
+        console.log(`[DeepCrawler] Límite de tiempo alcanzado (${i}/${targetUrls.length} URLs procesadas), devolviendo resultados parciales.`)
+        break
+      }
+
       const chunk = targetUrls.slice(i, i + CHUNK_SIZE)
       const chunkPromises = chunk.map(async (jobUrl) => {
         try {
@@ -340,7 +373,7 @@ export async function deepCrawlCompany(
     }
 
     // Si los subenlaces no devolvieron empleos (o estaban vacíos/bloqueados), extraer de la página raíz
-    if (collectedJobs.length === 0 && rootHtml) {
+    if (collectedJobs.length === 0 && rootHtml && (!deadlineMs || Date.now() <= deadlineMs)) {
       try {
         const directJobs = await extractExternalJobsFromContent(rootHtml, rootUrl, companyHint)
         collectedJobs.push(...directJobs)
@@ -352,6 +385,16 @@ export async function deepCrawlCompany(
     return {
       discoveredUrls: allDiscovered,
       jobs: collectedJobs,
+      skippedUrls,
+      mode: 'multi_page',
+    }
+  }
+
+  //Si todos los enlaces descubiertos ya existían en la base de datos, no volver a extraer de la raíz
+  if (allDiscovered.length > 0 && urlsToCrawl.length === 0) {
+    return {
+      discoveredUrls: allDiscovered,
+      jobs: [],
       skippedUrls,
       mode: 'multi_page',
     }

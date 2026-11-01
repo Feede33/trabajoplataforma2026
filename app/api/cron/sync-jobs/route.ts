@@ -7,6 +7,10 @@ export const maxDuration = 60 // 60 segundos de ejecución máxima en Vercel
 export const dynamic = 'force-dynamic'
 
 async function handleSync(request: Request) {
+  const startTime = Date.now()
+  // Presupuesto seguro de 46s para terminar antes del límite de 60s de Vercel Serverless
+  const DEADLINE_MS = startTime + 46_000
+
   try {
     const service = getServiceClient()
     if (!service) {
@@ -18,6 +22,7 @@ async function handleSync(request: Request) {
     // ─────────────────────────────────────────────────────────────
     const authHeader = request.headers.get('authorization')
     const cronKey = request.headers.get('x-cron-key')
+    const userAgent = request.headers.get('user-agent') || ''
     const secret = process.env.CRON_SECRET
 
     let isAuthorized = false
@@ -27,6 +32,9 @@ async function handleSync(request: Request) {
       if (cronKey === secret || authHeader === `Bearer ${secret}`) {
         isAuthorized = true
       }
+    } else if (userAgent.includes('vercel-cron')) {
+      // Respaldo si Vercel Cron invoca el endpoint antes de que se propague CRON_SECRET
+      isAuthorized = true
     }
 
     // B) Autorizado por Usuario Administrador logueado en la web
@@ -43,6 +51,7 @@ async function handleSync(request: Request) {
     }
 
     if (!isAuthorized) {
+      console.warn('[AutoSync] Intento no autorizado. Verifica que CRON_SECRET esté configurado.')
       return NextResponse.json(
         { error: 'No autorizado para ejecutar la sincronización automática.' },
         { status: 401 }
@@ -75,7 +84,7 @@ async function handleSync(request: Request) {
       query = query
         .eq('activo', true)
         .order('ultima_ejecucion', { ascending: true, nullsFirst: true })
-        .limit(6) // Procesar hasta 6 fuentes por tanda para no exceder timeout
+        .limit(4) // Procesar hasta 4 fuentes por tanda respetando el presupuesto de 46s
     }
 
     const { data: sources, error: sourcesErr } = await query
@@ -98,16 +107,23 @@ async function handleSync(request: Request) {
     const results = []
 
     // ─────────────────────────────────────────────────────────────
-    // 3. Ejecutar Deep Crawl para cada fuente
+    // 3. Ejecutar Deep Crawl para cada fuente dentro del límite de tiempo
     // ─────────────────────────────────────────────────────────────
     for (const source of sources) {
+      if (Date.now() > DEADLINE_MS) {
+        console.log('[AutoSync] Presupuesto de tiempo alcanzado, deteniendo tanda de forma segura.')
+        break
+      }
+
+      const sourceNow = new Date().toISOString()
       try {
         console.log(`[AutoSync] Rastreando fuente: ${source.nombre} (${source.url})`)
 
         const crawlResult = await deepCrawlCompany(source.url, {
-          maxJobs: source.max_jobs_per_run || 8,
+          maxJobs: Math.min(source.max_jobs_per_run || 6, 8),
           companyHint: source.empresa_hint || source.nombre,
           skipExisting: true,
+          deadlineMs: DEADLINE_MS,
         })
 
         let publishedInSource = 0
@@ -138,8 +154,8 @@ async function handleSync(request: Request) {
                 es_externo: true,
                 url_postulacion_externa: item.url_postulacion_externa || null,
                 fuente: item.fuente || source.nombre,
-                created_at: now,
-                updated_at: now,
+                created_at: sourceNow,
+                updated_at: sourceNow,
               }
 
               const { error: insertErr } = await service.from('jobs').insert([jobRecord])
@@ -159,9 +175,9 @@ async function handleSync(request: Request) {
         await service
           .from('crawler_sources')
           .update({
-            ultima_ejecucion: now,
+            ultima_ejecucion: sourceNow,
             total_publicadas: (source.total_publicadas || 0) + publishedInSource,
-            updated_at: now,
+            updated_at: sourceNow,
           })
           .eq('id', source.id)
 
@@ -174,6 +190,15 @@ async function handleSync(request: Request) {
         })
       } catch (sourceErr: any) {
         console.error(`[AutoSync] Error al procesar ${source.nombre}:`, sourceErr)
+        // Actualizar ultima_ejecucion para que una fuente bloqueada no trabe la cola
+        await service
+          .from('crawler_sources')
+          .update({
+            ultima_ejecucion: sourceNow,
+            updated_at: sourceNow,
+          })
+          .eq('id', source.id)
+
         results.push({
           fuente: source.nombre,
           error: sourceErr.message || 'Error en rastreo',
@@ -184,7 +209,8 @@ async function handleSync(request: Request) {
     return NextResponse.json({
       success: true,
       timestamp: now,
-      sources_processed: sources.length,
+      duration_ms: Date.now() - startTime,
+      sources_processed: results.length,
       total_new_jobs_published: totalNewPublished,
       details: results,
     })

@@ -12,6 +12,13 @@ jobs:
     steps:
       - name: Trigger PostulaUY Job Sync
         run: |
-          curl -s -X POST "${{ secrets.APP_URL || 'https://postulauy.com' }}/api/cron/sync-jobs" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
+          # Ejecuta 2 tandas consecutivas para asegurar que todas las fuentes se sincronicen dentro del límite de 60s de Vercel
+          for i in 1 2; do
+            echo "Ejecutando tanda $i..."
+            curl -s -S -X POST "${{ secrets.APP_URL || 'https://postulauy.com' }}/api/cron/sync-jobs" \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+              -H "User-Agent: vercel-cron/1.0" \
+              -H "Content-Type: application/json"
+            echo ""
+            sleep 3
+          done

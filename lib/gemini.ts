@@ -23,8 +23,8 @@ export interface ExtractedInformalJob {
 
 export const CANDIDATE_MODELS = [
   'gemini-3-flash-preview',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
 ]
 
 const SYSTEM_EXTRACTION_PROMPT = `
@@ -385,12 +385,16 @@ export function isGenericListingUrl(url: string): boolean {
     /\/ofertas-en-/i,
     /\/trabajo-en-/i,
     /\/trabajos-en-/i,
+    /\/ofertas\/_/i,
+    /\/ofertas\/[a-z0-9-]+_\/?$/i,
+    /\/ofertas\/[a-z0-9-]+\/trabajo-/i,
     /\/empleos\/?$/i,
     /\/ofertas-de-trabajo\/?$/i,
     /\/vacantes\/?$/i,
     /\/jobs\/?$/i,
     /\/careers\/?$/i,
-    /[?&]p=\d+/i,
+    /\/buscar\/?$/i,
+    /[?&](p|page|pagina|jornada|fechainicio)=/i,
   ].some((pattern) => pattern.test(url))
 }
 
@@ -428,7 +432,8 @@ export function resolveSpecificJobUrl(
 
     if (
       !isGenericListingUrl(href) &&
-      (href.includes('/oferta') ||
+      (/-ID-\d+\/?$/i.test(href) ||
+        href.includes('/oferta') ||
         href.includes('/job') ||
         href.includes('/vacante') ||
         href.includes('/aviso') ||
