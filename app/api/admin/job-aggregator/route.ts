@@ -5,7 +5,7 @@ if (typeof process !== 'undefined' && process.env) {
 import { NextResponse } from 'next/server'
 import { extractExternalJobsFromContent, ExtractedExternalJob } from '@/lib/gemini'
 import { deepCrawlCompany, fetchCleanPageContent } from '@/lib/crawler'
-import { searchTheirStackJobs } from '@/lib/theirstack'
+import { searchTheirStackJobs, getTheirStackCreditBalance } from '@/lib/theirstack'
 import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/server/auth'
 import { slugify } from '@/lib/utils'
 
@@ -108,9 +108,12 @@ export async function GET(request: Request) {
         !process.env.THEIRSTACK_API_KEY.includes('tu-theirstack')
     )
 
+    const theirstackBalance = theirstackConfigured ? await getTheirStackCreditBalance() : null
+
     return NextResponse.json({
       sources: sources || [],
       theirstackConfigured,
+      theirstackBalance,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Error al obtener fuentes' }, { status: 500 })
@@ -174,12 +177,15 @@ export async function POST(request: Request) {
         skipExisting: true,
       })
 
+      const balance = await getTheirStackCreditBalance(apiKey)
+
       return NextResponse.json({
         success: true,
         mode: 'theirstack_api',
         discoveredCount: result.rawReturnedCount,
         skippedCount: result.skippedCount,
         creditsUsed: result.creditsUsedEstimate,
+        theirstackBalance: balance,
         count: result.jobs.length,
         jobs: result.jobs,
       })

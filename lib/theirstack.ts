@@ -8,7 +8,7 @@ import { getServiceClient } from '@/lib/server/auth'
 
 export interface TheirStackSearchFilterParams {
   apiKey?: string
-  sourcePortal?: 'computrabajo' | 'all_uy' | 'custom'
+  sourcePortal?: 'all_uy' | 'computrabajo' | 'portales_uy' | 'custom'
   customDomains?: string[]
   countryCodes?: string[]
   jobTitles?: string[]
@@ -19,6 +19,15 @@ export interface TheirStackSearchFilterParams {
   limit?: number
   page?: number
   skipExisting?: boolean
+}
+
+export interface TheirStackCreditBalance {
+  api_credits: number
+  used_api_credits: number
+  remaining_api_credits: number
+  ui_credits?: number
+  used_ui_credits?: number
+  earliest_expiration?: string | null
 }
 
 export interface TheirStackJobItem {
@@ -269,18 +278,51 @@ function inferTipoContrato(job: TheirStackJobItem): 'full-time' | 'part-time' | 
 }
 
 function inferFuenteName(urlStr: string): string {
-  if (!urlStr) return 'Computrabajo'
+  if (!urlStr) return 'TheirStack'
   try {
     const host = new URL(urlStr).hostname.toLowerCase()
     if (host.includes('computrabajo')) return 'Computrabajo'
     if (host.includes('buscojobs')) return 'BuscoJobs'
     if (host.includes('smarttalent')) return 'SmartTalent'
     if (host.includes('linkedin')) return 'LinkedIn'
+    if (host.includes('indeed')) return 'Indeed'
     if (host.includes('gallito')) return 'El Gallito'
     if (host.includes('bumeran')) return 'Bumeran'
+    if (host.includes('workable')) return 'Workable'
+    if (host.includes('greenhouse')) return 'Greenhouse'
+    if (host.includes('lever')) return 'Lever'
     return host.replace(/^www\./, '')
   } catch {
-    return 'Computrabajo'
+    return 'TheirStack'
+  }
+}
+
+export async function getTheirStackCreditBalance(customApiKey?: string): Promise<TheirStackCreditBalance | null> {
+  const apiKey = (customApiKey || process.env.THEIRSTACK_API_KEY || '').trim()
+  if (!apiKey || apiKey.includes('tu-theirstack')) return null
+
+  try {
+    const res = await fetch('https://api.theirstack.com/v0/billing/credit-balance', {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    const total = Number(data?.api_credits) || 0
+    const used = Number(data?.used_api_credits) || 0
+    return {
+      api_credits: total,
+      used_api_credits: used,
+      remaining_api_credits: Math.max(total - used, 0),
+      ui_credits: data?.ui_credits,
+      used_ui_credits: data?.used_ui_credits,
+      earliest_expiration: data?.earliest_expiration || null,
+    }
+  } catch {
+    return null
   }
 }
 
@@ -325,12 +367,17 @@ export function mapTheirStackJobToExternalJob(job: TheirStackJobItem): Extracted
     'Importante Empresa'
   ).trim()
 
-  // Priorizar URL de Computrabajo (source_url o url) o final_url
-  const candidateUrls = [job.url, job.source_url, job.final_url].filter(
+  // Priorizar URL de Computrabajo, BuscoJobs o URL directa de la oferta (final_url / url)
+  const candidateUrls = [job.final_url, job.url, job.source_url].filter(
     (u): u is string => Boolean(u && (u.startsWith('http://') || u.startsWith('https://')))
   )
-  const computrabajoUrl = candidateUrls.find((u) => u.toLowerCase().includes('computrabajo'))
-  const chosenUrl = cleanUrl(computrabajoUrl || candidateUrls[0] || '')
+  const preferredPortalUrl = candidateUrls.find(
+    (u) =>
+      u.toLowerCase().includes('computrabajo') ||
+      u.toLowerCase().includes('buscojobs') ||
+      u.toLowerCase().includes('smarttalent')
+  )
+  const chosenUrl = cleanUrl(preferredPortalUrl || candidateUrls[0] || '')
 
   const rubro = inferRubroFromTheirStackJob(job)
   const zona = inferZonaFromTheirStackJob(job)
@@ -401,10 +448,20 @@ export async function searchTheirStackJobs(
     payload.job_country_code_or = countries
   }
 
-  // Filtro de dominio de origen (Computrabajo por defecto)
-  const sourcePortal = params.sourcePortal || 'computrabajo'
+  // Filtro de dominio de origen
+  const sourcePortal = params.sourcePortal || 'all_uy'
   if (sourcePortal === 'computrabajo') {
     payload.url_domain_or = ['computrabajo.com', 'uy.computrabajo.com', 'computrabajo.com.uy']
+  } else if (sourcePortal === 'portales_uy') {
+    payload.url_domain_or = [
+      'computrabajo.com',
+      'uy.computrabajo.com',
+      'computrabajo.com.uy',
+      'buscojobs.com.uy',
+      'buscojobs.com',
+      'indeed.com',
+      'smarttalent.uy',
+    ]
   } else if (sourcePortal === 'custom' && params.customDomains && params.customDomains.length > 0) {
     payload.url_domain_or = params.customDomains.map((d) => d.trim().toLowerCase()).filter(Boolean)
   }
@@ -472,7 +529,32 @@ export async function searchTheirStackJobs(
   }
 
   const json = await res.json()
-  const rawData: TheirStackJobItem[] = Array.isArray(json?.data) ? json.data : []
+  let rawData: TheirStackJobItem[] = Array.isArray(json?.data) ? json.data : []
+
+  // Si se filtró estrictamente por dominio computrabajo.com y devolvió 0 resultados (0 créditos gastados),
+  // ampliar automáticamente a todos los portales e integraciones del país (Indeed UY, BuscoJobs, etc.)
+  if (rawData.length === 0 && (sourcePortal === 'computrabajo' || sourcePortal === 'portales_uy')) {
+    const fallbackPayload = { ...payload }
+    delete fallbackPayload.url_domain_or
+
+    const fallbackRes = await fetch('https://api.theirstack.com/v1/jobs/search', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(fallbackPayload),
+      signal: AbortSignal.timeout(25000),
+    })
+
+    if (fallbackRes.ok) {
+      const fallbackJson = await fallbackRes.json()
+      if (Array.isArray(fallbackJson?.data) && fallbackJson.data.length > 0) {
+        rawData = fallbackJson.data
+      }
+    }
+  }
 
   const mappedJobs = rawData
     .map((item) => mapTheirStackJobToExternalJob(item))

@@ -50,9 +50,14 @@ export default function AdminAgregadorPage() {
 
   // Estado para Computrabajo / TheirStack API (search_jobs_v1)
   const [theirstackServerConfigured, setTheirstackServerConfigured] = useState(false)
+  const [theirstackBalance, setTheirstackBalance] = useState<{
+    api_credits: number
+    used_api_credits: number
+    remaining_api_credits: number
+  } | null>(null)
   const [tsApiKey, setTsApiKey] = useState('')
   const [showTsApiKeyInput, setShowTsApiKeyInput] = useState(false)
-  const [tsSourcePortal, setTsSourcePortal] = useState<'computrabajo' | 'all_uy' | 'custom'>('computrabajo')
+  const [tsSourcePortal, setTsSourcePortal] = useState<'all_uy' | 'computrabajo' | 'portales_uy' | 'custom'>('all_uy')
   const [tsCustomDomains, setTsCustomDomains] = useState('computrabajo.com, buscojobs.com')
   const [tsCountryCode, setTsCountryCode] = useState('UY')
   const [tsJobTitles, setTsJobTitles] = useState('')
@@ -113,6 +118,9 @@ export default function AdminAgregadorPage() {
       }
       if (typeof data.theirstackConfigured === 'boolean') {
         setTheirstackServerConfigured(data.theirstackConfigured)
+      }
+      if (data.theirstackBalance) {
+        setTheirstackBalance(data.theirstackBalance)
       }
     } catch (err) {
       console.error('Error al cargar fuentes de rastreo:', err)
@@ -237,6 +245,10 @@ export default function AdminAgregadorPage() {
       const data = await res.json()
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Error al procesar la extracción')
+      }
+
+      if (data.theirstackBalance) {
+        setTheirstackBalance(data.theirstackBalance)
       }
 
       if (!data.jobs || data.jobs.length === 0) {
@@ -669,6 +681,11 @@ export default function AdminAgregadorPage() {
                         Requiere API Key
                       </span>
                     )}
+                    {theirstackBalance && (
+                      <span className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 text-[10px] font-extrabold border border-sky-200 dark:border-sky-800">
+                        Créditos API: {theirstackBalance.remaining_api_credits} / {theirstackBalance.api_credits} disponibles
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
                     Consulta vacantes estructuradas de <strong>Computrabajo Uruguay</strong> y portales regionales directamente vía API oficial sin bloqueos de Cloudflare. Cada vacante devuelta consume 1 crédito en TheirStack y se deduplica contra PostulaUY.
@@ -774,11 +791,14 @@ export default function AdminAgregadorPage() {
                 </label>
                 <select
                   value={tsSourcePortal}
-                  onChange={(e) => setTsSourcePortal(e.target.value as 'computrabajo' | 'all_uy' | 'custom')}
+                  onChange={(e) =>
+                    setTsSourcePortal(e.target.value as 'all_uy' | 'computrabajo' | 'portales_uy' | 'custom')
+                  }
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                 >
-                  <option value="computrabajo">Solo Computrabajo (computrabajo.com)</option>
-                  <option value="all_uy">Todos los portales e integraciones (Computrabajo + ATS + LinkedIn)</option>
+                  <option value="all_uy">Todos los portales e integraciones en UY (Recomendado)</option>
+                  <option value="portales_uy">Portales Locales (Computrabajo + BuscoJobs + Indeed UY)</option>
+                  <option value="computrabajo">Priorizar Computrabajo (computrabajo.com)</option>
                   <option value="custom">Dominios personalizados...</option>
                 </select>
               </div>
