@@ -5,6 +5,7 @@ if (typeof process !== 'undefined' && process.env) {
 import { NextResponse } from 'next/server'
 import { extractExternalJobsFromContent, ExtractedExternalJob } from '@/lib/gemini'
 import { deepCrawlCompany, fetchCleanPageContent } from '@/lib/crawler'
+import { searchTheirStackJobs } from '@/lib/theirstack'
 import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/server/auth'
 import { slugify } from '@/lib/utils'
 
@@ -101,7 +102,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ sources: sources || [] })
+    const theirstackConfigured = Boolean(
+      process.env.THEIRSTACK_API_KEY &&
+        process.env.THEIRSTACK_API_KEY.trim().length > 5 &&
+        !process.env.THEIRSTACK_API_KEY.includes('tu-theirstack')
+    )
+
+    return NextResponse.json({
+      sources: sources || [],
+      theirstackConfigured,
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Error al obtener fuentes' }, { status: 500 })
   }
@@ -130,6 +140,50 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const { action } = body
+
+    // ─────────────────────────────────────────────────────────────
+    // 0A. TheirStack API (search_jobs_v1): Computrabajo & Portales
+    // ─────────────────────────────────────────────────────────────
+    if (action === 'theirstack_search') {
+      const {
+        apiKey,
+        sourcePortal,
+        customDomains,
+        countryCodes,
+        jobTitles,
+        descriptionKeywords,
+        companyNames,
+        postedAtMaxAgeDays,
+        workplaceTypes,
+        limit,
+        page,
+      } = body
+
+      const result = await searchTheirStackJobs({
+        apiKey,
+        sourcePortal: sourcePortal || 'computrabajo',
+        customDomains: Array.isArray(customDomains) ? customDomains : [],
+        countryCodes: Array.isArray(countryCodes) && countryCodes.length > 0 ? countryCodes : ['UY'],
+        jobTitles: Array.isArray(jobTitles) ? jobTitles : [],
+        descriptionKeywords: Array.isArray(descriptionKeywords) ? descriptionKeywords : [],
+        companyNames: Array.isArray(companyNames) ? companyNames : [],
+        postedAtMaxAgeDays: Number(postedAtMaxAgeDays) || 14,
+        workplaceTypes: Array.isArray(workplaceTypes) ? workplaceTypes : undefined,
+        limit: Math.min(Number(limit) || 10, 50),
+        page: Math.max(Number(page) || 0, 0),
+        skipExisting: true,
+      })
+
+      return NextResponse.json({
+        success: true,
+        mode: 'theirstack_api',
+        discoveredCount: result.rawReturnedCount,
+        skippedCount: result.skippedCount,
+        creditsUsed: result.creditsUsedEstimate,
+        count: result.jobs.length,
+        jobs: result.jobs,
+      })
+    }
 
     // ─────────────────────────────────────────────────────────────
     // 0. Deep Crawler: Rastrear enlaces internos de la página raíz

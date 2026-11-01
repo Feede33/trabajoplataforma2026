@@ -25,6 +25,10 @@ import {
   PlusCircle,
   Zap,
   Radio,
+  KeyRound,
+  Search,
+  Database,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useAuth } from '@/lib/context/AuthContext'
 import { ExtractedExternalJob } from '@/lib/gemini'
@@ -36,11 +40,28 @@ import { createClient } from '@/lib/supabase/client'
 export default function AdminAgregadorPage() {
   const { profile, isAdmin, isLoading } = useAuth()
 
-  const [activeTab, setActiveTab] = useState<'deep_crawl' | 'single_url' | 'text' | 'continuous_cron'>('deep_crawl')
+  const [activeTab, setActiveTab] = useState<
+    'computrabajo_api' | 'deep_crawl' | 'single_url' | 'text' | 'continuous_cron'
+  >('computrabajo_api')
   const [urlInput, setUrlInput] = useState('')
   const [textInput, setTextInput] = useState('')
   const [companyHint, setCompanyHint] = useState('')
   const [maxJobsLimit, setMaxJobsLimit] = useState(20)
+
+  // Estado para Computrabajo / TheirStack API (search_jobs_v1)
+  const [theirstackServerConfigured, setTheirstackServerConfigured] = useState(false)
+  const [tsApiKey, setTsApiKey] = useState('')
+  const [showTsApiKeyInput, setShowTsApiKeyInput] = useState(false)
+  const [tsSourcePortal, setTsSourcePortal] = useState<'computrabajo' | 'all_uy' | 'custom'>('computrabajo')
+  const [tsCustomDomains, setTsCustomDomains] = useState('computrabajo.com, buscojobs.com')
+  const [tsCountryCode, setTsCountryCode] = useState('UY')
+  const [tsJobTitles, setTsJobTitles] = useState('')
+  const [tsDescriptionWords, setTsDescriptionWords] = useState('')
+  const [tsCompanyNames, setTsCompanyNames] = useState('')
+  const [tsMaxAgeDays, setTsMaxAgeDays] = useState(14)
+  const [tsWorkplaceType, setTsWorkplaceType] = useState<'all' | 'on_site' | 'remote' | 'hybrid'>('all')
+  const [tsLimit, setTsLimit] = useState(10)
+  const [tsPage, setTsPage] = useState(0)
 
   const [isExtracting, setIsExtracting] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
@@ -51,6 +72,7 @@ export default function AdminAgregadorPage() {
     mode?: string
     discoveredCount?: number
     skippedCount?: number
+    creditsUsed?: number
   } | null>(null)
 
   const [extractedJobs, setExtractedJobs] = useState<ExtractedExternalJob[]>([])
@@ -89,6 +111,9 @@ export default function AdminAgregadorPage() {
       if (data.sources) {
         setSources(data.sources)
       }
+      if (typeof data.theirstackConfigured === 'boolean') {
+        setTheirstackServerConfigured(data.theirstackConfigured)
+      }
     } catch (err) {
       console.error('Error al cargar fuentes de rastreo:', err)
     } finally {
@@ -97,10 +122,30 @@ export default function AdminAgregadorPage() {
   }
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedKey = window.localStorage.getItem('puy_theirstack_api_key')
+      if (savedKey) {
+        setTsApiKey(savedKey)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (isAdmin) {
       loadSources()
     }
   }, [isAdmin])
+
+  const handleSaveTsApiKey = (val: string) => {
+    setTsApiKey(val)
+    if (typeof window !== 'undefined') {
+      if (val.trim()) {
+        window.localStorage.setItem('puy_theirstack_api_key', val.trim())
+      } else {
+        window.localStorage.removeItem('puy_theirstack_api_key')
+      }
+    }
+  }
 
   // Si no es admin
   if (!isLoading && !isAdmin) {
@@ -137,7 +182,28 @@ export default function AdminAgregadorPage() {
       } = await supabase.auth.getSession()
 
       let payload: any = {}
-      if (activeTab === 'deep_crawl') {
+      if (activeTab === 'computrabajo_api') {
+        const parseCommaList = (raw: string) =>
+          raw
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+
+        payload = {
+          action: 'theirstack_search',
+          apiKey: tsApiKey.trim() || undefined,
+          sourcePortal: tsSourcePortal,
+          customDomains: tsSourcePortal === 'custom' ? parseCommaList(tsCustomDomains) : undefined,
+          countryCodes: tsCountryCode === 'ALL' ? ['ALL'] : [tsCountryCode],
+          jobTitles: parseCommaList(tsJobTitles),
+          descriptionKeywords: parseCommaList(tsDescriptionWords),
+          companyNames: parseCommaList(tsCompanyNames),
+          postedAtMaxAgeDays: tsMaxAgeDays,
+          workplaceTypes: tsWorkplaceType === 'all' ? undefined : [tsWorkplaceType],
+          limit: tsLimit,
+          page: tsPage,
+        }
+      } else if (activeTab === 'deep_crawl') {
         payload = {
           action: 'deep_crawl',
           url: urlInput.trim(),
@@ -174,14 +240,19 @@ export default function AdminAgregadorPage() {
       }
 
       if (!data.jobs || data.jobs.length === 0) {
-        if (activeTab === 'deep_crawl' && data.skippedCount > 0) {
+        if ((activeTab === 'deep_crawl' || activeTab === 'computrabajo_api') && data.skippedCount > 0) {
           setCrawlStats({
             mode: data.mode,
             discoveredCount: data.discoveredCount,
             skippedCount: data.skippedCount,
+            creditsUsed: data.creditsUsed,
           })
           setSuccessMsg(
-            `Se descubrieron ${data.discoveredCount || 0} enlaces de vacantes, pero los ${data.skippedCount} ya estaban publicados en PostulaUY (no hay ofertas nuevas sin publicar).`
+            `Se encontraron ${data.discoveredCount || 0} vacantes, pero las ${data.skippedCount} ya estaban publicadas en PostulaUY (no hay ofertas nuevas sin publicar en esta página).`
+          )
+        } else if (activeTab === 'computrabajo_api') {
+          setErrorMsg(
+            'TheirStack no devolvió ofertas para esa combinación de filtros. Prueba ampliar la antigüedad (ej. 14 o 30 días) o quitar filtros específicos de cargo.'
           )
         } else {
           setErrorMsg('La IA no detectó ofertas de empleo válidas en el contenido analizado.')
@@ -190,7 +261,19 @@ export default function AdminAgregadorPage() {
         setExtractedJobs(data.jobs)
         setSelectedIndices(new Set(data.jobs.map((_: any, idx: number) => idx)))
 
-        if (activeTab === 'deep_crawl') {
+        if (activeTab === 'computrabajo_api') {
+          setCrawlStats({
+            mode: 'theirstack_api',
+            discoveredCount: data.discoveredCount,
+            skippedCount: data.skippedCount,
+            creditsUsed: data.creditsUsed,
+          })
+          setSuccessMsg(
+            `¡Consulta TheirStack exitosa! Se obtuvieron ${data.discoveredCount || data.jobs.length} vacantes de ${
+              tsSourcePortal === 'computrabajo' ? 'Computrabajo' : 'TheirStack'
+            } y ${data.jobs.length} están listas para publicar.`
+          )
+        } else if (activeTab === 'deep_crawl') {
           setCrawlStats({
             mode: data.mode,
             discoveredCount: data.discoveredCount,
@@ -489,6 +572,27 @@ export default function AdminAgregadorPage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
           <button
             type="button"
+            onClick={() => setActiveTab('computrabajo_api')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'computrabajo_api'
+                ? 'bg-sky-600 text-white shadow-md shadow-sky-500/20'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            <span>Computrabajo (TheirStack API)</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                activeTab === 'computrabajo_api'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300'
+              }`}
+            >
+              v1 API
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('deep_crawl')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'deep_crawl'
@@ -541,9 +645,323 @@ export default function AdminAgregadorPage() {
         </div>
 
         {/* ─────────────────────────────────────────────────────────────
-            TAB 1, 2 & 3: EXTRACCIÓN MANUAL / BAJO DEMANDA
+            TAB 0, 1, 2 & 3: EXTRACCIÓN MANUAL / API / BAJO DEMANDA
            ───────────────────────────────────────────────────────────── */}
-        {activeTab !== 'continuous_cron' ? (
+        {activeTab === 'computrabajo_api' ? (
+          <form onSubmit={handleExtract} className="space-y-5">
+            {/* Banner informativo de TheirStack */}
+            <div className="p-4 rounded-2xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200/70 dark:border-sky-800/60 text-xs text-sky-950 dark:text-sky-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <Database className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold">TheirStack API v1 (`POST /v1/jobs/search`) — Integración Computrabajo</p>
+                    {theirstackServerConfigured ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold uppercase border border-emerald-300 dark:border-emerald-800">
+                        THEIRSTACK_API_KEY activa en servidor
+                      </span>
+                    ) : tsApiKey.trim() ? (
+                      <span className="px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 text-[10px] font-extrabold uppercase border border-sky-300 dark:border-sky-800">
+                        Token configurado en navegador
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 text-[10px] font-extrabold uppercase border border-amber-300 dark:border-amber-800">
+                        Requiere API Key
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-sky-800 dark:text-sky-300 leading-relaxed">
+                    Consulta vacantes estructuradas de <strong>Computrabajo Uruguay</strong> y portales regionales directamente vía API oficial sin bloqueos de Cloudflare. Cada vacante devuelta consume 1 crédito en TheirStack y se deduplica contra PostulaUY.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTsApiKeyInput(!showTsApiKeyInput)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-sky-200 dark:border-sky-800 bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 text-xs font-bold hover:bg-sky-50 dark:hover:bg-slate-800 shrink-0 transition-colors cursor-pointer"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>{showTsApiKeyInput ? 'Ocultar API Key' : 'Configurar API Key'}</span>
+              </button>
+            </div>
+
+            {/* Campo de API Key (visible si se abre o si no está configurada en el servidor) */}
+            {(showTsApiKeyInput || (!theirstackServerConfigured && !tsApiKey)) && (
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="tsApiKey" className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-sky-600" />
+                    <span>TheirStack Bearer API Key:</span>
+                  </label>
+                  <a
+                    href="https://app.theirstack.com/settings/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline"
+                  >
+                    <span>Obtener API Key en TheirStack</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <input
+                  id="tsApiKey"
+                  type="password"
+                  placeholder={
+                    theirstackServerConfigured
+                      ? 'Opcional: Sobrescribir THEIRSTACK_API_KEY del servidor...'
+                      : 'Pega aquí tu token Bearer (eyJhbGci... o ts_...)'
+                  }
+                  value={tsApiKey}
+                  onChange={(e) => handleSaveTsApiKey(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Puedes guardarla aquí (se recuerda en tu navegador) o definir <code className="px-1 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800">THEIRSTACK_API_KEY</code> en <code className="px-1 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800">.env.local</code>.
+                </p>
+              </div>
+            )}
+
+            {/* Presets rápidos de búsqueda en Computrabajo */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1 flex items-center gap-1">
+                <SlidersHorizontal className="w-3 h-3" />
+                <span>Filtros rápidos:</span>
+              </span>
+              {[
+                { label: 'Todas las vacantes recientes (Computrabajo UY)', titles: '' },
+                {
+                  label: 'Tecnología & Sistemas',
+                  titles: 'Desarrollador, Software, Analista, Soporte, QA, Sistemas, Programador',
+                },
+                {
+                  label: 'Comercio & Ventas',
+                  titles: 'Vendedor, Cajero, Atención al Cliente, Ventas, Asesor Comercial, Repositor',
+                },
+                {
+                  label: 'Administración & Contabilidad',
+                  titles: 'Administrativo, Auxiliar Contable, Recepcionista, Facturación, Contabilidad',
+                },
+                {
+                  label: 'Logística & Operarios',
+                  titles: 'Logística, Depósito, Chofer, Operario, Cadete, Almacén',
+                },
+              ].map((preset, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setTsJobTitles(preset.titles)
+                    setTsPage(0)
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer ${
+                    tsJobTitles === preset.titles
+                      ? 'bg-sky-600 text-white border-sky-600'
+                      : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Grid de Parámetros search_jobs_v1 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Portal / Dominio */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Fuente / Portal (`url_domain_or`):
+                </label>
+                <select
+                  value={tsSourcePortal}
+                  onChange={(e) => setTsSourcePortal(e.target.value as 'computrabajo' | 'all_uy' | 'custom')}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                >
+                  <option value="computrabajo">Solo Computrabajo (computrabajo.com)</option>
+                  <option value="all_uy">Todos los portales e integraciones (Computrabajo + ATS + LinkedIn)</option>
+                  <option value="custom">Dominios personalizados...</option>
+                </select>
+              </div>
+
+              {/* País */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  País (`job_country_code_or`):
+                </label>
+                <select
+                  value={tsCountryCode}
+                  onChange={(e) => setTsCountryCode(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                >
+                  <option value="UY">🇺🇾 Uruguay (UY)</option>
+                  <option value="AR">🇦🇷 Argentina (AR)</option>
+                  <option value="CL">🇨🇱 Chile (CL)</option>
+                  <option value="CO">🇨🇴 Colombia (CO)</option>
+                  <option value="PE">🇵🇪 Perú (PE)</option>
+                  <option value="MX">🇲🇽 México (MX)</option>
+                  <option value="ES">🇪🇸 España (ES)</option>
+                  <option value="ALL">🌎 Todos los países</option>
+                </select>
+              </div>
+
+              {/* Antigüedad máxima (Obligatorio en TheirStack) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Publicadas hace máx. (`posted_at_max_age_days`):
+                </label>
+                <select
+                  value={tsMaxAgeDays}
+                  onChange={(e) => setTsMaxAgeDays(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                >
+                  <option value={1}>Últimas 24 horas (1 día)</option>
+                  <option value={3}>Últimos 3 días</option>
+                  <option value={7}>Últimos 7 días</option>
+                  <option value={14}>Últimos 14 días (Recomendado)</option>
+                  <option value={30}>Últimos 30 días</option>
+                  <option value={60}>Últimos 60 días</option>
+                </select>
+              </div>
+
+              {tsSourcePortal === 'custom' && (
+                <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Dominios personalizados (separados por coma):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="computrabajo.com, buscojobs.com, smarttalent.uy"
+                    value={tsCustomDomains}
+                    onChange={(e) => setTsCustomDomains(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200"
+                  />
+                </div>
+              )}
+
+              {/* Cargos / Títulos (job_title_or) */}
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Títulos o Cargos a buscar (`job_title_or`, separados por coma - opcional):
+                </label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Dejar vacío para traer cualquier cargo, o ej: Desarrollador, Vendedor, Analista"
+                    value={tsJobTitles}
+                    onChange={(e) => setTsJobTitles(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  />
+                </div>
+              </div>
+
+              {/* Filtrar por Empresa (company_name_partial_match_or) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Empresa (`company_name_partial_match_or` - opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Mercado Libre, Sabre, Tata..."
+                  value={tsCompanyNames}
+                  onChange={(e) => setTsCompanyNames(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                />
+              </div>
+
+              {/* Palabras en Descripción */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Palabras en descripción (`job_description_contains_or` - opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Excel, inglés, React, libreta..."
+                  value={tsDescriptionWords}
+                  onChange={(e) => setTsDescriptionWords(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                />
+              </div>
+
+              {/* Modalidad */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Modalidad (`workplace_types_or`):
+                </label>
+                <select
+                  value={tsWorkplaceType}
+                  onChange={(e) => setTsWorkplaceType(e.target.value as 'all' | 'on_site' | 'remote' | 'hybrid')}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                >
+                  <option value="all">Todas las modalidades</option>
+                  <option value="on_site">Presencial (on_site)</option>
+                  <option value="remote">Remoto (remote)</option>
+                  <option value="hybrid">Híbrido (hybrid)</option>
+                </select>
+              </div>
+
+              {/* Límite de vacantes y Página */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Límite (`limit`):
+                  </label>
+                  <select
+                    value={tsLimit}
+                    onChange={(e) => setTsLimit(Number(e.target.value))}
+                    className="w-full px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  >
+                    <option value={5}>5 empleos</option>
+                    <option value={10}>10 empleos</option>
+                    <option value={15}>15 empleos</option>
+                    <option value={25}>25 empleos</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Página (`page`):
+                  </label>
+                  <select
+                    value={tsPage}
+                    onChange={(e) => setTsPage(Number(e.target.value))}
+                    className="w-full px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  >
+                    <option value={0}>Página 1 (0)</option>
+                    <option value={1}>Página 2 (1)</option>
+                    <option value={2}>Página 3 (2)</option>
+                    <option value={3}>Página 4 (3)</option>
+                    <option value={4}>Página 5 (4)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="submit"
+                disabled={isExtracting}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-sky-500/20 cursor-pointer"
+              >
+                {isExtracting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Consultando TheirStack API v1 (Computrabajo)...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 text-sky-200" />
+                    <span>Buscar y Extraer Empleos de Computrabajo</span>
+                  </>
+                )}
+              </button>
+
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                Endpoint: <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800">POST https://api.theirstack.com/v1/jobs/search</code>
+              </span>
+            </div>
+          </form>
+        ) : activeTab !== 'continuous_cron' ? (
           <form onSubmit={handleExtract} className="space-y-4">
             {activeTab === 'deep_crawl' && (
               <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
@@ -1056,17 +1474,23 @@ export default function AdminAgregadorPage() {
           </div>
         )}
 
-        {/* Crawl Stats Banner for Manual Deep Crawl */}
+        {/* Crawl Stats Banner for Manual Deep Crawl or TheirStack API */}
         {activeTab !== 'continuous_cron' && crawlStats && (
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 flex flex-wrap items-center gap-4 text-xs">
             <div className="flex items-center gap-2">
               <span className="text-slate-500">Modo:</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200 capitalize">
-                {crawlStats.mode === 'multi_page' ? 'Multilink (Enlaces Internos)' : 'Página única'}
+              <span className="font-bold text-slate-800 dark:text-slate-200">
+                {crawlStats.mode === 'theirstack_api'
+                  ? 'TheirStack API v1 (Computrabajo)'
+                  : crawlStats.mode === 'multi_page'
+                  ? 'Multilink (Enlaces Internos)'
+                  : 'Página única'}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-500">Enlaces descubiertos:</span>
+              <span className="text-slate-500">
+                {crawlStats.mode === 'theirstack_api' ? 'Vacantes devueltas por API:' : 'Enlaces descubiertos:'}
+              </span>
               <span className="font-bold text-indigo-600 dark:text-indigo-400">
                 {crawlStats.discoveredCount || 0}
               </span>
@@ -1085,6 +1509,14 @@ export default function AdminAgregadorPage() {
                 {extractedJobs.length}
               </span>
             </div>
+            {crawlStats.creditsUsed !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500">Créditos TheirStack consumidos:</span>
+                <span className="font-bold text-sky-600 dark:text-sky-400">
+                  {crawlStats.creditsUsed}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

@@ -5,6 +5,7 @@ if (typeof process !== 'undefined' && process.env) {
 import * as cheerio from 'cheerio'
 import { extractExternalJobsFromContent, extractExternalJobsBatch, ExtractedExternalJob } from '@/lib/gemini'
 import { getServiceClient } from '@/lib/server/auth'
+import { searchTheirStackJobs } from '@/lib/theirstack'
 
 const JOB_PATH_PATTERNS = [
   /-ID-\d+\/?$/i, // Vacantes individuales de BuscoJobs (ej: /analista-en-montevideo-ID-278210)
@@ -330,8 +331,35 @@ export async function deepCrawlCompany(
 }> {
   const { maxJobs = 20, companyHint, skipExisting = true, deadlineMs } = options
 
+  // Si es una URL de Computrabajo o TheirStack y hay API Key configurada, usar TheirStack como vía principal o respaldo ante bloqueo Cloudflare
+  const isComputrabajoUrl = /computrabajo\.com/i.test(rootUrl) || /theirstack\.com/i.test(rootUrl)
+
   // 1. Obtener HTML de la página raíz
-  const rootHtml = await fetchCleanPageContent(rootUrl)
+  let rootHtml = ''
+  try {
+    if (/api\.theirstack\.com/i.test(rootUrl)) {
+      throw new Error('Use TheirStack API')
+    }
+    rootHtml = await fetchCleanPageContent(rootUrl)
+  } catch (fetchErr: any) {
+    if (isComputrabajoUrl && process.env.THEIRSTACK_API_KEY) {
+      console.log('[DeepCrawler] Usando TheirStack API para Computrabajo:', rootUrl)
+      const tsResult = await searchTheirStackJobs({
+        sourcePortal: 'computrabajo',
+        countryCodes: ['UY'],
+        limit: maxJobs,
+        postedAtMaxAgeDays: 14,
+        skipExisting,
+      })
+      return {
+        discoveredUrls: tsResult.jobs.map((j) => j.url_postulacion_externa),
+        jobs: tsResult.jobs,
+        skippedUrls: Array(tsResult.skippedCount).fill('skipped'),
+        mode: 'multi_page',
+      }
+    }
+    throw fetchErr
+  }
 
   // 2. Descubrir enlaces de vacantes
   const allDiscovered = discoverJobLinksFromHtml(rootUrl, rootHtml)
