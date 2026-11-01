@@ -4,7 +4,7 @@ if (typeof process !== 'undefined' && process.env) {
 
 import { NextResponse } from 'next/server'
 import { extractExternalJobsFromContent, ExtractedExternalJob } from '@/lib/gemini'
-import { deepCrawlCompany } from '@/lib/crawler'
+import { deepCrawlCompany, fetchCleanPageContent } from '@/lib/crawler'
 import { getAuthedContext, getServiceClient, isBackendConfigured } from '@/lib/server/auth'
 import { slugify } from '@/lib/utils'
 
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
       }
 
       const result = await deepCrawlCompany(url, {
-        maxJobs: Math.min(Number(maxJobs) || 8, 20),
+        maxJobs: Math.min(Number(maxJobs) || 20, 25),
         companyHint,
         skipExisting: true,
       })
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Debes proporcionar una URL válida.' }, { status: 400 })
       }
 
-      const content = await fetchPageMarkdown(url)
+      const content = await fetchCleanPageContent(url).catch(() => fetchPageMarkdown(url))
       if (!content || content.length < 50) {
         return NextResponse.json(
           { error: 'No se pudo obtener contenido de la URL indicada o la página está vacía.' },

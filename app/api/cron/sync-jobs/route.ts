@@ -120,7 +120,7 @@ async function handleSync(request: Request) {
         console.log(`[AutoSync] Rastreando fuente: ${source.nombre} (${source.url})`)
 
         const crawlResult = await deepCrawlCompany(source.url, {
-          maxJobs: Math.min(source.max_jobs_per_run || 6, 8),
+          maxJobs: Math.min(source.max_jobs_per_run || 20, 25),
           companyHint: source.empresa_hint || source.nombre,
           skipExisting: true,
           deadlineMs: DEADLINE_MS,

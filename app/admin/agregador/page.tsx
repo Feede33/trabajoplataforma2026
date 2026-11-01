@@ -39,7 +39,7 @@ export default function AdminAgregadorPage() {
   const [urlInput, setUrlInput] = useState('')
   const [textInput, setTextInput] = useState('')
   const [companyHint, setCompanyHint] = useState('')
-  const [maxJobsLimit, setMaxJobsLimit] = useState(10)
+  const [maxJobsLimit, setMaxJobsLimit] = useState(20)
 
   const [isExtracting, setIsExtracting] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
@@ -173,7 +173,18 @@ export default function AdminAgregadorPage() {
       }
 
       if (!data.jobs || data.jobs.length === 0) {
-        setErrorMsg('La IA no detectó ofertas de empleo válidas en el contenido analizado.')
+        if (activeTab === 'deep_crawl' && data.skippedCount > 0) {
+          setCrawlStats({
+            mode: data.mode,
+            discoveredCount: data.discoveredCount,
+            skippedCount: data.skippedCount,
+          })
+          setSuccessMsg(
+            `Se descubrieron ${data.discoveredCount || 0} enlaces de vacantes, pero los ${data.skippedCount} ya estaban publicados en PostulaUY (no hay ofertas nuevas sin publicar).`
+          )
+        } else {
+          setErrorMsg('La IA no detectó ofertas de empleo válidas en el contenido analizado.')
+        }
       } else {
         setExtractedJobs(data.jobs)
         setSelectedIndices(new Set(data.jobs.map((_: any, idx: number) => idx)))

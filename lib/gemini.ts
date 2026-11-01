@@ -22,9 +22,13 @@ export interface ExtractedInformalJob {
 }
 
 export const CANDIDATE_MODELS = [
-  'gemini-3-flash-preview',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
 ]
 
 const SYSTEM_EXTRACTION_PROMPT = `
@@ -85,7 +89,7 @@ export function makeHttpsPost(urlStr: string, payload: any): Promise<{ statusCod
           'Content-Length': Buffer.byteLength(postData),
         },
         rejectUnauthorized: false, // Evita conflictos con certificados de antivirus/proxies en Windows
-        timeout: 35000,
+        timeout: 14000,
       },
       (res) => {
         let responseBody = ''
@@ -106,7 +110,7 @@ export function makeHttpsPost(urlStr: string, payload: any): Promise<{ statusCod
 
     req.on('timeout', () => {
       req.destroy()
-      reject(new Error('Tiempo de espera agotado al conectar con Google Gemini (timeout 35s)'))
+      reject(new Error('Tiempo de espera agotado al conectar con Google Gemini (timeout 14s)'))
     })
 
     req.on('error', (err) => {
@@ -141,8 +145,7 @@ export async function callGemini(contents: any[]): Promise<any> {
       const { statusCode, data } = await makeHttpsPost(url, payload)
 
       if (statusCode !== 200) {
-        // Si el modelo está con alta demanda (503) o no existe (404), intentamos el siguiente
-        if (statusCode === 503 || statusCode === 404 || statusCode === 429) {
+        if (statusCode === 503 || statusCode === 404 || statusCode === 429 || statusCode >= 500) {
           lastError = new Error(`Modelo ${model} no disponible (${statusCode}): ${data?.error?.message || 'Error temporal'}`)
           continue
         }
@@ -160,6 +163,45 @@ export async function callGemini(contents: any[]): Promise<any> {
     } catch (err: any) {
       console.warn(`Intento fallido con modelo ${model}:`, err.message)
       lastError = err
+    }
+  }
+
+  // Fallback automático a OpenAI (gpt-4o-mini) si todos los modelos de Gemini fallan o agotan cuota
+  const openaiKey = process.env.OPENAI_API_KEY
+  const textParts = contents?.[0]?.parts?.filter((p: any) => typeof p?.text === 'string').map((p: any) => p.text) || []
+  const hasInlineData = contents?.[0]?.parts?.some((p: any) => p?.inline_data)
+  if (openaiKey && !openaiKey.includes('tu-openai') && textParts.length > 0 && !hasInlineData) {
+    try {
+      const oaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          temperature: 0.2,
+          messages: [
+            {
+              role: 'system',
+              content: 'Responde únicamente con un array JSON válido [...], sin texto adicional ni bloques markdown.',
+            },
+            {
+              role: 'user',
+              content: textParts.join('\n\n'),
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(15000),
+      })
+      if (oaiRes.ok) {
+        const oaiData = await oaiRes.json()
+        const rawText = oaiData?.choices?.[0]?.message?.content || ''
+        const cleanedText = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
+        return JSON.parse(cleanedText)
+      }
+    } catch (oaiErr: any) {
+      console.warn('Fallback a OpenAI también falló:', oaiErr.message)
     }
   }
 
@@ -349,9 +391,21 @@ export interface ExtractedExternalJob {
 }
 
 
-function cleanJobContent(raw: string, baseUrl?: string): string {
+export function cleanJobContent(raw: string, baseUrl?: string): string {
   if (!raw) return ''
-  // Preservar hipervínculos HTML convirtiéndolos a sintaxis Markdown antes de borrar las etiquetas
+
+  // 1. Conservar bloques JSON-LD (JobPosting estructurado en BuscoJobs, Computrabajo, etc.)
+  const jsonLdBlocks: string[] = []
+  const ldRegex = /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  let ldMatch: RegExpExecArray | null
+  while ((ldMatch = ldRegex.exec(raw)) !== null) {
+    const ldText = ldMatch[1]?.trim()
+    if (ldText && (ldText.includes('JobPosting') || ldText.includes('ListItem'))) {
+      jsonLdBlocks.push(ldText.slice(0, 3500))
+    }
+  }
+
+  // 2. Preservar hipervínculos HTML convirtiéndolos a sintaxis Markdown antes de borrar las etiquetas
   const processed = raw.replace(/<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis, (_, href, text) => {
     let cleanHref = String(href).trim()
     if (baseUrl && !cleanHref.startsWith('http://') && !cleanHref.startsWith('https://')) {
@@ -363,7 +417,7 @@ function cleanJobContent(raw: string, baseUrl?: string): string {
     return cleanText ? ` [${cleanText}](${cleanHref}) ` : ' '
   })
 
-  return processed
+  const bodyText = processed
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
     .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
@@ -376,6 +430,12 @@ function cleanJobContent(raw: string, baseUrl?: string): string {
     .replace(/[\r\n\t]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim()
+
+  if (jsonLdBlocks.length > 0) {
+    return `DATOS ESTRUCTURADOS JSON-LD:\n${jsonLdBlocks.join('\n')}\n\nTEXTO DE LA PÁGINA:\n${bodyText}`
+  }
+
+  return bodyText
 }
 
 export function isGenericListingUrl(url: string): boolean {
@@ -433,6 +493,7 @@ export function resolveSpecificJobUrl(
     if (
       !isGenericListingUrl(href) &&
       (/-ID-\d+\/?$/i.test(href) ||
+        href.includes('/anuncio/') ||
         href.includes('/oferta') ||
         href.includes('/job') ||
         href.includes('/vacante') ||
@@ -586,4 +647,82 @@ export async function extractExternalJobsFromContent(
       fuente: parsedFuente || 'Web Externa',
     }
   })
+}
+
+/**
+ * Extrae empleos en lote (hasta 4 páginas individuales en una sola llamada a Gemini)
+ * para multiplicar la velocidad x4 y evitar límites de cuota RPM.
+ */
+export async function extractExternalJobsBatch(
+  pages: Array<{ url: string; content: string }>,
+  companyHint?: string
+): Promise<ExtractedExternalJob[]> {
+  if (pages.length === 0) return []
+  if (pages.length === 1) {
+    return extractExternalJobsFromContent(pages[0].content, pages[0].url, companyHint)
+  }
+
+  const combinedBlocks = pages
+    .map((p, idx) => {
+      const cleaned = cleanJobContent(p.content, p.url).slice(0, 4200)
+      return `=== VACANTE #${idx + 1} | URL_DIRECTA_OBLIGATORIA: ${p.url} ===\n${cleaned}`
+    })
+    .join('\n\n')
+
+  const promptContext = [
+    EXTERNAL_JOBS_EXTRACTION_PROMPT,
+    companyHint ? `Contexto o portal: ${companyHint}` : '',
+    `IMPORTANTE: A continuación se incluyen ${pages.length} páginas individuales de vacantes separadas por "=== VACANTE #N | URL_DIRECTA_OBLIGATORIA: <url> ===". Extrae CADA vacante y asigna como "url_postulacion_externa" exactamente la URL_DIRECTA_OBLIGATORIA de su bloque.`,
+    `\nCONTENIDO DE LAS ${pages.length} VACANTES:\n\n${combinedBlocks}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const result = await callGemini([{ parts: [{ text: promptContext }] }])
+  const items = Array.isArray(result) ? result : [result]
+
+  return items
+    .filter((item: any) => item && item.titulo)
+    .map((item: any, idx: number) => {
+      const fallbackUrl = pages[Math.min(idx, pages.length - 1)]?.url || pages[0].url
+      const rawUrl = String(item.url_postulacion_externa || '').trim()
+      const validUrl =
+        rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : fallbackUrl
+
+      let parsedFuente = item.fuente
+      if (!parsedFuente && validUrl) {
+        try {
+          const host = new URL(validUrl).hostname.replace(/^www\./, '')
+          if (host.includes('computrabajo')) parsedFuente = 'Computrabajo'
+          else if (host.includes('buscojobs')) parsedFuente = 'BuscoJobs'
+          else if (host.includes('smarttalent')) parsedFuente = 'SmartTalent'
+          else parsedFuente = host
+        } catch {
+          parsedFuente = 'Web Externa'
+        }
+      }
+
+      return {
+        titulo: String(item.titulo || 'Vacante de Empleo').trim(),
+        empresa_nombre: String(item.empresa_nombre || companyHint || 'Empresa').trim(),
+        empresa_logo: item.empresa_logo || null,
+        descripcion: String(item.descripcion || '').trim(),
+        rubro: String(item.rubro || 'General').trim(),
+        zona: String(item.zona || 'Montevideo').trim(),
+        modalidad: ['presencial', 'remoto', 'hibrido'].includes(item.modalidad)
+          ? item.modalidad
+          : 'presencial',
+        tipo_contrato: ['full-time', 'part-time', 'freelance', 'pasantia'].includes(
+          item.tipo_contrato
+        )
+          ? item.tipo_contrato
+          : 'full-time',
+        salario_rango: item.salario_rango || null,
+        tags: Array.isArray(item.tags)
+          ? item.tags.map((t: any) => String(t).trim()).filter(Boolean)
+          : [],
+        url_postulacion_externa: validUrl,
+        fuente: parsedFuente || 'Web Externa',
+      }
+    })
 }

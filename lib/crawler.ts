@@ -3,12 +3,13 @@ if (typeof process !== 'undefined' && process.env) {
 }
 
 import * as cheerio from 'cheerio'
-import { extractExternalJobsFromContent, ExtractedExternalJob } from '@/lib/gemini'
+import { extractExternalJobsFromContent, extractExternalJobsBatch, ExtractedExternalJob } from '@/lib/gemini'
 import { getServiceClient } from '@/lib/server/auth'
 
 const JOB_PATH_PATTERNS = [
   /-ID-\d+\/?$/i, // Vacantes individuales de BuscoJobs (ej: /analista-en-montevideo-ID-278210)
   /\/ofertas-de-trabajo\/oferta-de-trabajo-/i, // Vacantes individuales de Computrabajo
+  /\/anuncio\//i, // Vacantes individuales de El Gallito (ej: /anuncio/peon-para-planta-industrial-d8u33)
   /\/ofertas?[-_a-z0-9]*\//i,
   /\/oferta-de-trabajo/i,
   /\/jobs?[-_a-z0-9]*\//i,
@@ -146,6 +147,26 @@ export function discoverJobLinksFromHtml(rootUrl: string, content: string): stri
     })
   }
 
+  // 2b. Capturar enlaces Markdown anidados que contienen imágenes dentro del texto: [... ![img](...) ...](https://...)
+  const nestedMdRegex = /\]\((https?:\/\/[^\s\)\"\']+)\)/g
+  let nestedMatch: RegExpExecArray | null
+  while ((nestedMatch = nestedMdRegex.exec(content)) !== null) {
+    rawCandidates.push({
+      href: nestedMatch[1].trim(),
+      text: 'ver oferta',
+    })
+  }
+
+  // 3. Extraer URLs de bloques JSON-LD ("url": "https://...") como usa BuscoJobs en su HTML SSR
+  const jsonLdUrlRegex = /"url"\s*:\s*"(https?:\/\/[^"\s]+)"/gi
+  let ldMatch: RegExpExecArray | null
+  while ((ldMatch = jsonLdUrlRegex.exec(content)) !== null) {
+    rawCandidates.push({
+      href: ldMatch[1].trim(),
+      text: 'ver oferta',
+    })
+  }
+
   for (const { href: rawHref, text: anchorText } of rawCandidates) {
     if (
       !rawHref ||
@@ -231,50 +252,57 @@ export async function fetchCleanPageContent(targetUrl: string): Promise<string> 
     if (trimmed.length <= 150) return true
     if (
       /Target URL returned error (403|401|503)/i.test(trimmed) ||
-      (/Title:\s*Just a moment/i.test(trimmed) && trimmed.length < 1500) ||
-      (/Enable JavaScript and cookies to continue/i.test(trimmed) && trimmed.length < 1500)
+      (/Title:\s*Just a moment/i.test(trimmed) && trimmed.length < 2500) ||
+      (/Enable JavaScript and cookies to continue/i.test(trimmed) && trimmed.length < 2500) ||
+      (/Attention Required!\s*\|\s*Cloudflare/i.test(trimmed) && trimmed.length < 4000)
     ) {
       return true
     }
     return false
   }
 
-  // 1. Jina Reader
+  // 1. Fetch directo ultrarrápido (~150-600ms, sin límite de rate-limit externo)
   try {
-    const jinaUrl = `https://r.jina.ai/${cleaned}`
-    const res = await fetch(jinaUrl, {
+    const directRes = await fetch(cleaned, {
       headers: {
-        Accept: 'text/plain',
-        'User-Agent': 'PostulaUY-DeepCrawler/1.0',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'es-UY,es;q=0.9,en;q=0.8',
       },
-      signal: AbortSignal.timeout(6500),
+      signal: AbortSignal.timeout(5000),
     })
 
-    if (res.ok) {
-      const text = await res.text()
-      if (text && !isBlockedOrChallengeText(text)) {
-        return text
+    if (directRes.ok) {
+      const html = await directRes.text()
+      if (html && !isBlockedOrChallengeText(html) && html.length > 500) {
+        return html
       }
     }
   } catch (err) {
-    console.warn(`[DeepCrawler] Jina falló para ${cleaned}, probando fetch directo:`, err)
+    console.warn(`[DeepCrawler] Fetch directo falló para ${cleaned}, probando Jina Reader:`, err)
   }
 
-  // 2. Fetch directo
-  const directRes = await fetch(cleaned, {
+  // 2. Fallback a Jina Reader (para SPAs complejas o páginas que requieran renderizado)
+  const jinaUrl = `https://r.jina.ai/${cleaned}`
+  const res = await fetch(jinaUrl, {
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,text/plain',
+      Accept: 'text/plain',
+      'User-Agent': 'PostulaUY-DeepCrawler/1.0',
     },
-    signal: AbortSignal.timeout(6000),
+    signal: AbortSignal.timeout(6500),
   })
 
-  if (!directRes.ok) {
-    throw new Error(`Error HTTP ${directRes.status} al leer ${cleaned}`)
+  if (!res.ok) {
+    throw new Error(`Error HTTP ${res.status} al leer ${cleaned}`)
   }
 
-  return await directRes.text()
+  const text = await res.text()
+  if (isBlockedOrChallengeText(text)) {
+    throw new Error(`El sitio ${new URL(cleaned).hostname} bloqueó el acceso automático (Cloudflare/403).`)
+  }
+
+  return text
 }
 
 export interface DeepCrawlProgress {
@@ -300,7 +328,7 @@ export async function deepCrawlCompany(
   skippedUrls: string[]
   mode: 'multi_page' | 'single_page'
 }> {
-  const { maxJobs = 10, companyHint, skipExisting = true, deadlineMs } = options
+  const { maxJobs = 20, companyHint, skipExisting = true, deadlineMs } = options
 
   // 1. Obtener HTML de la página raíz
   const rootHtml = await fetchCleanPageContent(rootUrl)
@@ -340,46 +368,79 @@ export async function deepCrawlCompany(
   // Limitar al máximo solicitado
   const targetUrls = urlsToCrawl.slice(0, maxJobs)
 
-  // 4. Si encontramos enlaces individuales, rastrear cada uno en lotes
+  // 4. Si encontramos enlaces individuales, descargar su HTML en paralelo y extraer en lotes con IA
   if (targetUrls.length > 0) {
     const collectedJobs: ExtractedExternalJob[] = []
+    const fetchedPages: Array<{ url: string; content: string }> = []
 
-    // Procesar en chunks de 3 en 3 para mayor velocidad dentro de la ventana de Vercel
-    const CHUNK_SIZE = 3
-    for (let i = 0; i < targetUrls.length; i += CHUNK_SIZE) {
+    // 4a. Descargar páginas HTML en paralelo (de 6 en 6, toma < 1s con fetch directo)
+    const FETCH_CONCURRENCY = 6
+    for (let i = 0; i < targetUrls.length; i += FETCH_CONCURRENCY) {
+      if (deadlineMs && Date.now() > deadlineMs) break
+      const slice = targetUrls.slice(i, i + FETCH_CONCURRENCY)
+      const fetched = await Promise.allSettled(
+        slice.map(async (jobUrl) => ({
+          url: jobUrl,
+          content: await fetchCleanPageContent(jobUrl),
+        }))
+      )
+      fetched.forEach((res) => {
+        if (res.status === 'fulfilled' && res.value.content) {
+          fetchedPages.push(res.value)
+        }
+      })
+    }
+
+    // 4b. Extraer con IA agrupando de a 4 vacantes por llamada a Gemini (20 vacantes = solo 5 llamadas)
+    const AI_BATCH_SIZE = 4
+    const aiBatches: Array<Array<{ url: string; content: string }>> = []
+    for (let i = 0; i < fetchedPages.length; i += AI_BATCH_SIZE) {
+      aiBatches.push(fetchedPages.slice(i, i + AI_BATCH_SIZE))
+    }
+
+    let lastAiError: any = null
+
+    // Ejecutar hasta 2 lotes de IA en paralelo por ola (8 vacantes por ola)
+    const AI_WAVE_CONCURRENCY = 2
+    for (let w = 0; w < aiBatches.length; w += AI_WAVE_CONCURRENCY) {
       if (deadlineMs && Date.now() > deadlineMs) {
-        console.log(`[DeepCrawler] Límite de tiempo alcanzado (${i}/${targetUrls.length} URLs procesadas), devolviendo resultados parciales.`)
+        console.log(`[DeepCrawler] Límite de tiempo alcanzado, devolviendo ${collectedJobs.length} empleos extraídos.`)
         break
       }
 
-      const chunk = targetUrls.slice(i, i + CHUNK_SIZE)
-      const chunkPromises = chunk.map(async (jobUrl) => {
-        try {
-          const pageContent = await fetchCleanPageContent(jobUrl)
-          const extracted = await extractExternalJobsFromContent(pageContent, jobUrl, companyHint)
-          return extracted
-        } catch (err) {
-          console.warn(`[DeepCrawler] Error extrayendo ${jobUrl}:`, err)
-          return []
-        }
-      })
+      const wave = aiBatches.slice(w, w + AI_WAVE_CONCURRENCY)
+      const waveResults = await Promise.allSettled(
+        wave.map(async (batch) => {
+          try {
+            return await extractExternalJobsBatch(batch, companyHint)
+          } catch (err) {
+            lastAiError = err
+            console.warn('[DeepCrawler] Error en lote IA:', err)
+            return []
+          }
+        })
+      )
 
-      const results = await Promise.allSettled(chunkPromises)
-      results.forEach((res) => {
+      waveResults.forEach((res) => {
         if (res.status === 'fulfilled' && Array.isArray(res.value)) {
           collectedJobs.push(...res.value)
         }
       })
     }
 
-    // Si los subenlaces no devolvieron empleos (o estaban vacíos/bloqueados), extraer de la página raíz
+    // Si los subenlaces no devolvieron empleos, intentar extraer de la página raíz
     if (collectedJobs.length === 0 && rootHtml && (!deadlineMs || Date.now() <= deadlineMs)) {
       try {
         const directJobs = await extractExternalJobsFromContent(rootHtml, rootUrl, companyHint)
         collectedJobs.push(...directJobs)
       } catch (err) {
+        lastAiError = err
         console.warn('[DeepCrawler] Fallback de página principal falló:', err)
       }
+    }
+
+    if (collectedJobs.length === 0 && lastAiError) {
+      throw lastAiError
     }
 
     return {
@@ -402,9 +463,41 @@ export async function deepCrawlCompany(
 
   // 5. Fallback: Si no tiene enlaces a páginas individuales, la página raíz lista todo en un solo bloque
   const directExtracted = await extractExternalJobsFromContent(rootHtml, rootUrl, companyHint)
+  let filteredDirect = directExtracted
+
+  if (skipExisting && directExtracted.length > 0) {
+    const service = getServiceClient()
+    if (service) {
+      try {
+        const candidateUrls = directExtracted
+          .map((j) => cleanUrl(j.url_postulacion_externa))
+          .filter(Boolean)
+        if (candidateUrls.length > 0) {
+          const { data: existing } = await service
+            .from('jobs')
+            .select('url_postulacion_externa')
+            .in('url_postulacion_externa', candidateUrls)
+          if (existing && existing.length > 0) {
+            const existingSet = new Set(existing.map((e) => cleanUrl(e.url_postulacion_externa || '')))
+            filteredDirect = directExtracted.filter((j) => {
+              const u = cleanUrl(j.url_postulacion_externa)
+              if (u && existingSet.has(u) && u !== cleanUrl(rootUrl)) {
+                skippedUrls.push(u)
+                return false
+              }
+              return true
+            })
+          }
+        }
+      } catch (err) {
+        console.warn('[DeepCrawler] Error verificando duplicados en modo single_page:', err)
+      }
+    }
+  }
+
   return {
     discoveredUrls: [rootUrl],
-    jobs: directExtracted,
+    jobs: filteredDirect,
     skippedUrls,
     mode: 'single_page',
   }
