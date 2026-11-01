@@ -280,8 +280,29 @@ export async function POST(request: Request) {
       const insertedJobs = []
       const errors = []
 
+      // Prevenir duplicados al momento de publicar en lote (por URL externa)
+      const incomingUrls = jobs
+        .map((j) => (j.url_postulacion_externa || '').trim())
+        .filter(Boolean)
+      const alreadyPublishedUrls = new Set<string>()
+      if (incomingUrls.length > 0) {
+        const { data: existingRows } = await service
+          .from('jobs')
+          .select('url_postulacion_externa')
+          .in('url_postulacion_externa', incomingUrls)
+        existingRows?.forEach((r) => {
+          if (r.url_postulacion_externa) alreadyPublishedUrls.add(r.url_postulacion_externa.trim())
+        })
+      }
+
       for (const item of jobs) {
         try {
+          if (
+            item.url_postulacion_externa &&
+            alreadyPublishedUrls.has(item.url_postulacion_externa.trim())
+          ) {
+            continue
+          }
           const randomSuffix = Math.floor(1000 + Math.random() * 9000)
           const baseSlug = slugify(item.titulo || 'empleo')
           const companySlug = item.empresa_nombre ? slugify(item.empresa_nombre) : 'uy'

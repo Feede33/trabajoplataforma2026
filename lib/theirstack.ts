@@ -466,7 +466,7 @@ function formatComputrabajoDescription(rawDesc: string): string {
  */
 export async function fetchComputrabajoDirectJobs(
   params: TheirStackSearchFilterParams
-): Promise<{ jobs: ExtractedExternalJob[]; rawDiscoveredCount: number }> {
+): Promise<{ jobs: ExtractedExternalJob[]; rawDiscoveredCount: number; preSkippedCount: number }> {
   const countryMap: Record<string, { subdomain: string; defaultPath: string }> = {
     UY: { subdomain: 'uy', defaultPath: '/empleos-en-montevideo' },
     AR: { subdomain: 'ar', defaultPath: '/empleos-en-buenos-aires-gba' },
@@ -521,14 +521,52 @@ export async function fetchComputrabajoDirectJobs(
       const html = await res.text()
       const matches = html.match(/\/ofertas-de-trabajo\/oferta-de-trabajo-[a-zA-Z0-9_-]+/g) || []
       for (const rel of matches) {
-        discoveredOfferUrls.add(`${baseUrl}${rel}`)
+        discoveredOfferUrls.add(cleanUrl(`${baseUrl}${rel}`))
       }
     })
   )
 
   const allOfferUrls = Array.from(discoveredOfferUrls)
   if (allOfferUrls.length === 0) {
-    return { jobs: [], rawDiscoveredCount: 0 }
+    return { jobs: [], rawDiscoveredCount: 0, preSkippedCount: 0 }
+  }
+
+  // Filtrar previamente contra Supabase las URLs ya publicadas para no descargarlas de nuevo
+  // y poder completar el cupo `limit` con ofertas realmente nuevas de la página
+  let candidateOfferUrls = allOfferUrls
+  let preSkippedCount = 0
+
+  if (params.skipExisting !== false) {
+    const service = getServiceClient()
+    if (service) {
+      try {
+        const { data: existing } = await service
+          .from('jobs')
+          .select('url_postulacion_externa')
+          .in('url_postulacion_externa', allOfferUrls)
+
+        if (existing && existing.length > 0) {
+          const existingSet = new Set(existing.map((e) => cleanUrl(e.url_postulacion_externa || '')))
+          candidateOfferUrls = allOfferUrls.filter((u) => {
+            if (existingSet.has(cleanUrl(u))) {
+              preSkippedCount++
+              return false
+            }
+            return true
+          })
+        }
+      } catch (err) {
+        console.warn('[ComputrabajoDirect] Error verificando URLs existentes:', err)
+      }
+    }
+  }
+
+  if (candidateOfferUrls.length === 0) {
+    return {
+      jobs: [],
+      rawDiscoveredCount: preSkippedCount,
+      preSkippedCount,
+    }
   }
 
   // Tomar un margen extra para aplicar filtros de empresa/descripción si fueron indicados
@@ -537,7 +575,7 @@ export async function fetchComputrabajoDirectJobs(
     (params.descriptionKeywords && params.descriptionKeywords.length > 0) ||
     (params.workplaceTypes && params.workplaceTypes.length > 0)
 
-  const urlsToFetch = allOfferUrls.slice(0, hasExtraFilters ? Math.min(limit * 2, 24) : limit)
+  const urlsToFetch = candidateOfferUrls.slice(0, hasExtraFilters ? Math.min(limit * 2, 24) : limit)
   const extractedJobs: ExtractedExternalJob[] = []
 
   const detailResponses = await Promise.allSettled(
@@ -658,7 +696,8 @@ export async function fetchComputrabajoDirectJobs(
 
   return {
     jobs: extractedJobs,
-    rawDiscoveredCount: extractedJobs.length,
+    rawDiscoveredCount: extractedJobs.length + preSkippedCount,
+    preSkippedCount,
   }
 }
 
@@ -692,6 +731,7 @@ export async function searchTheirStackJobs(
 
   let collectedJobs: ExtractedExternalJob[] = []
   let rawReturnedCount = 0
+  let preSkippedTotal = 0
   let creditsUsedEstimate = 0
 
   // 1. Si el usuario seleccionó Computrabajo o puso uy.computrabajo.com en dominios personalizados,
@@ -699,9 +739,10 @@ export async function searchTheirStackJobs(
   if (wantsComputrabajoDirect) {
     try {
       const directCt = await fetchComputrabajoDirectJobs(params)
-      if (directCt.jobs.length > 0) {
+      if (directCt.jobs.length > 0 || directCt.preSkippedCount > 0) {
         collectedJobs.push(...directCt.jobs)
         rawReturnedCount += directCt.rawDiscoveredCount
+        preSkippedTotal += directCt.preSkippedCount
       }
     } catch (ctErr) {
       console.warn('[ComputrabajoDirect] Error al extraer directamente de Computrabajo:', ctErr)
@@ -855,42 +896,58 @@ export async function searchTheirStackJobs(
     )
   }
 
-  // Deduplicar URLs repetidas dentro del mismo lote
+  // Deduplicar URLs y títulos repetidos dentro del mismo lote
   const seenUrls = new Set<string>()
+  const seenTitleCompany = new Set<string>()
   const uniqueBatchJobs: ExtractedExternalJob[] = []
   for (const j of collectedJobs) {
     const key = cleanUrl(j.url_postulacion_externa)
-    if (!key || seenUrls.has(key)) continue
+    const tcKey = `${j.titulo.toLowerCase().trim()}|${j.empresa_nombre.toLowerCase().trim()}`
+    if (!key || seenUrls.has(key) || seenTitleCompany.has(tcKey)) continue
     seenUrls.add(key)
+    seenTitleCompany.add(tcKey)
     uniqueBatchJobs.push(j)
   }
 
-  // Deduplicar contra vacantes ya publicadas en Supabase
+  // Deduplicar contra vacantes ya publicadas en Supabase (por URL exacta y por Título + Empresa)
   let finalJobs = uniqueBatchJobs
-  let skippedCount = 0
+  let skippedCount = preSkippedTotal
 
   if (params.skipExisting !== false && uniqueBatchJobs.length > 0) {
     const service = getServiceClient()
     if (service) {
       try {
         const candidateUrls = uniqueBatchJobs.map((j) => j.url_postulacion_externa).filter(Boolean)
-        if (candidateUrls.length > 0) {
-          const { data: existing } = await service
-            .from('jobs')
-            .select('url_postulacion_externa')
-            .in('url_postulacion_externa', candidateUrls)
+        const candidateTitles = uniqueBatchJobs.map((j) => j.titulo).filter(Boolean)
 
-          if (existing && existing.length > 0) {
-            const existingSet = new Set(existing.map((e) => cleanUrl(e.url_postulacion_externa || '')))
-            finalJobs = uniqueBatchJobs.filter((j) => {
-              if (existingSet.has(cleanUrl(j.url_postulacion_externa))) {
-                skippedCount++
-                return false
-              }
-              return true
-            })
+        const [{ data: existingByUrl }, { data: existingByTitle }] = await Promise.all([
+          candidateUrls.length > 0
+            ? service.from('jobs').select('url_postulacion_externa').in('url_postulacion_externa', candidateUrls)
+            : Promise.resolve({ data: [] as any[] }),
+          candidateTitles.length > 0
+            ? service.from('jobs').select('titulo, empresa_nombre').in('titulo', candidateTitles)
+            : Promise.resolve({ data: [] as any[] }),
+        ])
+
+        const existingUrlSet = new Set(
+          (existingByUrl || []).map((e: any) => cleanUrl(e.url_postulacion_externa || ''))
+        )
+        const existingTitleCompanySet = new Set(
+          (existingByTitle || []).map(
+            (e: any) =>
+              `${String(e.titulo || '').toLowerCase().trim()}|${String(e.empresa_nombre || '').toLowerCase().trim()}`
+          )
+        )
+
+        finalJobs = uniqueBatchJobs.filter((j) => {
+          const urlKey = cleanUrl(j.url_postulacion_externa)
+          const tcKey = `${j.titulo.toLowerCase().trim()}|${j.empresa_nombre.toLowerCase().trim()}`
+          if (existingUrlSet.has(urlKey) || existingTitleCompanySet.has(tcKey)) {
+            skippedCount++
+            return false
           }
-        }
+          return true
+        })
       } catch (err) {
         console.warn('[TheirStack] No se pudo verificar duplicados en Supabase:', err)
       }
