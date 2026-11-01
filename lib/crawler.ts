@@ -331,19 +331,22 @@ export async function deepCrawlCompany(
 }> {
   const { maxJobs = 20, companyHint, skipExisting = true, deadlineMs } = options
 
-  // Si es una URL de Computrabajo o TheirStack y hay API Key configurada, usar TheirStack como vía principal o respaldo ante bloqueo Cloudflare
+  // Si es la raíz de Computrabajo o TheirStack, extraer directamente vía JSON-LD / TheirStack
+  const isComputrabajoRoot = /^https?:\/\/(www\.|uy\.)?computrabajo\.com(\.uy)?\/?(ofertas-de-trabajo\/?)?$/i.test(
+    rootUrl.trim()
+  )
   const isComputrabajoUrl = /computrabajo\.com/i.test(rootUrl) || /theirstack\.com/i.test(rootUrl)
 
   // 1. Obtener HTML de la página raíz
   let rootHtml = ''
   try {
-    if (/api\.theirstack\.com/i.test(rootUrl)) {
-      throw new Error('Use TheirStack API')
+    if (/api\.theirstack\.com/i.test(rootUrl) || isComputrabajoRoot) {
+      throw new Error('Use Direct Computrabajo / TheirStack Extractor')
     }
     rootHtml = await fetchCleanPageContent(rootUrl)
   } catch (fetchErr: any) {
-    if (isComputrabajoUrl && process.env.THEIRSTACK_API_KEY) {
-      console.log('[DeepCrawler] Usando TheirStack API para Computrabajo:', rootUrl)
+    if (isComputrabajoUrl) {
+      console.log('[DeepCrawler] Extrayendo vacantes estructuradas de Computrabajo:', rootUrl)
       const tsResult = await searchTheirStackJobs({
         sourcePortal: 'computrabajo',
         countryCodes: ['UY'],
