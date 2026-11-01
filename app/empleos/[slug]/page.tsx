@@ -26,6 +26,7 @@ import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 import { ApplyModal } from '@/components/jobs/ApplyModal'
 import { EditJobModal } from '@/components/jobs/EditJobModal'
 import { BookmarkIconButton } from '@/components/jobs/BookmarkIconButton'
+import { FormattedJobDescription } from '@/components/jobs/FormattedJobDescription'
 import { useAuth } from '@/lib/context/AuthContext'
 
 export default function JobDetailPage() {
@@ -259,9 +260,7 @@ export default function JobDetailPage() {
               Descripción del Puesto
             </h2>
 
-            <div className="prose prose-slate max-w-none text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-              {job.descripcion}
-            </div>
+            <FormattedJobDescription content={job.descripcion} />
 
             {/* Tags */}
             {job.tags && job.tags.length > 0 && (

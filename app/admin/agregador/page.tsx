@@ -30,6 +30,7 @@ import { useAuth } from '@/lib/context/AuthContext'
 import { ExtractedExternalJob } from '@/lib/gemini'
 import { CrawlerSource } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
+import { stripMarkdownToPlainText } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
 export default function AdminAgregadorPage() {
@@ -1220,7 +1221,7 @@ export default function AdminAgregadorPage() {
                   </div>
 
                   <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed">
-                    {job.descripcion.replace(/[*#_`-]/g, '')}
+                    {stripMarkdownToPlainText(job.descripcion)}
                   </p>
 
                   <div className="pt-1 space-y-1 border-t border-slate-100 dark:border-slate-800">

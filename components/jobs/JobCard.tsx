@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { MapPin, Building2, Clock, Banknote, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { JobWithEmpresa } from '@/lib/supabase/database.types'
 import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, stripMarkdownToPlainText } from '@/lib/utils'
 import { BookmarkIconButton } from '@/components/jobs/BookmarkIconButton'
 
 interface JobCardProps {
@@ -103,7 +103,7 @@ export function JobCard({ job, featured = false, isApplied = false }: JobCardPro
 
         {/* Description snippet */}
         <p className="text-sm text-slate-600 mt-3 line-clamp-2 leading-relaxed">
-          {job.descripcion.replace(/[*#_`-]/g, '')}
+          {stripMarkdownToPlainText(job.descripcion)}
         </p>
 
         {/* Tags */}

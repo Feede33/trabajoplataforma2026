@@ -201,3 +201,22 @@ export function getAiBadgeDetails(score: number): AiBadgeInfo {
     scoreColor: 'text-rose-700 dark:text-rose-300',
   }
 }
+
+/**
+ * Limpia encabezados y sintaxis Markdown para mostrar resúmenes limpios en tarjetas (JobCard, etc.)
+ */
+export function stripMarkdownToPlainText(markdown: string): string {
+  if (!markdown) return ''
+  return markdown
+    .replace(/\r\n/g, '\n')
+    // Eliminar líneas que son solo títulos Markdown (ej: "## Responsabilidades", "### Requisitos")
+    .replace(/^#{1,6}\s+[^\n]+\n?/gm, ' ')
+    // Convertir enlaces [texto](url) en solo texto
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Quitar marcadores de viñetas al inicio de línea
+    .replace(/^[-*•]\s+/gm, '')
+    // Quitar negritas, cursivas y código
+    .replace(/[*_#`~]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
