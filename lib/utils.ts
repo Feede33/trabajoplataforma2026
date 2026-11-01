@@ -209,12 +209,15 @@ export function stripMarkdownToPlainText(markdown: string): string {
   if (!markdown) return ''
   return markdown
     .replace(/\r\n/g, '\n')
+    .replace(/\\([.*#\-+_~()[\]])/g, '$1')
     // Eliminar líneas que son solo títulos Markdown (ej: "## Responsabilidades", "### Requisitos")
     .replace(/^#{1,6}\s+[^\n]+\n?/gm, ' ')
+    // Eliminar encabezados comunes en mayúsculas al inicio
+    .replace(/^(?:RESPONSABILIDADES PRINCIPALES|REQUISITOS DEL CARGO|OBJETIVOS DEL ROL|DESCRIPCI[OÓ]N DEL PUESTO)\s*\n?/gim, ' ')
     // Convertir enlaces [texto](url) en solo texto
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Quitar marcadores de viñetas al inicio de línea
-    .replace(/^[-*•]\s+/gm, '')
+    // Quitar marcadores de viñetas o numeración al inicio de línea
+    .replace(/^(?:[-*•–—]|\d+[.)])\s+/gm, '')
     // Quitar negritas, cursivas y código
     .replace(/[*_#`~]+/g, '')
     .replace(/\s+/g, ' ')
